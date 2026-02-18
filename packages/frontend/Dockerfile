@@ -16,6 +16,8 @@ COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
 COPY packages/frontend ./packages/frontend
 
+# Build shared first so dist/ exists for Vite's module resolution
+RUN yarn workspace @time-keeper/shared build
 RUN yarn workspace @time-keeper/frontend build
 
 # ---- Runtime stage ----
