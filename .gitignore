@@ -1,0 +1,29 @@
+# Yarn
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/sdks
+!.yarn/versions
+.pnp.*
+
+# Dependencies
+node_modules
+
+# Build output
+dist
+build
+
+# Environment
+.env
+*.env.local
+
+# SQLite (dev)
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+dev-data/
+
+# OS
+.DS_Store

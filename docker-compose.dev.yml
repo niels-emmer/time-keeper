@@ -1,0 +1,51 @@
+# Development overlay — use with:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+# Or run locally without Docker:
+#   yarn workspace @time-keeper/backend dev
+#   yarn workspace @time-keeper/frontend dev
+
+services:
+  # Skip oauth2-proxy in dev — backend reads DEV_USER_ID env var instead
+  oauth2-proxy:
+    profiles:
+      - disabled
+
+  frontend:
+    build: null
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "corepack enable && yarn workspace @time-keeper/frontend dev --host 0.0.0.0"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/packages/frontend/node_modules
+    ports:
+      - "5173:5173"
+    environment:
+      VITE_API_URL: "http://backend:3001"
+    depends_on:
+      - backend
+
+  backend:
+    build: null
+    image: node:22-alpine
+    working_dir: /app
+    command: sh -c "corepack enable && yarn workspace @time-keeper/backend dev"
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/packages/backend/node_modules
+      - ./dev-data:/data
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: development
+      PORT: "3001"
+      DATABASE_PATH: "/data/time-keeper.db"
+      DEV_USER_ID: "dev@localhost"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s

@@ -1,0 +1,69 @@
+services:
+
+  # Auth gate: validates OIDC with Authentik, sets X-Auth-Request-User header
+  oauth2-proxy:
+    image: quay.io/oauth2-proxy/oauth2-proxy:v7.6.0
+    restart: unless-stopped
+    environment:
+      OAUTH2_PROXY_PROVIDER: oidc
+      OAUTH2_PROXY_OIDC_ISSUER_URL: ${AUTHENTIK_ISSUER_URL}
+      OAUTH2_PROXY_CLIENT_ID: ${OAUTH2_CLIENT_ID}
+      OAUTH2_PROXY_CLIENT_SECRET: ${OAUTH2_CLIENT_SECRET}
+      OAUTH2_PROXY_COOKIE_SECRET: ${OAUTH2_COOKIE_SECRET}
+      OAUTH2_PROXY_COOKIE_SECURE: "true"
+      OAUTH2_PROXY_EMAIL_DOMAINS: "*"
+      OAUTH2_PROXY_UPSTREAMS: "http://frontend:80"
+      OAUTH2_PROXY_HTTP_ADDRESS: "0.0.0.0:4180"
+      # Skip auth for the health check endpoint
+      OAUTH2_PROXY_SKIP_AUTH_ROUTES: "^/api/health$"
+      # Forward user identity to upstream
+      OAUTH2_PROXY_SET_XAUTHREQUEST: "true"
+      OAUTH2_PROXY_PASS_ACCESS_TOKEN: "false"
+      OAUTH2_PROXY_REDIRECT_URL: "${APP_URL}/oauth2/callback"
+    ports:
+      - "4180:4180"
+    networks:
+      - app
+    depends_on:
+      - frontend
+
+  # Frontend: React SPA served by nginx, also proxies /api/* to backend
+  frontend:
+    build:
+      context: .
+      dockerfile: packages/frontend/Dockerfile
+    restart: unless-stopped
+    networks:
+      - app
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # Backend: Express API with SQLite
+  backend:
+    build:
+      context: .
+      dockerfile: packages/backend/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      DATABASE_PATH: "/data/time-keeper.db"
+    volumes:
+      - db-data:/data
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - app
+
+volumes:
+  db-data:
+    driver: local
+
+networks:
+  app:
+    driver: bridge
