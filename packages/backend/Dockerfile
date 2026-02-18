@@ -11,15 +11,15 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/backend/package.json ./packages/backend/
 COPY packages/frontend/package.json ./packages/frontend/
 
-# Install all workspace deps (needed to build shared)
+# Install all workspace deps
 RUN yarn install --frozen-lockfile
 
 COPY tsconfig.base.json ./
 COPY packages/shared ./packages/shared
 COPY packages/backend ./packages/backend
 
-# Build shared first, then backend
-RUN yarn workspace @time-keeper/shared tsc --noEmit || true
+# Build shared (emits to packages/shared/dist/), then backend
+RUN yarn workspace @time-keeper/shared build
 RUN yarn workspace @time-keeper/backend build
 
 # ---- Runtime stage ----
@@ -37,9 +37,9 @@ COPY packages/frontend/package.json ./packages/frontend/
 # Install only production deps
 RUN yarn workspaces focus @time-keeper/backend --production
 
-# Copy compiled output and migrations
+# Copy compiled output from builder
+COPY --from=builder /app/packages/shared/dist ./packages/shared/dist
 COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
-COPY --from=builder /app/packages/shared/src ./packages/shared/src
 COPY --from=builder /app/packages/backend/drizzle ./packages/backend/drizzle
 
 EXPOSE 3001
