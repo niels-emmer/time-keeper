@@ -63,7 +63,7 @@ The backend auth middleware (`packages/backend/src/middleware/auth.ts`) reads `X
    - Domain: `timekeeper.yourdomain.com`
    - Scheme: `http`
    - Forward Hostname/IP: `127.0.0.1`
-   - Forward Port: `8080`
+   - Forward Port: `38521`
    - Websockets: on (optional but harmless)
 3. **SSL tab:** request or select your cert, force SSL on
 4. **Advanced tab** — paste this custom nginx config:
