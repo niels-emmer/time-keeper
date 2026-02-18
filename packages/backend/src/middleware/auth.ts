@@ -9,13 +9,21 @@ declare global {
 }
 
 /**
- * Extract the authenticated user from the X-Auth-Request-User header set by oauth2-proxy.
- * In development, falls back to the DEV_USER_ID environment variable.
- * Returns 401 if no user can be determined.
+ * Extract the authenticated user from headers set by Authentik's proxy outpost.
+ *
+ * Authentik sets these headers on authenticated requests:
+ *   X-Forwarded-Email    — user's email address (used as userId)
+ *   X-Forwarded-User     — OIDC sub (UUID)
+ *   X-Forwarded-Preferred-Username — username
+ *
+ * We use X-Forwarded-Email as the stable userId.
+ *
+ * In development (NODE_ENV !== 'production'), falls back to the DEV_USER_ID env var.
+ * Returns 401 if no user can be determined in production.
  */
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   const user =
-    req.headers['x-auth-request-user'] as string | undefined ??
+    (req.headers['x-forwarded-email'] as string | undefined) ??
     (process.env.NODE_ENV !== 'production' ? process.env.DEV_USER_ID : undefined);
 
   if (!user) {
