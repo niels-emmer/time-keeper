@@ -2,24 +2,24 @@
 
 ## Service map
 
-| Service | Image | Port (internal) | Port (external) | Role |
-|---------|-------|-----------------|-----------------|------|
-| `oauth2-proxy` | `quay.io/oauth2-proxy/oauth2-proxy:v7.6.0` | 4180 | 4180 | Auth gate; entry point from SSL proxy |
-| `frontend` | Built from `packages/frontend/Dockerfile` | 80 | — | Serves React SPA, proxies `/api/*` to backend |
-| `backend` | Built from `packages/backend/Dockerfile` | 3001 | — | Express API + SQLite |
+| Service | Image | Port (internal) | Port (host) | Role |
+|---------|-------|-----------------|-------------|------|
+| `frontend` | Built from `packages/frontend/Dockerfile` | 80 | `127.0.0.1:38521` | Serves React SPA, proxies `/api/*` to backend |
+| `backend` | Built from `packages/backend/Dockerfile` | 3001 | — (internal only) | Express API + SQLite |
+
+Auth is not a Docker service — it is handled by Authentik's embedded outpost running inside your existing Authentik stack, integrated via NPM forward auth.
 
 ## Network layout
 
-All services are on the `app` bridge network. Only `oauth2-proxy` exposes a port to the host (4180). Your SSL terminator (nginx/caddy on the host) proxies to `localhost:4180`.
+Both services are on the `app` bridge network. Only the frontend exposes a port to the host (`127.0.0.1:38521`). NPM proxies to this port after the Authentik auth check passes.
 
 ```
 Host machine:
-  [your SSL proxy] → localhost:4180 (oauth2-proxy)
+  NPM (SSL) → Authentik outpost (auth check) → localhost:38521 (frontend)
 
 Docker network (app):
-  oauth2-proxy → frontend:80 (nginx)
-                     ↓ /api/*
-                 backend:3001 (Express)
+  frontend:80 (nginx)
+      └── /api/* → backend:3001 (Express)
 ```
 
 ## Volumes
@@ -32,21 +32,23 @@ Docker network (app):
 
 ## Build contexts
 
-Both Dockerfiles use the **repo root** as the build context (`.`), not the package directory. This is required because:
-- The backend Dockerfile needs to copy `packages/shared/` to build shared types
-- The frontend Dockerfile needs `packages/shared/` for the API type imports
+Both Dockerfiles use the **repo root** as the build context (`.`). This is required because both need `packages/shared/` — the shared TypeScript types and utilities package. The build process compiles `shared` first, then the target package.
 
 ## Environment variables
 
-All variables are defined in `.env` (gitignored). See `.env.example` for the full list.
+There are no required environment variables for production. Auth is handled externally by Authentik and NPM.
 
-In development, only `DEV_USER_ID` is needed (no OAuth2 variables required).
+For development only:
+
+| Variable | Purpose |
+|----------|---------|
+| `DEV_USER_ID` | Email address to use as the user identity in dev mode (bypasses auth) |
 
 ## Compose files
 
 | File | Purpose |
 |------|---------|
-| `docker-compose.yml` | Production configuration |
+| `docker-compose.yml` | Production |
 | `docker-compose.dev.yml` | Development overlay (hot reload, no auth) |
 
 To run in development:
@@ -54,6 +56,10 @@ To run in development:
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
-## Health checks
+## Health check
 
-The backend exposes `GET /api/health` which returns `{"status":"ok","version":"0.1.0"}`. This is excluded from oauth2-proxy authentication so Docker can poll it without credentials. The frontend depends on the backend being healthy before starting.
+The backend exposes `GET /api/health` → `{"status":"ok","version":"0.1.0"}`. The frontend container waits for this to return healthy before starting. It is also useful for manual verification:
+
+```bash
+docker compose exec backend wget -qO- http://localhost:3001/api/health
+```

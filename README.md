@@ -1,14 +1,16 @@
 # Time Keeper
 
-A personal work-timer PWA for tracking time across Workday categories. Runs on macOS (installable from Safari/Chrome) and Android (installable from Chrome). Hosted in Docker on a private VPS, behind an SSL reverse proxy with Authentik authentication.
+A self-hosted personal work-timer PWA. Track time against named categories from any device, view weekly summaries, and copy them into Workday (or any time registration tool) with one click.
+
+Runs as a PWA — installs to the macOS Dock and Android home screen with no app store required.
 
 ## Features
 
-- **One-tap timer start** — tap a category to start tracking, tap Stop to finish
-- **Auto-stop** — starting a new category stops the previous one automatically
-- **Weekly overview** — see time per category per day, copy to clipboard for Workday
-- **End-of-day rounding** — round minutes up to whole hours (capped at 40h/week)
-- **PWA** — installs on macOS Dock and Android home screen, works in standalone mode
+- **One-tap timer** — tap a category to start, tap Stop to finish; starting a new category auto-stops the previous one
+- **Weekly overview** — time per category per day, copy to clipboard in a format ready to paste into your time registration tool
+- **End-of-day rounding** — round tracked minutes up to whole hours, capped at 40h/week
+- **PWA** — installable on macOS and Android, runs in standalone mode (no browser chrome)
+- **Self-hosted** — runs in Docker, no external services or accounts required beyond your own Authentik instance
 
 ## Tech stack
 
@@ -17,50 +19,60 @@ A personal work-timer PWA for tracking time across Workday categories. Runs on m
 | Frontend | React 18 + Vite + Tailwind CSS + shadcn/ui |
 | Backend | Node.js 22 + Express + Drizzle ORM |
 | Database | SQLite (better-sqlite3, WAL mode) |
-| Auth | oauth2-proxy → Authentik (OIDC) |
+| Auth | Authentik embedded outpost via Nginx Proxy Manager forward auth |
 | Container | Docker Compose |
 
-## Local development
+## Prerequisites
 
-### Prerequisites
-- Node.js 22+
-- Yarn 4 (`corepack enable`)
-- Docker (optional, for full-stack testing)
+- Docker Engine 24+ with Docker Compose v2
+- An [Authentik](https://goauthentik.io) instance
+- [Nginx Proxy Manager](https://nginxproxymanager.com) (or another reverse proxy with forward auth support)
+- A domain name with SSL
 
-### Run without Docker
+## Quick start (local development)
 
 ```bash
-# Install dependencies
+# 1. Install dependencies (requires Node 22+ and Yarn 4 via corepack)
+corepack enable
 yarn install
 
-# Terminal 1 — backend (API on :3001)
-DEV_USER_ID=dev@localhost yarn workspace @time-keeper/backend dev
+# 2. Start the backend (Terminal 1)
+DEV_USER_ID=you@example.com yarn workspace @time-keeper/backend dev
 
-# Terminal 2 — frontend (Vite dev server on :5173)
+# 3. Start the frontend (Terminal 2)
 yarn workspace @time-keeper/frontend dev
 ```
 
-Open http://localhost:5173. No auth is required in dev mode.
-
-### Run with Docker (dev)
-
-```bash
-cp .env.example .env
-# Edit .env if needed (DEV_USER_ID is set automatically in dev compose)
-
-docker compose -f docker-compose.yml -f docker-compose.dev.yml up
-```
+Open http://localhost:5173. Auth is bypassed in dev mode — all data is stored under the `DEV_USER_ID` value.
 
 ## Deployment
 
-See [docs/operations/deployment.md](docs/operations/deployment.md) for VPS deployment steps including SSL proxy configuration and Authentik setup.
+See [docs/operations/deployment.md](docs/operations/deployment.md) for the full guide, including:
+- Docker Compose setup
+- Nginx Proxy Manager configuration
+- Authentik provider and outpost setup
+
+The short version:
+1. Clone the repo on your VPS
+2. `docker compose up -d --build`
+3. Create a **Proxy Provider** in Authentik (forward auth mode, external host = your domain)
+4. Add it to your existing proxy outpost
+5. Add a proxy host in NPM pointing to `localhost:38521` with the standard Authentik forward auth Advanced config
 
 ## Documentation
 
 | Path | Contents |
 |------|----------|
 | [AGENTS.md](AGENTS.md) | Entry point for AI coding agents |
-| [docs/memory/INDEX.md](docs/memory/INDEX.md) | Architectural memory index |
-| [docs/integration/auth.md](docs/integration/auth.md) | oauth2-proxy + Authentik wiring |
+| [docs/memory/INDEX.md](docs/memory/INDEX.md) | Architecture overview and session guide |
+| [docs/integration/auth.md](docs/integration/auth.md) | Authentik + NPM wiring |
 | [docs/integration/docker.md](docs/integration/docker.md) | Docker services and volumes |
+| [docs/integration/pwa.md](docs/integration/pwa.md) | Installing on macOS and Android |
 | [docs/operations/deployment.md](docs/operations/deployment.md) | Production deployment guide |
+| [docs/operations/runbooks.md](docs/operations/runbooks.md) | Common break/fix procedures |
+
+## Customising categories
+
+Categories are managed in the app itself (Settings tab). Add one category per booking type you want to track. The optional "Workday code" field appears in the weekly copy output.
+
+There is no multi-user support — this is intentionally a single-user personal tool.
