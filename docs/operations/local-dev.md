@@ -28,13 +28,12 @@ No OAuth2 / Authentik needed. The backend uses `DEV_USER_ID` as the user identit
 ## Option B: Run with Docker Compose (dev mode)
 
 ```bash
-cp .env.example .env
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
 - Frontend: http://localhost:5173
 - Backend: http://localhost:3001
-- No oauth2-proxy in dev mode
+- No auth in dev mode — backend reads `DEV_USER_ID=dev@localhost` from the dev compose overlay
 
 ## Database
 

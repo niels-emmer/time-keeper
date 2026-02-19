@@ -9,7 +9,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 - One active timer at a time per user
 - Daily target: 8h average, weekly: 40h
 - End-of-day rounding: minutes → whole hours (cap at 40h/week)
-- Auth: Authentik via oauth2-proxy sidecar (no auth code in the app)
+- Auth: Authentik embedded outpost via NPM forward auth (no auth code in the app)
 
 ## Critical files
 
@@ -17,9 +17,9 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 |------|---------------|
 | `packages/backend/src/db/schema.ts` | All data types flow from here |
 | `packages/shared/src/utils/rounding.ts` | Core business logic — the rounding algorithm |
-| `packages/backend/src/middleware/auth.ts` | Auth boundary — reads `X-Auth-Request-User` header |
+| `packages/backend/src/middleware/auth.ts` | Auth boundary — reads `X-authentik-email` header |
 | `packages/frontend/src/components/CategoryGrid.tsx` | Primary UX surface |
-| `docker-compose.yml` | Service wiring; nginx must pass `X-Auth-Request-User` |
+| `docker-compose.yml` | Service wiring; nginx must pass `X-authentik-email` |
 | `packages/backend/drizzle/` | Migration SQL files — committed, run on startup |
 
 ## Task routing

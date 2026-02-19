@@ -5,11 +5,7 @@
 #   yarn workspace @time-keeper/frontend dev
 
 services:
-  # Skip oauth2-proxy in dev — backend reads DEV_USER_ID env var instead
-  oauth2-proxy:
-    profiles:
-      - disabled
-
+  # Auth is skipped in dev — backend reads DEV_USER_ID env var instead of X-authentik-email
   frontend:
     build: null
     image: node:22-alpine

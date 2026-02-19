@@ -2,7 +2,7 @@ services:
 
   # Frontend: React SPA served by nginx, proxies /api/* to backend
   # Auth is handled upstream by Authentik's proxy outpost via NPM forward auth.
-  # Authentik sets X-Forwarded-Email on authenticated requests; nginx passes it to the backend.
+  # Authentik sets X-authentik-email on authenticated requests; nginx passes it to the backend.
   frontend:
     build:
       context: .

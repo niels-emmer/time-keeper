@@ -36,17 +36,17 @@ Then refresh the app.
 
 ---
 
-## RB-003: oauth2-proxy redirect loop
+## RB-003: Authentik redirect loop after login
 
-**Symptom:** Browser keeps redirecting through the Authentik login page without stopping.
+**Symptom:** Browser keeps cycling through the Authentik login page without reaching the app.
 
-**Cause:** Usually a mismatch between `APP_URL` in `.env` and the redirect URI registered in Authentik.
+**Cause:** Usually a mismatch between the Proxy Provider's **External host** and the domain NPM is serving.
 
 **Fix:**
-1. In `.env`, verify `APP_URL` matches the redirect URI in Authentik exactly (protocol, hostname, no trailing slash).
-2. In Authentik, verify the redirect URI is `${APP_URL}/oauth2/callback`.
-3. Regenerate `OAUTH2_COOKIE_SECRET` if the cookie is corrupted: `openssl rand -base64 32`.
-4. Restart oauth2-proxy: `docker compose restart oauth2-proxy`.
+1. In Authentik Admin → Applications → Providers → `time-keeper`: verify **External host** matches the domain exactly, including `https://` and no trailing slash.
+2. In NPM, verify the proxy host domain matches the External host above.
+3. Confirm the outpost has been saved after adding the application (it reconfigures within seconds).
+4. If the loop started after a domain change: update the External host in Authentik, save, and hard-refresh the browser to clear the Authentik session cookie.
 
 ---
 

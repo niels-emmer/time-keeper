@@ -26,16 +26,27 @@ Drizzle + better-sqlite3 was chosen over Prisma because:
 - Mobile-first design aligns well with the Android + macOS target
 - Tailwind v3 chosen over v4: v4 ecosystem still maturing as of project start
 
-## D-003: oauth2-proxy sidecar for authentication
+## D-003: No auth code in the application
 
 **Date:** 2026-02
-**Status:** Accepted
+**Status:** Accepted (implementation changed — see D-007)
 
-Instead of implementing OIDC in the Express backend:
-- oauth2-proxy handles all token validation, session cookies, and OIDC flows
-- The backend only reads an HTTP header — zero auth complexity in the app code
-- Auth is enforced at the network level, not inside application logic
-- Makes the backend trivially testable without a running Authentik instance
+The backend never validates tokens, manages sessions, or contacts an identity provider. Auth is enforced at the network/proxy level. The backend only reads a trusted HTTP header set by the upstream proxy. This keeps auth complexity out of the app and makes it testable without a running IdP.
+
+## D-007: Authentik embedded outpost via NPM forward auth (replaces oauth2-proxy)
+
+**Date:** 2026-02
+**Status:** Accepted — supersedes original D-003 implementation
+
+Initially planned as an oauth2-proxy sidecar. Changed during deployment when it became clear the target VPS already ran Authentik with an embedded proxy outpost, making oauth2-proxy redundant.
+
+Authentik's embedded outpost integrates directly with Nginx Proxy Manager via the standard forward auth template. It sets `X-authentik-email` (and other `X-authentik-*` headers) on authenticated requests. NPM proxies to `localhost:38521` (frontend) only after the auth check passes.
+
+Benefits over oauth2-proxy sidecar:
+- No OIDC client ID/secret to manage in the codebase — zero secrets in the repo
+- No additional Docker service — auth runs entirely in the existing Authentik stack
+- Reuses the same NPM proxy template already protecting other apps on the VPS
+- The nginx `proxy_set_header` pattern is identical to all other Authentik-protected apps
 
 ## D-004: user_id denormalized into all tables
 

@@ -16,7 +16,7 @@ export function createApp() {
 
   app.use(express.json());
 
-  // Health check — no auth required (oauth2-proxy skips this route)
+  // Health check — no auth required (used by Docker healthcheck and manual verification)
   app.get('/api/health', (_req, res) => {
     res.json({ status: 'ok', version: '0.1.0' });
   });

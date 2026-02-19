@@ -15,7 +15,7 @@ This file is the entry point for AI coding agents working in this repository.
 | Package manager | Yarn 4 (workspaces) |
 | Backend | Node.js + Express + Drizzle ORM + SQLite |
 | Frontend | React + Vite + Tailwind + shadcn/ui |
-| Auth | oauth2-proxy sidecar (OIDC via Authentik) |
+| Auth | Authentik embedded outpost via NPM forward auth (reads `X-authentik-email`) |
 | Container | Docker Compose |
 
 ## Workspace commands
