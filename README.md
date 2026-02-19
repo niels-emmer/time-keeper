@@ -64,7 +64,7 @@ The short version:
 2. `docker compose up -d --build`
 3. Create a **Proxy Provider** in Authentik (forward auth mode, external host = your domain)
 4. Add it to your existing proxy outpost
-5. Add a proxy host in NPM pointing to `localhost:38521` with the standard Authentik forward auth Advanced config
+5. Add a proxy host in NPM pointing to `192.168.x.x:38521` (your server's LAN IP) with the standard Authentik forward auth Advanced config
 
 ## Documentation
 
@@ -82,7 +82,11 @@ The short version:
 
 Categories are managed in the app itself (Settings tab). Add one category per booking type you want to track. The optional "Workday code" field appears in the weekly copy output.
 
-There is no multi-user support — this is intentionally a single-user personal tool.
+## Multi-user support
+
+The app is multi-user capable out of the box. Each user's data is fully isolated by the email address Authentik sets in the `X-authentik-email` header — no configuration required. Add users to your Authentik application and they each get their own independent set of categories and time entries.
+
+There is no shared data, cross-user reporting, or admin interface — each user only ever sees their own data.
 
 ## Attribution
 
