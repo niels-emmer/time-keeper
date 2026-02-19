@@ -1,6 +1,8 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { Timer, BarChart2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useWeeklySummary } from '@/hooks/useSummary';
+import { useTimer } from '@/hooks/useTimer';
 
 const navItems = [
   { to: '/', icon: Timer, label: 'Track' },
@@ -26,6 +28,37 @@ function TimekeeperLogo({ className }: { className?: string }) {
   );
 }
 
+function formatHHMM(totalMinutes: number): string {
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+function WeeklyProgress() {
+  const { data: summary } = useWeeklySummary();
+  const { data: timerData } = useTimer();
+
+  // Base: completed minutes from the weekly summary (excludes the running timer)
+  const completedMinutes = summary?.totalMinutes ?? 0;
+
+  // Add live elapsed minutes from the running timer (timer polls every 5s)
+  const activeElapsedMinutes =
+    timerData?.active && timerData.entry?.startTime
+      ? Math.floor((Date.now() - new Date(timerData.entry.startTime).getTime()) / 60000)
+      : 0;
+
+  const totalMinutes = completedMinutes + activeElapsedMinutes;
+
+  if (!summary) return null;
+
+  return (
+    <span className="font-mono text-sm tabular-nums text-muted-foreground">
+      {formatHHMM(totalMinutes)}
+      <span className="text-muted-foreground/50"> / 40</span>
+    </span>
+  );
+}
+
 export function Layout() {
   return (
     <div className="flex min-h-screen flex-col">
@@ -34,6 +67,9 @@ export function Layout() {
         <div className="flex items-center gap-2">
           <TimekeeperLogo className="h-7 w-7 shrink-0" />
           <h1 className="text-base font-bold tracking-tight">Time Keeper</h1>
+          <div className="ml-auto">
+            <WeeklyProgress />
+          </div>
         </div>
       </header>
 
