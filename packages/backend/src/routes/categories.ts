@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, asc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { categories } from '../db/schema.js';
@@ -20,12 +20,21 @@ const updateSchema = z.object({
   sortOrder: z.number().int().optional(),
 });
 
+const reorderSchema = z.array(
+  z.object({
+    id: z.number().int(),
+    sortOrder: z.number().int(),
+  })
+);
+
+// List — ordered by sort_order ascending
 categoriesRouter.get('/', (req, res, next) => {
   try {
     const rows = db
       .select()
       .from(categories)
       .where(eq(categories.userId, req.userId))
+      .orderBy(asc(categories.sortOrder))
       .all();
     res.json(rows);
   } catch (err) {
@@ -33,13 +42,23 @@ categoriesRouter.get('/', (req, res, next) => {
   }
 });
 
+// Create — assign next sort_order value
 categoriesRouter.post('/', (req, res, next) => {
   try {
     const body = createSchema.parse(req.body);
     const now = new Date().toISOString();
+
+    // Place new category at the end of the list
+    const maxRow = db
+      .select({ maxOrder: sql<number>`COALESCE(MAX(sort_order), -1)` })
+      .from(categories)
+      .where(eq(categories.userId, req.userId))
+      .get();
+    const nextOrder = (maxRow?.maxOrder ?? -1) + 1;
+
     const result = db
       .insert(categories)
-      .values({ userId: req.userId, ...body, createdAt: now, updatedAt: now })
+      .values({ userId: req.userId, ...body, sortOrder: nextOrder, createdAt: now, updatedAt: now })
       .returning()
       .get();
     res.status(201).json(result);
@@ -48,6 +67,7 @@ categoriesRouter.post('/', (req, res, next) => {
   }
 });
 
+// Update a single category
 categoriesRouter.put('/:id', (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);
@@ -70,6 +90,27 @@ categoriesRouter.put('/:id', (req, res, next) => {
   }
 });
 
+// Bulk reorder — accepts [{ id, sortOrder }, ...]; runs in a transaction
+categoriesRouter.patch('/reorder', (req, res, next) => {
+  try {
+    const items = reorderSchema.parse(req.body);
+
+    db.transaction(() => {
+      for (const { id, sortOrder } of items) {
+        db.update(categories)
+          .set({ sortOrder, updatedAt: new Date().toISOString() })
+          .where(and(eq(categories.id, id), eq(categories.userId, req.userId)))
+          .run();
+      }
+    });
+
+    res.status(204).end();
+  } catch (err) {
+    next(err);
+  }
+});
+
+// Delete a category
 categoriesRouter.delete('/:id', (req, res, next) => {
   try {
     const id = parseInt(req.params.id, 10);

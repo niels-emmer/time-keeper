@@ -33,3 +33,13 @@ export function useDeleteCategory() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['categories'] }),
   });
 }
+
+export function useReorderCategories() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (items: { id: number; sortOrder: number }[]) => api.categories.reorder(items),
+    // Optimistic update is applied by the caller via setQueryData;
+    // revalidate on settle to confirm the server state.
+    onSettled: () => qc.invalidateQueries({ queryKey: ['categories'] }),
+  });
+}

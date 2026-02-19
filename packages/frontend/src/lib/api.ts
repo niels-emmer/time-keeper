@@ -32,6 +32,8 @@ export const api = {
       request<Category>(`/categories/${id}`, { method: 'PUT', body: JSON.stringify(dto) }),
     delete: (id: number) =>
       request<void>(`/categories/${id}`, { method: 'DELETE' }),
+    reorder: (items: { id: number; sortOrder: number }[]) =>
+      request<void>('/categories/reorder', { method: 'PATCH', body: JSON.stringify(items) }),
   },
 
   timer: {
