@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Time-keeper maskable icon">
+  <!-- Full-bleed background -->
+  <rect x="0" y="0" width="512" height="512" rx="112" fill="#0B1220"/>
+  <!-- Safe-zone artwork (centered ~72% area) -->
+  <g transform="translate(256 256) scale(6.5) translate(-32 -32)">
+    <circle cx="32" cy="32" r="18" fill="none" stroke="#17D4FF" stroke-width="6"/>
+    <line x1="32" y1="32" x2="32" y2="21" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+    <line x1="32" y1="32" x2="44" y2="32" stroke="#FFFFFF" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="32" cy="32" r="4.5" fill="#FFFFFF"/>
+    <path d="M22 41 L28.5 47.5 L42 34" fill="none" stroke="#7CFF6B" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>
