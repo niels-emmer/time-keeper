@@ -10,6 +10,10 @@ import { summaryRouter } from './routes/summary.js';
 export function createApp() {
   const app = express();
 
+  // Trust the reverse proxy chain (nginx → NPM → Authentik outpost)
+  // Required for express-rate-limit to correctly read X-Forwarded-For
+  app.set('trust proxy', 1);
+
   app.use(express.json());
 
   // Health check — no auth required (oauth2-proxy skips this route)
