@@ -47,6 +47,15 @@ export function ActiveTimer({ entry, categoryName, categoryColor }: Props) {
     };
   }, [entry.startTime]);
 
+  // ── Document title: reflect running timer in the tab/window title ─────────
+  useEffect(() => {
+    const timeStr = formatElapsed(elapsed);
+    document.title = `${timeStr} · ${categoryName} – Time Keeper`;
+    return () => {
+      document.title = 'Time Keeper';
+    };
+  }, [elapsed, categoryName]);
+
   // ── Notifications: tell SW to own the notification lifecycle ─────────────
   useEffect(() => {
     // Ask for permission lazily (first time the timer appears)
