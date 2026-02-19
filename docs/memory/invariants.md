@@ -8,11 +8,11 @@ These rules must never be broken. Before making architectural changes, verify th
 
 The backend **never** validates JWT tokens, never imports a JWT library, and never contacts Authentik directly. Authentik's proxy outpost handles all auth flows and sets identity headers on authenticated requests.
 
-The backend only reads the `X-Forwarded-Email` header that the outpost sets.
+The backend only reads the `X-authentik-email` header that the outpost sets.
 
 ## I-002: Missing auth header = 401 in production
 
-If `X-Forwarded-Email` is absent and `NODE_ENV=production`, the auth middleware **must** return 401. There is no fallback user in production. This is enforced in `packages/backend/src/middleware/auth.ts`.
+If `X-authentik-email` is absent and `NODE_ENV=production`, the auth middleware **must** return 401. There is no fallback user in production. This is enforced in `packages/backend/src/middleware/auth.ts`.
 
 The `DEV_USER_ID` fallback is only active when `NODE_ENV !== 'production'`.
 
@@ -32,15 +32,20 @@ The entire application state lives in a single SQLite file at `DATABASE_PATH` (d
 
 The `computeRounding()` function in `packages/shared/src/utils/rounding.ts` must never produce a result where `weekMinutesSoFar + dayRoundedTotal > 2400`. The cap logic is there to enforce this. Do not bypass it.
 
-## I-007: nginx must forward the auth header
+## I-007: nginx must forward the auth headers
 
-The frontend nginx container proxies `/api/*` to the backend. It must pass the identity header from Authentik's outpost through:
+The frontend nginx container proxies `/api/*` to the backend. It must pass the identity headers from Authentik's embedded outpost through:
 
 ```nginx
-proxy_set_header X-Forwarded-Email $http_x_forwarded_email;
+proxy_set_header X-authentik-email $http_x_authentik_email;
+proxy_set_header X-authentik-username $http_x_authentik_username;
+proxy_set_header X-authentik-uid $http_x_authentik_uid;
 ```
 
-This is in `packages/frontend/nginx.conf`. Never remove this line.
+This is in `packages/frontend/nginx.conf`. Never remove these lines.
+
+Note: Authentik's embedded outpost uses `X-authentik-*` headers (lowercase, hyphenated).
+This is set in the NPM proxy template and differs from the standalone outpost's `X-Forwarded-*` headers.
 
 ## I-008: No users table
 
