@@ -7,6 +7,9 @@ export function Home() {
   const { data: timerStatus } = useTimer();
   const { data: categories = [] } = useCategories();
 
+  // The SW owns the notification lifecycle and polls /api/timer independently.
+  // No page-side notification management needed here.
+
   const activeEntry = timerStatus?.active ? timerStatus.entry : undefined;
   const activeCategory = activeEntry
     ? categories.find((c) => c.id === activeEntry.categoryId)

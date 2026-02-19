@@ -70,3 +70,13 @@ Fix:
 - Updated `nginx.conf` to forward `X-authentik-*` headers (not `X-Forwarded-*`)
 - Updated `invariants.md` and all docs to reference the correct header name
 Learning: Authentik's **embedded outpost** sets `X-authentik-*` headers. Authentik's **standalone outpost** and generic oauth2-proxy set `X-Forwarded-*` headers. These are different. Always verify which outpost type you're using and check the actual NPM Advanced config to see which headers are being set.
+
+---
+
+## INC-006: 502 Bad Gateway — NPM cannot reach frontend via LAN IP
+
+Date: 2026-02-19
+Symptom: App returned 502 after rebuild. `curl http://127.0.0.1:38521/api/health` worked fine from the host. `wget http://backend:3001/api/health` worked from inside the frontend container.
+Root cause: `docker-compose.yml` bound the frontend port to `127.0.0.1:38521` (loopback only). NPM runs in Docker and reaches services via the server's LAN IP (192.168.101.252), not loopback — so it could never connect.
+Fix: Changed port binding from `"127.0.0.1:38521:80"` to `"38521:80"` in `docker-compose.yml`. Updated NPM proxy host to use `192.168.101.252:38521`.
+Learning: When NPM (or any Docker-based reverse proxy) accesses services by LAN IP, the target port must be bound to `0.0.0.0` (all interfaces), not `127.0.0.1`. Use `"PORT:PORT"` not `"127.0.0.1:PORT:PORT"` in docker-compose.yml for services that NPM needs to reach.
