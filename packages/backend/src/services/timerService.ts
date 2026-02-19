@@ -26,7 +26,7 @@ export function startTimer(userId: string, categoryId: number) {
   if (active) {
     db.update(timeEntries)
       .set({ endTime: now, updatedAt: now })
-      .where(eq(timeEntries.id, active.id))
+      .where(and(eq(timeEntries.id, active.id), eq(timeEntries.userId, userId)))
       .run();
   }
 
@@ -51,7 +51,7 @@ export function stopTimer(userId: string) {
   const result = db
     .update(timeEntries)
     .set({ endTime: now, updatedAt: now })
-    .where(eq(timeEntries.id, active.id))
+    .where(and(eq(timeEntries.id, active.id), eq(timeEntries.userId, userId)))
     .returning()
     .get();
 

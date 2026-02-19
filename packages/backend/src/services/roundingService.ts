@@ -1,4 +1,4 @@
-import { eq, and, gte, lte, isNotNull, eq as drizzleEq } from 'drizzle-orm';
+import { eq, and, gte, lte, isNotNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { timeEntries, categories } from '../db/schema.js';
 import { computeRounding } from '@time-keeper/shared';
@@ -72,7 +72,7 @@ export function applyRounding(userId: string, date: string): RoundingResult {
     if (delta === 0) {
       // Still mark as rounded so we don't re-process
       for (const e of entries) {
-        db.update(timeEntries).set({ rounded: true, updatedAt: now }).where(eq(timeEntries.id, e.id)).run();
+        db.update(timeEntries).set({ rounded: true, updatedAt: now }).where(and(eq(timeEntries.id, e.id), eq(timeEntries.userId, userId))).run();
       }
       continue;
     }
@@ -91,13 +91,13 @@ export function applyRounding(userId: string, date: string): RoundingResult {
 
     db.update(timeEntries)
       .set({ endTime: newEndTime.toISOString(), rounded: true, updatedAt: now })
-      .where(eq(timeEntries.id, lastEntry.id))
+      .where(and(eq(timeEntries.id, lastEntry.id), eq(timeEntries.userId, userId)))
       .run();
 
     // Mark all other entries in this category as rounded (no time change)
     for (const e of entries) {
       if (e.id !== lastEntry.id) {
-        db.update(timeEntries).set({ rounded: true, updatedAt: now }).where(eq(timeEntries.id, e.id)).run();
+        db.update(timeEntries).set({ rounded: true, updatedAt: now }).where(and(eq(timeEntries.id, e.id), eq(timeEntries.userId, userId))).run();
       }
     }
 
