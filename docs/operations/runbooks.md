@@ -60,7 +60,8 @@ Then refresh the app.
 
 **Fix (force):**
 - Android Chrome: Open app → three-dot menu → "Clear data" → re-install
-- macOS: In Chrome, navigate to `chrome://serviceworker-internals`, find the app's worker, click "Unregister"
+- macOS Chrome: Navigate to `chrome://serviceworker-internals`, find the app's worker, click "Unregister", then reload
+- macOS Safari: **Cmd+Shift+R** for a hard refresh; or Develop menu → Empty Caches, then reload. Enable the Develop menu via Settings → Advanced → "Show features for web developers"
 
 **Fix (developer — prevent this):** Ensure the `vite build` output has content-hashed filenames (default behavior). If filenames are not changing, the service worker won't detect updates.
 

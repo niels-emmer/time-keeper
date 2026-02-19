@@ -35,6 +35,26 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | Understand Docker layout | `docs/integration/docker.md` |
 | Fix a recurring incident | `docs/memory/incidents.md` |
 
+## API routes
+
+| Route | Auth | Notes |
+|-------|------|-------|
+| `GET /api/health` | No | Docker healthcheck |
+| `GET /api/info` | Yes | Version, repo URL, current user — drives Settings → About |
+| `GET /api/categories` | Yes | List user's categories |
+| `GET /api/timer` | Yes | Active timer status |
+| `POST /api/timer/start` | Yes | Start timer |
+| `POST /api/timer/stop` | Yes | Stop timer |
+| `GET /api/entries` | Yes | Time entries by date/week |
+| `GET /api/summary/weekly` | Yes | Weekly summary |
+| `POST /api/summary/round` | Yes | Apply end-of-day rounding |
+
+## Deploy command
+
+```bash
+APP_VERSION=$(git describe --tags --abbrev=0) docker compose up -d --build
+```
+
 ## Read next
 
 - [invariants.md](invariants.md) — rules that must never be broken

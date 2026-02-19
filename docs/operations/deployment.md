@@ -19,11 +19,11 @@ cd /opt/time-keeper
 No `.env` file is needed — there are no secrets to configure. Auth is handled entirely by Authentik and NPM.
 
 ```bash
-docker compose up -d --build
+APP_VERSION=$(git describe --tags --abbrev=0) docker compose up -d --build
 ```
 
 This starts two containers:
-- `frontend` — nginx serving the React SPA, proxies `/api/*` to the backend, bound to `localhost:38521`
+- `frontend` — nginx serving the React SPA, proxies `/api/*` to the backend, bound on all interfaces at port `38521`
 - `backend` — Express API with SQLite, on the internal Docker network only
 
 Verify they're running:
@@ -45,7 +45,7 @@ See [docs/integration/auth.md](../integration/auth.md) for the full walkthrough.
 ## Step 4: Configure Nginx Proxy Manager
 
 Add a proxy host:
-- **Forward to:** `127.0.0.1:38521`
+- **Forward to:** `192.168.x.x:38521` (your server's LAN IP — use `ip a` to find it; do **not** use `127.0.0.1` if NPM runs in Docker)
 - **SSL:** enabled, force HTTPS
 - **Advanced tab:** paste the standard Authentik NPM forward auth template (same block you use for other protected apps)
 
@@ -60,10 +60,10 @@ Open `https://timekeeper.yourdomain.com` in a browser. You should be redirected 
 ```bash
 cd /opt/time-keeper
 git pull
-docker compose up -d --build
+APP_VERSION=$(git describe --tags --abbrev=0) docker compose up -d --build
 ```
 
-Docker rebuilds only changed layers. The SQLite database is preserved in the `db-data` volume.
+The `APP_VERSION` variable bakes the latest git tag into the backend image so the Settings → About section shows the correct version. Docker rebuilds only changed layers. The SQLite database is preserved in the `db-data` volume.
 
 ## Backup
 

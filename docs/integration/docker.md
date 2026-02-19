@@ -4,23 +4,24 @@
 
 | Service | Image | Port (internal) | Port (host) | Role |
 |---------|-------|-----------------|-------------|------|
-| `frontend` | Built from `packages/frontend/Dockerfile` | 80 | `127.0.0.1:38521` | Serves React SPA, proxies `/api/*` to backend |
+| `frontend` | Built from `packages/frontend/Dockerfile` | 80 | `0.0.0.0:38521` | Serves React SPA, proxies `/api/*` to backend |
 | `backend` | Built from `packages/backend/Dockerfile` | 3001 | — (internal only) | Express API + SQLite |
 
 Auth is not a Docker service — it is handled by Authentik's embedded outpost running inside your existing Authentik stack, integrated via NPM forward auth.
 
 ## Network layout
 
-Both services are on the `app` bridge network. Only the frontend exposes a port to the host (`127.0.0.1:38521`). NPM proxies to this port after the Authentik auth check passes.
+Both services are on the `app` bridge network. The frontend exposes port `38521` on all interfaces (`0.0.0.0`) so NPM can reach it via the server's LAN IP. NPM proxies to this port after the Authentik auth check passes.
 
 ```
-Host machine:
-  NPM (SSL) → Authentik outpost (auth check) → localhost:38521 (frontend)
+Internet → NPM (SSL, LAN IP:38521) → Authentik outpost (auth check) → 192.168.x.x:38521 (frontend)
 
 Docker network (app):
   frontend:80 (nginx)
       └── /api/* → backend:3001 (Express)
 ```
+
+> **Note:** Do not use `127.0.0.1:38521` in NPM if NPM itself runs in Docker — it will resolve to NPM's own loopback, not the host. Use the server's LAN IP instead.
 
 ## Volumes
 
@@ -36,13 +37,15 @@ Both Dockerfiles use the **repo root** as the build context (`.`). This is requi
 
 ## Environment variables
 
-There are no required environment variables for production. Auth is handled externally by Authentik and NPM.
+| Variable | Set by | Purpose |
+|----------|--------|---------|
+| `APP_VERSION` | Build arg (`--build-arg APP_VERSION=...`) | Git tag baked into the backend image; served by `GET /api/info` and shown in Settings → About. Falls back to `"dev"` if not set. |
+| `DEV_USER_ID` | Shell env (dev only) | Email address to use as the user identity in dev mode (bypasses auth) |
 
-For development only:
-
-| Variable | Purpose |
-|----------|---------|
-| `DEV_USER_ID` | Email address to use as the user identity in dev mode (bypasses auth) |
+Pass `APP_VERSION` at build time:
+```bash
+APP_VERSION=$(git describe --tags --abbrev=0) docker compose up -d --build
+```
 
 ## Compose files
 
@@ -56,10 +59,19 @@ To run in development:
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
-## Health check
+## API endpoints (internal reference)
 
-The backend exposes `GET /api/health` → `{"status":"ok","version":"0.1.0"}`. The frontend container waits for this to return healthy before starting. It is also useful for manual verification:
+| Endpoint | Auth | Purpose |
+|----------|------|---------|
+| `GET /api/health` | No | Docker healthcheck; returns `{"status":"ok","version":"0.1.0"}` |
+| `GET /api/info` | Yes | Returns `{ version, repoUrl, user }` — shown in Settings → About |
 
+Manual verification:
 ```bash
+# Health (no auth needed)
 docker compose exec backend wget -qO- http://localhost:3001/api/health
+
+# Info (requires auth header)
+docker compose exec backend wget -qO- http://localhost:3001/api/info \
+  --header="X-authentik-email: you@example.com"
 ```
