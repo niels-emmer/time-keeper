@@ -24,10 +24,15 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
 
 ## Prerequisites
 
-- Docker Engine 24+ with Docker Compose v2
-- An [Authentik](https://goauthentik.io) instance
+**To deploy (production):**
+- [Docker Engine 24+](https://docs.docker.com/engine/install/) with [Docker Compose v2](https://docs.docker.com/compose/install/)
+- An [Authentik](https://goauthentik.io) instance (or another identity provider — see [auth integration guide](docs/integration/auth.md))
 - [Nginx Proxy Manager](https://nginxproxymanager.com) (or another reverse proxy with forward auth support)
 - A domain name with SSL
+
+**To develop locally:**
+- [Node.js 22+](https://nodejs.org/en/download) — ([nvm](https://github.com/nvm-sh/nvm) / [fnm](https://github.com/Schniz/fnm) recommended for version management)
+- [Yarn 4](https://yarnpkg.com/getting-started/install) via Corepack (ships with Node.js 16.9+)
 
 ## Quick start (local development)
 
@@ -76,3 +81,7 @@ The short version:
 Categories are managed in the app itself (Settings tab). Add one category per booking type you want to track. The optional "Workday code" field appears in the weekly copy output.
 
 There is no multi-user support — this is intentionally a single-user personal tool.
+
+## Attribution
+
+Original idea and product direction by the author. All code, architecture, and debugging by [Claude Code](https://claude.ai/claude-code) (Claude Sonnet 4.5 / Opus 4.6, Anthropic).

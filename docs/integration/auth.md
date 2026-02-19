@@ -27,6 +27,38 @@ Authentik's embedded outpost sets these headers on authenticated requests (as fo
 
 The backend auth middleware (`packages/backend/src/middleware/auth.ts`) reads `X-authentik-email`. All database queries filter by this value.
 
+## Using a different identity provider
+
+The app only reads one header: **the email address of the authenticated user**. Any reverse proxy + IdP combination that can set a trusted `X-authentik-email` header (or any header you remap to it) will work.
+
+The header name is read in `packages/backend/src/middleware/auth.ts`. You can change it there to match whatever your proxy sets.
+
+Common alternatives:
+
+| Setup | Header to forward | Notes |
+|-------|-------------------|-------|
+| **Authentik** (embedded outpost) | `X-authentik-email` | Default — documented below |
+| **Authelia** | `Remote-Email` | Set `proxy_set_header X-authentik-email $http_remote_email;` in nginx |
+| **Keycloak** (with oauth2-proxy) | `X-Auth-Request-Email` | Set `proxy_set_header X-authentik-email $http_x_auth_request_email;` in nginx |
+| **Cloudflare Access** | `Cf-Access-Authenticated-User-Email` | Set `proxy_set_header X-authentik-email $http_cf_access_authenticated_user_email;` in nginx |
+| **Caddy + caddy-security** | `X-Forwarded-User` | Set the header to the email value in your Caddy config |
+
+For any of these, the nginx forward in `packages/frontend/nginx.conf` must pass the header to the backend:
+
+```nginx
+# Change the right-hand side to match whichever header your proxy sets
+proxy_set_header X-authentik-email $http_x_authentik_email;
+```
+
+Or rename the header the backend reads — one line in `packages/backend/src/middleware/auth.ts`:
+
+```typescript
+const user = req.headers['x-authentik-email'] as string | undefined;
+//                        ^^^ change this to match your proxy
+```
+
+---
+
 ## Authentik setup
 
 ### Step 1: Create a Proxy Provider
