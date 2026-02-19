@@ -9,7 +9,7 @@ services:
       dockerfile: packages/frontend/Dockerfile
     restart: unless-stopped
     ports:
-      - "127.0.0.1:38521:80"  # Only bind to localhost — NPM proxies to this port
+      - "38521:80"  # Bind on all interfaces so NPM can reach via LAN IP (192.168.101.252)
     networks:
       - app
     depends_on:
