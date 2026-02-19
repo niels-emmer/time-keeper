@@ -21,20 +21,22 @@ export function getActiveTimer(userId: string) {
 export function startTimer(userId: string, categoryId: number) {
   const now = new Date().toISOString();
 
-  // Auto-stop any running timer
-  const active = getActiveTimer(userId);
-  if (active) {
-    db.update(timeEntries)
-      .set({ endTime: now, updatedAt: now })
-      .where(and(eq(timeEntries.id, active.id), eq(timeEntries.userId, userId)))
-      .run();
-  }
+  const result = db.transaction(() => {
+    // Auto-stop any running timer
+    const active = getActiveTimer(userId);
+    if (active) {
+      db.update(timeEntries)
+        .set({ endTime: now, updatedAt: now })
+        .where(and(eq(timeEntries.id, active.id), eq(timeEntries.userId, userId)))
+        .run();
+    }
 
-  const result = db
-    .insert(timeEntries)
-    .values({ userId, categoryId, startTime: now })
-    .returning()
-    .get();
+    return db
+      .insert(timeEntries)
+      .values({ userId, categoryId, startTime: now })
+      .returning()
+      .get();
+  });
 
   if (!result) throw createError('Failed to create timer entry', 500);
   return result;
