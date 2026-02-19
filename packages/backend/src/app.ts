@@ -6,6 +6,7 @@ import { categoriesRouter } from './routes/categories.js';
 import { timerRouter } from './routes/timer.js';
 import { entriesRouter } from './routes/entries.js';
 import { summaryRouter } from './routes/summary.js';
+import { infoRouter } from './routes/info.js';
 
 export function createApp() {
   const app = express();
@@ -36,6 +37,7 @@ export function createApp() {
   app.use('/api/timer', timerRouter);
   app.use('/api/entries', entriesRouter);
   app.use('/api/summary', summaryRouter);
+  app.use('/api/info', infoRouter);
 
   app.use(errorHandler);
 

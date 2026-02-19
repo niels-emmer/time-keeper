@@ -21,6 +21,10 @@ services:
     build:
       context: .
       dockerfile: packages/backend/Dockerfile
+      args:
+        # Pass the latest git tag so /api/info can report the running version.
+        # Falls back to 'dev' if no tags exist.
+        APP_VERSION: ${APP_VERSION:-dev}
     restart: unless-stopped
     environment:
       NODE_ENV: production

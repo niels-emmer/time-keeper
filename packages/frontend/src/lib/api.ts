@@ -56,4 +56,8 @@ export const api = {
     round: (date: string) =>
       request<RoundingResult>('/summary/round', { method: 'POST', body: JSON.stringify({ date }) }),
   },
+
+  info: {
+    get: () => request<{ version: string; repoUrl: string; user: string }>('/info'),
+  },
 } as const;

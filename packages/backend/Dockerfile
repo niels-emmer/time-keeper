@@ -48,4 +48,8 @@ ENV NODE_ENV=production
 ENV PORT=3001
 ENV DATABASE_PATH=/data/time-keeper.db
 
+# Baked in at build time via: --build-arg APP_VERSION=$(git describe --tags --abbrev=0)
+ARG APP_VERSION=dev
+ENV APP_VERSION=${APP_VERSION}
+
 CMD ["node", "packages/backend/dist/index.js"]
