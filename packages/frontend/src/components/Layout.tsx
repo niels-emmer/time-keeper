@@ -18,12 +18,34 @@ function TimekeeperLogo({ className }: { className?: string }) {
       aria-hidden="true"
       className={className}
     >
-      <rect x="4" y="4" width="56" height="56" rx="14" fill="#0B1220" />
-      <circle cx="32" cy="32" r="18" fill="none" stroke="#17D4FF" strokeWidth="6" />
-      <line x1="32" y1="32" x2="32" y2="21" stroke="#FFFFFF" strokeWidth="6" strokeLinecap="round" />
-      <line x1="32" y1="32" x2="44" y2="32" stroke="#FFFFFF" strokeWidth="6" strokeLinecap="round" />
-      <circle cx="32" cy="32" r="4.5" fill="#FFFFFF" />
-      <path d="M22 41 L28.5 47.5 L42 34" fill="none" stroke="#7CFF6B" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+      <defs>
+        <linearGradient id="tk-bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#0F1E35" />
+          <stop offset="100%" stopColor="#0A1628" />
+        </linearGradient>
+        <linearGradient id="tk-ring" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#00D4FF" />
+          <stop offset="100%" stopColor="#0099CC" />
+        </linearGradient>
+      </defs>
+      {/* Rounded square background */}
+      <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#tk-bg)" />
+      {/* Subtle inner highlight */}
+      <rect x="2" y="2" width="60" height="60" rx="16" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
+      {/* Clock ring */}
+      <circle cx="32" cy="32" r="17" fill="none" stroke="url(#tk-ring)" strokeWidth="3.5" />
+      {/* Hour markers */}
+      <circle cx="32" cy="17" r="1.5" fill="#00D4FF" opacity="0.7" />
+      <circle cx="47" cy="32" r="1.5" fill="#00D4FF" opacity="0.7" />
+      <circle cx="32" cy="47" r="1.5" fill="#00D4FF" opacity="0.7" />
+      <circle cx="17" cy="32" r="1.5" fill="#00D4FF" opacity="0.7" />
+      {/* Minute hand — ~10 o'clock */}
+      <line x1="32" y1="32" x2="22.5" y2="19.5" stroke="#E8F4FF" strokeWidth="2.5" strokeLinecap="round" />
+      {/* Hour hand — ~2 o'clock */}
+      <line x1="32" y1="32" x2="40" y2="25" stroke="#FFAA00" strokeWidth="3" strokeLinecap="round" />
+      {/* Center pivot */}
+      <circle cx="32" cy="32" r="3" fill="#FFAA00" />
+      <circle cx="32" cy="32" r="1.5" fill="#FFD966" />
     </svg>
   );
 }
