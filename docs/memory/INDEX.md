@@ -19,8 +19,10 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `packages/shared/src/utils/rounding.ts` | Core business logic — the rounding algorithm |
 | `packages/backend/src/middleware/auth.ts` | Auth boundary — reads `X-authentik-email` header |
 | `packages/frontend/src/components/CategoryGrid.tsx` | Primary UX surface |
+| `packages/frontend/src/components/CategoryManager.tsx` | Category CRUD + drag-to-reorder + A-Z sort |
 | `docker-compose.yml` | Service wiring; nginx must pass `X-authentik-email` |
 | `packages/backend/drizzle/` | Migration SQL files — committed, run on startup |
+| `packages/shared/src/utils/rounding.test.ts` | Unit tests for the rounding algorithm (Vitest) |
 
 ## Task routing
 
@@ -41,11 +43,17 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 |-------|------|-------|
 | `GET /api/health` | No | Docker healthcheck |
 | `GET /api/info` | Yes | Version, repo URL, current user — drives Settings → About |
-| `GET /api/categories` | Yes | List user's categories |
+| `GET /api/categories` | Yes | List user's categories, ordered by `sort_order ASC` |
+| `POST /api/categories` | Yes | Create category; auto-assigns next `sort_order` |
+| `PUT /api/categories/:id` | Yes | Update a category |
+| `DELETE /api/categories/:id` | Yes | Delete a category |
+| `PATCH /api/categories/reorder` | Yes | Bulk update `sort_order`; body: `[{id, sortOrder}]` |
 | `GET /api/timer` | Yes | Active timer status |
 | `POST /api/timer/start` | Yes | Start timer |
 | `POST /api/timer/stop` | Yes | Stop timer |
 | `GET /api/entries` | Yes | Time entries by date/week |
+| `PATCH /api/entries/:id` | Yes | Update a time entry |
+| `DELETE /api/entries/:id` | Yes | Delete a time entry |
 | `GET /api/summary/weekly` | Yes | Weekly summary |
 | `POST /api/summary/round` | Yes | Apply end-of-day rounding |
 
@@ -71,3 +79,12 @@ yarn workspace @time-keeper/backend db:generate    # after schema changes
 yarn workspace @time-keeper/backend build
 yarn workspace @time-keeper/frontend build
 ```
+
+## Running tests
+
+```bash
+yarn workspace @time-keeper/shared test        # run unit tests (Vitest)
+yarn workspace @time-keeper/shared test:watch  # watch mode
+```
+
+Tests live in `packages/shared/src/utils/rounding.test.ts`. They cover the core rounding algorithm (`computeRounding`): basic ceiling rounding, zero-minute no-ops, the 40h weekly cap, and idempotency.

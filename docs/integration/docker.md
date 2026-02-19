@@ -65,6 +65,19 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 |----------|------|---------|
 | `GET /api/health` | No | Docker healthcheck; returns `{"status":"ok","version":"0.1.0"}` |
 | `GET /api/info` | Yes | Returns `{ version, repoUrl, user }` — shown in Settings → About |
+| `GET /api/categories` | Yes | List categories ordered by `sort_order ASC` |
+| `POST /api/categories` | Yes | Create category (auto-assigns `sort_order`) |
+| `PUT /api/categories/:id` | Yes | Update a category |
+| `DELETE /api/categories/:id` | Yes | Delete a category |
+| `PATCH /api/categories/reorder` | Yes | Bulk-set `sort_order`; body: `[{id, sortOrder}]` |
+| `GET /api/timer` | Yes | Active timer status |
+| `POST /api/timer/start` | Yes | Start timer with `{ categoryId }` |
+| `POST /api/timer/stop` | Yes | Stop active timer |
+| `GET /api/entries` | Yes | Time entries by `?date=YYYY-MM-DD` or `?week=YYYY-WNN` |
+| `PATCH /api/entries/:id` | Yes | Update a time entry |
+| `DELETE /api/entries/:id` | Yes | Delete a time entry |
+| `GET /api/summary/weekly` | Yes | Weekly summary (optionally `?week=YYYY-WNN`) |
+| `POST /api/summary/round` | Yes | Apply end-of-day rounding with `{ date }` |
 
 Manual verification:
 ```bash
@@ -74,4 +87,10 @@ docker compose exec backend wget -qO- http://localhost:3001/api/health
 # Info (requires auth header)
 docker compose exec backend wget -qO- http://localhost:3001/api/info \
   --header="X-authentik-email: you@example.com"
+
+# Test category reorder (from host)
+curl -s -X PATCH http://localhost:38521/api/categories/reorder \
+  -H "Content-Type: application/json" \
+  -H "X-authentik-email: you@example.com" \
+  -d '[{"id":1,"sortOrder":0},{"id":2,"sortOrder":1}]'
 ```

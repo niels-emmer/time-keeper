@@ -76,3 +76,30 @@ React Query provides:
 - Background refetching on window focus
 - `refetchInterval: 5000` for the active timer query (keeps elapsed time fresh without manual polling code)
 - Clean separation between server state (React Query) and local UI state (useState)
+
+## D-008: @dnd-kit for drag-to-reorder categories
+
+**Date:** 2026-02
+**Status:** Accepted
+
+`@dnd-kit/core` + `@dnd-kit/sortable` + `@dnd-kit/utilities` were chosen over alternatives (react-beautiful-dnd, react-dnd, HTML5 native drag) because:
+- Works on both pointer (mouse) and touch (Android) via separate sensors — critical for the Android target
+- Fully accessible: keyboard-navigable, respects `prefers-reduced-motion`
+- Headless — no opinions on markup or styling; integrates cleanly with shadcn/ui cards
+- react-beautiful-dnd is no longer maintained; @dnd-kit is its spiritual successor
+- Native HTML5 drag API does not fire on mobile
+
+Optimistic updates are applied via `qc.setQueryData` before the `PATCH /api/categories/reorder` mutation fires, giving instant visual response. `onSettled` invalidation re-syncs with the server.
+
+## D-009: Vitest for unit tests in @time-keeper/shared
+
+**Date:** 2026-02
+**Status:** Accepted
+
+Vitest was chosen over Jest because:
+- Native ESM support — the codebase uses `"type": "module"` throughout; Jest requires additional transforms
+- Vite-native: same config as the frontend build toolchain; zero extra config files
+- API-compatible with Jest (same `describe`/`it`/`expect` surface) — easy migration path
+- Fast cold start; no separate Babel transform pipeline
+
+Tests are scoped to `@time-keeper/shared` only, as it contains the pure business logic (`computeRounding`) that is most valuable to test in isolation. Backend routes and frontend components are tested via manual Docker validation for now.
