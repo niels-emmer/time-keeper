@@ -180,4 +180,36 @@ describe('computeRounding', () => {
     const { result } = computeRounding([raw(1, HOUR_IN_MINUTES)], 0);
     expect(result[0].roundedMinutes).toBe(HOUR_IN_MINUTES);
   });
+
+  // ── custom weeklyGoalMinutes parameter ───────────────────────────────────
+
+  it('uses the default 2400 min goal when weeklyGoalMinutes is omitted', () => {
+    // weekSoFar = 2340 (39h), raw = 90 min → rounds to 120, excess vs 2400 cap
+    const { capped, weekWouldExceed } = computeRounding([raw(1, 90)], 2340);
+    expect(capped).toBe(true);
+    expect(weekWouldExceed).toBe(true);
+  });
+
+  it('respects a custom 20h goal (1200 min)', () => {
+    // goal = 1200 min (20h); weekSoFar = 1140 (19h), raw = 90 → rounds to 120
+    // headroom = 60 min; excess = 60 min; reducible = 30; stops at raw (90)
+    const { result, capped, weekWouldExceed } = computeRounding([raw(1, 90)], 1140, 1200);
+    expect(weekWouldExceed).toBe(true);
+    expect(capped).toBe(true);
+    expect(result[0].roundedMinutes).toBe(90); // rounding bonus stripped
+  });
+
+  it('does not cap when weekSoFar + rounded total equals the custom goal exactly', () => {
+    // goal = 1200 min; weekSoFar = 1080 (18h), raw = 120 → rounds to 120 → projected = 1200
+    const { result, capped } = computeRounding([raw(1, 120)], 1080, 1200);
+    expect(result[0].roundedMinutes).toBe(120);
+    expect(capped).toBe(false);
+  });
+
+  it('respects a goal of 0 — all rounding bonuses are removed', () => {
+    // goal = 0; headroom = 0; raw = 30 min → rounds to 60 normally; bonus = 30 min removed
+    const { result, capped } = computeRounding([raw(1, 30)], 0, 0);
+    expect(result[0].roundedMinutes).toBe(30); // back to raw
+    expect(capped).toBe(true);
+  });
 });

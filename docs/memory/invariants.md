@@ -28,9 +28,9 @@ At any given moment, a user can have at most one running timer (a `time_entries`
 
 The entire application state lives in a single SQLite file at `DATABASE_PATH` (default `/data/time-keeper.db` in production). Backups = copying this file. There is no cache, no session store, no other persistence.
 
-## I-006: Rounding never exceeds 40h per week
+## I-006: Rounding never exceeds the user's weekly goal
 
-The `computeRounding()` function in `packages/shared/src/utils/rounding.ts` must never produce a result where `weekMinutesSoFar + dayRoundedTotal > 2400`. The cap logic is there to enforce this. Do not bypass it.
+The `computeRounding()` function in `packages/shared/src/utils/rounding.ts` must never produce a result where `weekMinutesSoFar + dayRoundedTotal > weeklyGoalMinutes`. The cap is the user's configured weekly goal (stored in `user_settings.weekly_goal_hours`, default 40 h = 2400 min). The service layer reads this from the DB and passes it to `computeRounding()`; do not bypass it or hardcode 2400.
 
 ## I-007: nginx must forward the auth headers
 
@@ -49,4 +49,4 @@ This is set in the NPM proxy template and differs from the standalone outpost's 
 
 ## I-008: No users table
 
-Authentik owns user management. The app has no `users` table. User identity is a plain text `user_id` column in `categories` and `time_entries`. Deactivating a user in Authentik is sufficient to lock them out (the outpost blocks them before the app sees the request).
+Authentik owns user management. The app has no `users` table. User identity is a plain text `user_id` column in `categories`, `time_entries`, and `user_settings`. Deactivating a user in Authentik is sufficient to lock them out (the outpost blocks them before the app sees the request).

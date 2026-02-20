@@ -7,22 +7,26 @@
 A personal work-timer PWA. The user tracks time in categories (aligned to Workday) from macOS and Android. At end of week, they copy a time summary into Workday's time registration.
 
 - One active timer at a time per user
-- Daily target: 8h average, weekly: 40h
-- End-of-day rounding: minutes → whole hours (cap at 40h/week)
+- Configurable weekly goal (default 40 h) stored per user in `user_settings`
+- End-of-day rounding: minutes → whole hours (capped at user's weekly goal)
 - Auth: Authentik embedded outpost via NPM forward auth (no auth code in the app)
 
 ## Critical files
 
 | File | Why it matters |
 |------|---------------|
-| `packages/backend/src/db/schema.ts` | All data types flow from here |
+| `packages/backend/src/db/schema.ts` | All data types flow from here (`categories`, `time_entries`, `user_settings`) |
 | `packages/shared/src/utils/rounding.ts` | Core business logic — the rounding algorithm |
 | `packages/backend/src/middleware/auth.ts` | Auth boundary — reads `X-authentik-email` header |
+| `packages/backend/src/routes/settings.ts` | GET/PUT `/api/settings` — weekly goal hours |
+| `packages/backend/src/services/summaryService.ts` | Builds weekly summary; reads weekly goal from DB |
 | `packages/frontend/src/components/CategoryGrid.tsx` | Primary UX surface |
 | `packages/frontend/src/components/CategoryManager.tsx` | Category CRUD + drag-to-reorder + A-Z sort |
+| `packages/frontend/src/components/WeeklyGoalSetting.tsx` | Settings UI for weekly goal (number input + slider) |
 | `docker-compose.yml` | Service wiring; nginx must pass `X-authentik-email` |
 | `packages/backend/drizzle/` | Migration SQL files — committed, run on startup |
 | `packages/shared/src/utils/rounding.test.ts` | Unit tests for the rounding algorithm (Vitest) |
+| `packages/backend/src/routes/settings.test.ts` | Unit tests for the settings route (Vitest) |
 
 ## Task routing
 
@@ -32,6 +36,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | Change the rounding logic | `packages/shared/src/utils/rounding.ts` |
 | Add an API endpoint | Add route in `packages/backend/src/routes/`, register in `app.ts` |
 | Add a UI feature | `packages/frontend/src/pages/` or `components/` |
+| Change the weekly goal setting | `packages/backend/src/routes/settings.ts` + `WeeklyGoalSetting.tsx` |
 | Debug auth issues | `docs/integration/auth.md`, `packages/backend/src/middleware/auth.ts` |
 | Deploy | `docs/operations/deployment.md` |
 | Understand Docker layout | `docs/integration/docker.md` |
@@ -43,6 +48,8 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 |-------|------|-------|
 | `GET /api/health` | No | Docker healthcheck |
 | `GET /api/info` | Yes | Version, repo URL, current user — drives Settings → About |
+| `GET /api/settings` | Yes | Returns `{ weeklyGoalHours }` (default 40) |
+| `PUT /api/settings` | Yes | Update `{ weeklyGoalHours }` (0–40 inclusive) |
 | `GET /api/categories` | Yes | List user's categories, ordered by `sort_order ASC` |
 | `POST /api/categories` | Yes | Create category; auto-assigns next `sort_order` |
 | `PUT /api/categories/:id` | Yes | Update a category |
@@ -54,8 +61,8 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `GET /api/entries` | Yes | Time entries by date/week |
 | `PATCH /api/entries/:id` | Yes | Update a time entry |
 | `DELETE /api/entries/:id` | Yes | Delete a time entry |
-| `GET /api/summary/weekly` | Yes | Weekly summary |
-| `POST /api/summary/round` | Yes | Apply end-of-day rounding |
+| `GET /api/summary/weekly` | Yes | Weekly summary (goalMinutes comes from user_settings) |
+| `POST /api/summary/round` | Yes | Apply end-of-day rounding (cap = user's weekly goal) |
 
 ## Deploy command
 
@@ -87,4 +94,4 @@ yarn workspace @time-keeper/shared test        # run unit tests (Vitest)
 yarn workspace @time-keeper/shared test:watch  # watch mode
 ```
 
-Tests live in `packages/shared/src/utils/rounding.test.ts`. They cover the core rounding algorithm (`computeRounding`): basic ceiling rounding, zero-minute no-ops, the 40h weekly cap, and idempotency.
+Tests live in `packages/shared/src/utils/rounding.test.ts`. They cover the core rounding algorithm (`computeRounding`): basic ceiling rounding, zero-minute no-ops, the configurable weekly cap, and idempotency. The `computeRounding` function accepts an optional `weeklyGoalMinutes` parameter (default 2400 = 40 h).

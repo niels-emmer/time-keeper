@@ -103,3 +103,19 @@ Vitest was chosen over Jest because:
 - Fast cold start; no separate Babel transform pipeline
 
 Tests are scoped to `@time-keeper/shared` only, as it contains the pure business logic (`computeRounding`) that is most valuable to test in isolation. Backend routes and frontend components are tested via manual Docker validation for now.
+
+## D-010: Per-user weekly goal stored in user_settings table
+
+**Date:** 2026-02
+**Status:** Accepted
+
+The 40 h weekly cap was previously a hardcoded constant (`WEEKLY_GOAL_MINUTES = 2400`) in `@time-keeper/shared`. Replaced by a per-user `weekly_goal_hours` column in a new `user_settings` SQLite table (upserted on first access, default 40).
+
+Why a DB table rather than an env variable or localStorage:
+- Per-user: different users on the same instance can have different goals
+- Server-authoritative: the rounding algorithm runs server-side; the cap must come from the same source of truth
+- Consistent with the existing pattern (`user_id` on every table, no external config files)
+
+The `computeRounding()` function now accepts an optional `weeklyGoalMinutes` parameter (default 2400) so existing unit tests continue to work without changes, and callers that need the user value pass it explicitly.
+
+The frontend reads the goal via `GET /api/settings` and exposes a number input + range slider (0–40) in Settings → Work week. Changes are saved on blur/release and invalidate both the `settings` and `summary` React Query caches.
