@@ -19,6 +19,7 @@ import { z } from 'zod';
 const userSettings = sqliteTable('user_settings', {
   userId: text('user_id').primaryKey(),
   weeklyGoalHours: integer('weekly_goal_hours').notNull().default(40),
+  roundingIncrementMinutes: integer('rounding_increment_minutes').notNull().default(60),
   updatedAt: text('updated_at')
     .notNull()
     .default(sql`(datetime('now'))`),
@@ -28,6 +29,7 @@ const userSettings = sqliteTable('user_settings', {
 
 const updateSchema = z.object({
   weeklyGoalHours: z.number().int().min(0).max(40),
+  roundingIncrementMinutes: z.union([z.literal(30), z.literal(60)]),
 });
 
 // ── Test DB factory ──────────────────────────────────────────────────────────
@@ -38,6 +40,7 @@ function makeDb() {
     CREATE TABLE IF NOT EXISTS user_settings (
       user_id TEXT PRIMARY KEY,
       weekly_goal_hours INTEGER NOT NULL DEFAULT 40,
+      rounding_increment_minutes INTEGER NOT NULL DEFAULT 60,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
@@ -49,18 +52,27 @@ function makeDb() {
 function getOrCreate(db: ReturnType<typeof makeDb>, userId: string) {
   let row = db.select().from(userSettings).where(eq(userSettings.userId, userId)).get();
   if (!row) {
-    row = db.insert(userSettings).values({ userId, weeklyGoalHours: 40 }).returning().get()!;
+    row = db
+      .insert(userSettings)
+      .values({ userId, weeklyGoalHours: 40, roundingIncrementMinutes: 60 })
+      .returning()
+      .get()!;
   }
   return row;
 }
 
-function upsertGoal(db: ReturnType<typeof makeDb>, userId: string, weeklyGoalHours: number) {
+function upsertSettings(
+  db: ReturnType<typeof makeDb>,
+  userId: string,
+  weeklyGoalHours: number,
+  roundingIncrementMinutes: 30 | 60 = 60
+) {
   const now = new Date().toISOString();
   db.insert(userSettings)
-    .values({ userId, weeklyGoalHours, updatedAt: now })
+    .values({ userId, weeklyGoalHours, roundingIncrementMinutes, updatedAt: now })
     .onConflictDoUpdate({
       target: userSettings.userId,
-      set: { weeklyGoalHours, updatedAt: now },
+      set: { weeklyGoalHours, roundingIncrementMinutes, updatedAt: now },
     })
     .run();
 }
@@ -80,6 +92,11 @@ describe('settings service — getOrCreate', () => {
     expect(settings.userId).toBe('alice@example.com');
   });
 
+  it('creates a row with the default 60-min rounding increment', () => {
+    const settings = getOrCreate(db, 'alice@example.com');
+    expect(settings.roundingIncrementMinutes).toBe(60);
+  });
+
   it('returns the existing row without creating a duplicate', () => {
     getOrCreate(db, 'alice@example.com');
     const second = getOrCreate(db, 'alice@example.com');
@@ -97,54 +114,88 @@ describe('settings service — getOrCreate', () => {
   });
 });
 
-describe('settings service — upsertGoal', () => {
+describe('settings service — upsertSettings', () => {
   let db: ReturnType<typeof makeDb>;
 
   beforeEach(() => {
     db = makeDb();
   });
 
-  it('inserts a new row with the given goal', () => {
-    upsertGoal(db, 'alice@example.com', 32);
+  it('inserts a new row with the given goal and increment', () => {
+    upsertSettings(db, 'alice@example.com', 32, 30);
     const row = db.select().from(userSettings).where(eq(userSettings.userId, 'alice@example.com')).get();
     expect(row?.weeklyGoalHours).toBe(32);
+    expect(row?.roundingIncrementMinutes).toBe(30);
   });
 
   it('updates an existing row on conflict', () => {
-    upsertGoal(db, 'alice@example.com', 40);
-    upsertGoal(db, 'alice@example.com', 20);
+    upsertSettings(db, 'alice@example.com', 40, 60);
+    upsertSettings(db, 'alice@example.com', 20, 30);
     const row = db.select().from(userSettings).where(eq(userSettings.userId, 'alice@example.com')).get();
     expect(row?.weeklyGoalHours).toBe(20);
+    expect(row?.roundingIncrementMinutes).toBe(30);
   });
 
   it('stores 0 as a valid goal', () => {
-    upsertGoal(db, 'alice@example.com', 0);
+    upsertSettings(db, 'alice@example.com', 0);
     const row = db.select().from(userSettings).where(eq(userSettings.userId, 'alice@example.com')).get();
     expect(row?.weeklyGoalHours).toBe(0);
+  });
+
+  it('stores 60-min increment', () => {
+    upsertSettings(db, 'alice@example.com', 40, 60);
+    const row = db.select().from(userSettings).where(eq(userSettings.userId, 'alice@example.com')).get();
+    expect(row?.roundingIncrementMinutes).toBe(60);
+  });
+
+  it('stores 30-min increment', () => {
+    upsertSettings(db, 'alice@example.com', 40, 30);
+    const row = db.select().from(userSettings).where(eq(userSettings.userId, 'alice@example.com')).get();
+    expect(row?.roundingIncrementMinutes).toBe(30);
   });
 });
 
 describe('settings PUT validation schema', () => {
-  it('accepts integer values 0–40', () => {
-    expect(() => updateSchema.parse({ weeklyGoalHours: 0 })).not.toThrow();
-    expect(() => updateSchema.parse({ weeklyGoalHours: 20 })).not.toThrow();
-    expect(() => updateSchema.parse({ weeklyGoalHours: 40 })).not.toThrow();
+  it('accepts integer values 0–40 with increment 60', () => {
+    expect(() => updateSchema.parse({ weeklyGoalHours: 0, roundingIncrementMinutes: 60 })).not.toThrow();
+    expect(() => updateSchema.parse({ weeklyGoalHours: 20, roundingIncrementMinutes: 60 })).not.toThrow();
+    expect(() => updateSchema.parse({ weeklyGoalHours: 40, roundingIncrementMinutes: 60 })).not.toThrow();
+  });
+
+  it('accepts increment of 30', () => {
+    expect(() => updateSchema.parse({ weeklyGoalHours: 40, roundingIncrementMinutes: 30 })).not.toThrow();
   });
 
   it('rejects values above 40', () => {
-    expect(() => updateSchema.parse({ weeklyGoalHours: 41 })).toThrow();
+    expect(() => updateSchema.parse({ weeklyGoalHours: 41, roundingIncrementMinutes: 60 })).toThrow();
   });
 
   it('rejects values below 0', () => {
-    expect(() => updateSchema.parse({ weeklyGoalHours: -1 })).toThrow();
+    expect(() => updateSchema.parse({ weeklyGoalHours: -1, roundingIncrementMinutes: 60 })).toThrow();
   });
 
-  it('rejects non-integer values', () => {
-    expect(() => updateSchema.parse({ weeklyGoalHours: 37.5 })).toThrow();
+  it('rejects non-integer weeklyGoalHours', () => {
+    expect(() => updateSchema.parse({ weeklyGoalHours: 37.5, roundingIncrementMinutes: 60 })).toThrow();
   });
 
-  it('rejects non-numeric values', () => {
-    expect(() => updateSchema.parse({ weeklyGoalHours: '40' })).toThrow();
-    expect(() => updateSchema.parse({ weeklyGoalHours: null })).toThrow();
+  it('rejects non-numeric weeklyGoalHours', () => {
+    expect(() => updateSchema.parse({ weeklyGoalHours: '40', roundingIncrementMinutes: 60 })).toThrow();
+    expect(() => updateSchema.parse({ weeklyGoalHours: null, roundingIncrementMinutes: 60 })).toThrow();
+  });
+
+  it('rejects increment values other than 30 or 60', () => {
+    expect(() => updateSchema.parse({ weeklyGoalHours: 40, roundingIncrementMinutes: 15 })).toThrow();
+    expect(() => updateSchema.parse({ weeklyGoalHours: 40, roundingIncrementMinutes: 45 })).toThrow();
+    expect(() => updateSchema.parse({ weeklyGoalHours: 40, roundingIncrementMinutes: 120 })).toThrow();
+    expect(() => updateSchema.parse({ weeklyGoalHours: 40, roundingIncrementMinutes: 0 })).toThrow();
+  });
+
+  it('rejects missing roundingIncrementMinutes', () => {
+    expect(() => updateSchema.parse({ weeklyGoalHours: 40 })).toThrow();
+  });
+
+  it('rejects non-numeric roundingIncrementMinutes', () => {
+    expect(() => updateSchema.parse({ weeklyGoalHours: 40, roundingIncrementMinutes: '60' })).toThrow();
+    expect(() => updateSchema.parse({ weeklyGoalHours: 40, roundingIncrementMinutes: null })).toThrow();
   });
 });

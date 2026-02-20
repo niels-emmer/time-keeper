@@ -5,9 +5,13 @@ export function WeeklyGoalSetting() {
   const { data, isLoading } = useSettings();
   const update = useUpdateSettings();
   const [value, setValue] = useState<number>(40);
+  const [increment, setIncrement] = useState<30 | 60>(60);
 
   useEffect(() => {
-    if (data !== undefined) setValue(data.weeklyGoalHours);
+    if (data !== undefined) {
+      setValue(data.weeklyGoalHours);
+      setIncrement(data.roundingIncrementMinutes);
+    }
   }, [data]);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -17,8 +21,16 @@ export function WeeklyGoalSetting() {
 
   function handleBlur() {
     if (data !== undefined && value !== data.weeklyGoalHours) {
-      update.mutate(value);
+      update.mutate({ weeklyGoalHours: value, roundingIncrementMinutes: increment });
     }
+  }
+
+  function handleIncrementChange(next: 30 | 60) {
+    setIncrement(next);
+    update.mutate({
+      weeklyGoalHours: value,
+      roundingIncrementMinutes: next,
+    });
   }
 
   return (
@@ -26,6 +38,7 @@ export function WeeklyGoalSetting() {
       <h2 className="text-lg font-semibold">Work week</h2>
 
       <div className="rounded-lg border bg-card px-4 py-3 space-y-3 text-sm">
+        {/* ── Weekly goal ─────────────────────────────────────── */}
         <div className="flex items-center justify-between gap-4">
           <div>
             <span className="font-medium">Weekly goal</span>
@@ -60,6 +73,42 @@ export function WeeklyGoalSetting() {
           disabled={isLoading || update.isPending}
           className="w-full accent-primary disabled:opacity-50"
         />
+
+        {/* ── Divider ─────────────────────────────────────────── */}
+        <div className="border-t" />
+
+        {/* ── Rounding increment ──────────────────────────────── */}
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <span className="font-medium">Rounding increment</span>
+            <p className="text-muted-foreground text-xs mt-0.5">
+              Round each category up to the nearest interval
+            </p>
+          </div>
+          <div
+            className="flex rounded-md border overflow-hidden shrink-0 disabled:opacity-50"
+            role="group"
+            aria-label="Rounding increment"
+          >
+            {([30, 60] as const).map((opt) => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => handleIncrementChange(opt)}
+                disabled={isLoading || update.isPending}
+                className={[
+                  'px-3 py-1 text-sm font-medium transition-colors',
+                  increment === opt
+                    ? 'bg-primary text-primary-foreground'
+                    : 'bg-background text-muted-foreground hover:bg-muted',
+                  opt === 30 ? 'border-r' : '',
+                ].join(' ')}
+              >
+                {opt} min
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

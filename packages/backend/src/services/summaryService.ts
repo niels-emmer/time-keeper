@@ -10,6 +10,11 @@ function getWeeklyGoalMinutes(userId: string): number {
   return hours * 60;
 }
 
+function getRoundingIncrementMinutes(userId: string): number {
+  const row = db.select().from(userSettings).where(eq(userSettings.userId, userId)).get();
+  return row?.roundingIncrementMinutes ?? 60;
+}
+
 /**
  * Build a weekly summary for the given ISO week string (e.g. "2026-W07").
  * Only includes completed entries (endTime IS NOT NULL).
@@ -126,3 +131,8 @@ export function getWeekMinutesBefore(userId: string, date: string): number {
  * Get the user's weekly goal in minutes.
  */
 export { getWeeklyGoalMinutes };
+
+/**
+ * Get the user's rounding increment in minutes (30 or 60).
+ */
+export { getRoundingIncrementMinutes };

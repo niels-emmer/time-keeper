@@ -2,7 +2,7 @@ import { eq, and, gte, lte, isNotNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { timeEntries, categories } from '../db/schema.js';
 import { computeRounding } from '@time-keeper/shared';
-import { getWeekMinutesBefore, getWeeklyGoalMinutes } from './summaryService.js';
+import { getWeekMinutesBefore, getWeeklyGoalMinutes, getRoundingIncrementMinutes } from './summaryService.js';
 import type { RoundingResult } from '@time-keeper/shared';
 
 /**
@@ -42,13 +42,19 @@ export function applyRounding(userId: string, date: string): RoundingResult {
 
   const weekMinutesSoFar = getWeekMinutesBefore(userId, date);
   const weeklyGoalMinutes = getWeeklyGoalMinutes(userId);
+  const roundingIncrementMinutes = getRoundingIncrementMinutes(userId);
 
   const categoriesInput = Array.from(byCat.entries()).map(([categoryId, minutes]) => ({
     categoryId,
     minutes,
   }));
 
-  const { result, weekWouldExceed } = computeRounding(categoriesInput, weekMinutesSoFar, weeklyGoalMinutes);
+  const { result, weekWouldExceed } = computeRounding(
+    categoriesInput,
+    weekMinutesSoFar,
+    weeklyGoalMinutes,
+    roundingIncrementMinutes
+  );
 
   // Build a map of categoryId → target total rounded minutes
   const roundedByCat = new Map(result.map((r) => [r.categoryId, r.roundedMinutes]));

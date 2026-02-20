@@ -11,7 +11,7 @@ function getOrCreateSettings(userId: string) {
   if (!row) {
     row = db
       .insert(userSettings)
-      .values({ userId, weeklyGoalHours: 40 })
+      .values({ userId, weeklyGoalHours: 40, roundingIncrementMinutes: 60 })
       .returning()
       .get();
   }
@@ -21,7 +21,10 @@ function getOrCreateSettings(userId: string) {
 settingsRouter.get('/', (req, res, next) => {
   try {
     const settings = getOrCreateSettings(req.userId);
-    res.json({ weeklyGoalHours: settings.weeklyGoalHours });
+    res.json({
+      weeklyGoalHours: settings.weeklyGoalHours,
+      roundingIncrementMinutes: settings.roundingIncrementMinutes,
+    });
   } catch (err) {
     next(err);
   }
@@ -29,20 +32,23 @@ settingsRouter.get('/', (req, res, next) => {
 
 settingsRouter.put('/', (req, res, next) => {
   try {
-    const { weeklyGoalHours } = z
-      .object({ weeklyGoalHours: z.number().int().min(0).max(40) })
+    const { weeklyGoalHours, roundingIncrementMinutes } = z
+      .object({
+        weeklyGoalHours: z.number().int().min(0).max(40),
+        roundingIncrementMinutes: z.union([z.literal(30), z.literal(60)]),
+      })
       .parse(req.body);
 
     const now = new Date().toISOString();
     db.insert(userSettings)
-      .values({ userId: req.userId, weeklyGoalHours, updatedAt: now })
+      .values({ userId: req.userId, weeklyGoalHours, roundingIncrementMinutes, updatedAt: now })
       .onConflictDoUpdate({
         target: userSettings.userId,
-        set: { weeklyGoalHours, updatedAt: now },
+        set: { weeklyGoalHours, roundingIncrementMinutes, updatedAt: now },
       })
       .run();
 
-    res.json({ weeklyGoalHours });
+    res.json({ weeklyGoalHours, roundingIncrementMinutes });
   } catch (err) {
     next(err);
   }

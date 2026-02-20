@@ -1,0 +1,1 @@
+ALTER TABLE `user_settings` ADD `rounding_increment_minutes` integer DEFAULT 60 NOT NULL;

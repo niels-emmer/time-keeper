@@ -50,6 +50,7 @@ export const timeEntries = sqliteTable(
 export const userSettings = sqliteTable('user_settings', {
   userId: text('user_id').primaryKey(),
   weeklyGoalHours: integer('weekly_goal_hours').notNull().default(40),
+  roundingIncrementMinutes: integer('rounding_increment_minutes').notNull().default(60),
   updatedAt: text('updated_at')
     .notNull()
     .default(sql`(datetime('now'))`),

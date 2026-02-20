@@ -15,6 +15,13 @@
       "when": 1771563682098,
       "tag": "0001_loving_blizzard",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1771578758390,
+      "tag": "0002_slow_mandrill",
+      "breakpoints": true
     }
   ]
 }

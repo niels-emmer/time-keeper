@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { computeRounding, WEEKLY_GOAL_MINUTES, HOUR_IN_MINUTES } from './rounding.js';
+import { computeRounding, WEEKLY_GOAL_MINUTES, HOUR_IN_MINUTES, DEFAULT_ROUNDING_INCREMENT } from './rounding.js';
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function raw(categoryId: number, minutes: number) {
@@ -211,5 +211,73 @@ describe('computeRounding', () => {
     const { result, capped } = computeRounding([raw(1, 30)], 0, 0);
     expect(result[0].roundedMinutes).toBe(30); // back to raw
     expect(capped).toBe(true);
+  });
+
+  // ── 30-minute rounding increment ─────────────────────────────────────────
+
+  it('DEFAULT_ROUNDING_INCREMENT is 60', () => {
+    expect(DEFAULT_ROUNDING_INCREMENT).toBe(60);
+  });
+
+  it('rounds up to the nearest 30 minutes when increment is 30', () => {
+    // 1 min → 30; 30 min → 30; 31 min → 60; 60 min → 60; 61 min → 90
+    const { result, capped } = computeRounding(
+      [raw(1, 1), raw(2, 30), raw(3, 31), raw(4, 60), raw(5, 61)],
+      0,
+      WEEKLY_GOAL_MINUTES,
+      30
+    );
+    expect(result[0].roundedMinutes).toBe(30);
+    expect(result[1].roundedMinutes).toBe(30);
+    expect(result[2].roundedMinutes).toBe(60);
+    expect(result[3].roundedMinutes).toBe(60);
+    expect(result[4].roundedMinutes).toBe(90);
+    expect(capped).toBe(false);
+  });
+
+  it('leaves categories with 0 minutes at 0 when increment is 30', () => {
+    const { result } = computeRounding([raw(1, 0), raw(2, 15)], 0, WEEKLY_GOAL_MINUTES, 30);
+    expect(result[0].roundedMinutes).toBe(0);
+    expect(result[1].roundedMinutes).toBe(30);
+  });
+
+  it('caps correctly when using 30-minute increment', () => {
+    // weekSoFar = 2370 (39.5h), headroom = 30 min
+    // raw = 20 min → rounds to 30 with 30-min increment → fits exactly
+    const { result, weekWouldExceed, capped } = computeRounding(
+      [raw(1, 20)],
+      2370,
+      WEEKLY_GOAL_MINUTES,
+      30
+    );
+    expect(result[0].roundedMinutes).toBe(30);
+    expect(weekWouldExceed).toBe(false);
+    expect(capped).toBe(false);
+  });
+
+  it('strips 30-min bonus when headroom is 0 with 30-minute increment', () => {
+    // weekSoFar = 2400 (40h), headroom = 0
+    // raw = 20 min → rounds to 30 min; but no headroom, bonus removed
+    const { result, capped } = computeRounding([raw(1, 20)], 2400, WEEKLY_GOAL_MINUTES, 30);
+    expect(result[0].roundedMinutes).toBe(20); // back to raw
+    expect(capped).toBe(true);
+  });
+
+  it('produces smaller rounded totals with 30-min vs 60-min increment for the same input', () => {
+    // raw = 31 min: 30-min increment → 60; 60-min increment → 60 (same)
+    // raw = 1 min:  30-min increment → 30; 60-min increment → 60 (smaller with 30-min)
+    const { result: r30 } = computeRounding([raw(1, 1)], 0, WEEKLY_GOAL_MINUTES, 30);
+    const { result: r60 } = computeRounding([raw(1, 1)], 0, WEEKLY_GOAL_MINUTES, 60);
+    expect(r30[0].roundedMinutes).toBe(30);
+    expect(r60[0].roundedMinutes).toBe(60);
+    expect(r30[0].roundedMinutes).toBeLessThan(r60[0].roundedMinutes);
+  });
+
+  it('uses default (60-min) increment when roundingIncrementMinutes is omitted', () => {
+    // Omitting the 4th argument must behave identically to passing 60
+    const { result: rDefault } = computeRounding([raw(1, 45)], 0);
+    const { result: r60 } = computeRounding([raw(1, 45)], 0, WEEKLY_GOAL_MINUTES, 60);
+    expect(rDefault[0].roundedMinutes).toBe(r60[0].roundedMinutes);
+    expect(rDefault[0].roundedMinutes).toBe(60);
   });
 });

@@ -2,8 +2,8 @@
  * End-of-day rounding algorithm.
  *
  * Rules:
- * - Round each category's raw minutes UP to the nearest whole hour (60 min).
- * - If the resulting day total would push the ISO week over 40h (2400 min),
+ * - Round each category's raw minutes UP to the nearest rounding increment (30 or 60 min).
+ * - If the resulting day total would push the ISO week over the weekly goal,
  *   cap the day at the remaining weekly headroom.
  *   Excess is removed from the category with the most minutes (greedy smallest-first removal).
  * - Already-rounded entries are not re-rounded (idempotent via `rounded` flag).
@@ -13,6 +13,7 @@
 export const DAILY_GOAL_MINUTES = 480; // 8h
 export const WEEKLY_GOAL_MINUTES = 2400; // 40h
 export const HOUR_IN_MINUTES = 60;
+export const DEFAULT_ROUNDING_INCREMENT = 60; // minutes
 
 export interface CategoryRaw {
   categoryId: number;
@@ -31,12 +32,14 @@ export interface CategoryRounded {
  * @param categories  Raw minutes per category for the day (only unrounded entries)
  * @param weekMinutesSoFar  Total minutes booked earlier in the week (excluding this day)
  * @param weeklyGoalMinutes  Weekly cap in minutes (defaults to WEEKLY_GOAL_MINUTES = 2400)
+ * @param roundingIncrementMinutes  Rounding increment in minutes — 30 or 60 (defaults to 60)
  * @returns Per-category rounding result
  */
 export function computeRounding(
   categories: CategoryRaw[],
   weekMinutesSoFar: number,
-  weeklyGoalMinutes: number = WEEKLY_GOAL_MINUTES
+  weeklyGoalMinutes: number = WEEKLY_GOAL_MINUTES,
+  roundingIncrementMinutes: number = DEFAULT_ROUNDING_INCREMENT
 ): { result: CategoryRounded[]; weekWouldExceed: boolean; capped: boolean } {
   if (categories.length === 0 || categories.every((c) => c.minutes === 0)) {
     return {
@@ -46,11 +49,14 @@ export function computeRounding(
     };
   }
 
-  // Step 1: Round each category up to nearest hour
+  // Step 1: Round each category up to nearest increment
   const rounded: CategoryRounded[] = categories.map((c) => ({
     categoryId: c.categoryId,
     rawMinutes: c.minutes,
-    roundedMinutes: c.minutes === 0 ? 0 : Math.ceil(c.minutes / HOUR_IN_MINUTES) * HOUR_IN_MINUTES,
+    roundedMinutes:
+      c.minutes === 0
+        ? 0
+        : Math.ceil(c.minutes / roundingIncrementMinutes) * roundingIncrementMinutes,
   }));
 
   const dayRoundedTotal = rounded.reduce((sum, c) => sum + c.roundedMinutes, 0);

@@ -32,6 +32,8 @@ The entire application state lives in a single SQLite file at `DATABASE_PATH` (d
 
 The `computeRounding()` function in `packages/shared/src/utils/rounding.ts` must never produce a result where `weekMinutesSoFar + dayRoundedTotal > weeklyGoalMinutes`. The cap is the user's configured weekly goal (stored in `user_settings.weekly_goal_hours`, default 40 h = 2400 min). The service layer reads this from the DB and passes it to `computeRounding()`; do not bypass it or hardcode 2400.
 
+The rounding increment (30 or 60 min, stored in `user_settings.rounding_increment_minutes`, default 60) is also read from the DB and passed to `computeRounding()` as its fourth argument. Do not hardcode 60.
+
 ## I-007: nginx must forward the auth headers
 
 The frontend nginx container proxies `/api/*` to the backend. It must pass the identity headers from Authentik's embedded outpost through:

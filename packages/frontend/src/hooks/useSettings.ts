@@ -12,7 +12,8 @@ export function useSettings() {
 export function useUpdateSettings() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (weeklyGoalHours: number) => api.settings.update(weeklyGoalHours),
+    mutationFn: (settings: { weeklyGoalHours: number; roundingIncrementMinutes: 30 | 60 }) =>
+      api.settings.update(settings),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['settings'] });
       qc.invalidateQueries({ queryKey: ['summary'] });

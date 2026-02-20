@@ -64,11 +64,11 @@ export const api = {
   },
 
   settings: {
-    get: () => request<{ weeklyGoalHours: number }>('/settings'),
-    update: (weeklyGoalHours: number) =>
-      request<{ weeklyGoalHours: number }>('/settings', {
+    get: () => request<{ weeklyGoalHours: number; roundingIncrementMinutes: 30 | 60 }>('/settings'),
+    update: (settings: { weeklyGoalHours: number; roundingIncrementMinutes: 30 | 60 }) =>
+      request<{ weeklyGoalHours: number; roundingIncrementMinutes: 30 | 60 }>('/settings', {
         method: 'PUT',
-        body: JSON.stringify({ weeklyGoalHours }),
+        body: JSON.stringify(settings),
       }),
   },
 } as const;

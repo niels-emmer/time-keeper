@@ -141,3 +141,19 @@ Triggers for an update (any one is sufficient):
 If none of these apply in a session, explicitly confirm before closing — do not silently skip.
 
 Rationale: security docs that are written once and never updated give visitors a false sense of confidence. A stale doc is worse than none because it misleads. Keeping it in sync with `AGENTS.md` makes maintenance automatic rather than optional.
+
+## D-012: Configurable rounding increment (30 or 60 min) stored in user_settings
+
+**Date:** 2026-02
+**Status:** Accepted
+
+The rounding increment (previously hardcoded to 60 min = 1 h) is now a per-user setting stored in `user_settings.rounding_increment_minutes` (integer, NOT NULL DEFAULT 60). Valid values are 30 or 60 — enforced at the DB default level and via Zod validation on the `PUT /api/settings` route (`z.union([z.literal(30), z.literal(60)])`).
+
+Why the same `user_settings` table (not env var / localStorage):
+- Per-user: different users on the same instance may want different precision
+- Server-authoritative: `computeRounding()` runs server-side; the increment must come from the same source as the weekly goal
+- Consistent with the existing `weeklyGoalHours` pattern added in D-010
+
+`computeRounding()` in `@time-keeper/shared` now accepts a fourth optional parameter `roundingIncrementMinutes` (default `DEFAULT_ROUNDING_INCREMENT = 60`) so all existing tests continue to pass unchanged.
+
+The frontend exposes the setting as a two-button toggle ("30 min" / "60 min") immediately below the weekly goal slider in the Settings → Work week card. Selecting either option fires an immediate PUT (the entire settings object is sent — both `weeklyGoalHours` and `roundingIncrementMinutes` — because the backend validates the full body).
