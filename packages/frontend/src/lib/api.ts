@@ -62,4 +62,13 @@ export const api = {
   info: {
     get: () => request<{ version: string; repoUrl: string; user: string }>('/info'),
   },
+
+  settings: {
+    get: () => request<{ weeklyGoalHours: number }>('/settings'),
+    update: (weeklyGoalHours: number) =>
+      request<{ weeklyGoalHours: number }>('/settings', {
+        method: 'PUT',
+        body: JSON.stringify({ weeklyGoalHours }),
+      }),
+  },
 } as const;

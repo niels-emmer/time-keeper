@@ -1,8 +1,14 @@
 import { eq, and, gte, lte, isNotNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { timeEntries, categories } from '../db/schema.js';
+import { timeEntries, categories, userSettings } from '../db/schema.js';
 import { isoWeekBounds, toDateString, toISOWeek } from '@time-keeper/shared';
 import type { WeeklySummary, DaySummary, CategorySummary } from '@time-keeper/shared';
+
+function getWeeklyGoalMinutes(userId: string): number {
+  const row = db.select().from(userSettings).where(eq(userSettings.userId, userId)).get();
+  const hours = row?.weeklyGoalHours ?? 40;
+  return hours * 60;
+}
 
 /**
  * Build a weekly summary for the given ISO week string (e.g. "2026-W07").
@@ -36,6 +42,9 @@ export function getWeeklySummary(userId: string, week: string): WeeklySummary {
       )
     )
     .all();
+
+  const weeklyGoalMinutes = getWeeklyGoalMinutes(userId);
+  const dailyGoalMinutes = Math.round(weeklyGoalMinutes / 5); // 5 working days
 
   // Group by day then by category
   const byDay = new Map<string, typeof entries>();
@@ -77,12 +86,12 @@ export function getWeeklySummary(userId: string, week: string): WeeklySummary {
     }));
 
     const totalMinutes = catSummaries.reduce((sum, c) => sum + c.minutes, 0);
-    days.push({ date: dateStr, totalMinutes, goalMinutes: 480, categories: catSummaries });
+    days.push({ date: dateStr, totalMinutes, goalMinutes: dailyGoalMinutes, categories: catSummaries });
   }
 
   const totalMinutes = days.reduce((sum, d) => sum + d.totalMinutes, 0);
 
-  return { week, totalMinutes, goalMinutes: 2400, days };
+  return { week, totalMinutes, goalMinutes: weeklyGoalMinutes, days };
 }
 
 /**
@@ -112,3 +121,8 @@ export function getWeekMinutesBefore(userId: string, date: string): number {
     return sum + Math.floor(ms / 60000);
   }, 0);
 }
+
+/**
+ * Get the user's weekly goal in minutes.
+ */
+export { getWeeklyGoalMinutes };

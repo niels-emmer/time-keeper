@@ -70,13 +70,14 @@ function WeeklyProgress() {
       : 0;
 
   const totalMinutes = completedMinutes + activeElapsedMinutes;
+  const goalHours = summary ? summary.goalMinutes / 60 : 40;
 
   if (!summary) return null;
 
   return (
     <span className="font-mono text-sm tabular-nums text-muted-foreground">
       {formatHHMM(totalMinutes)}
-      <span className="text-muted-foreground/50"> / 40</span>
+      <span className="text-muted-foreground/50"> / {goalHours}</span>
     </span>
   );
 }

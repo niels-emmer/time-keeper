@@ -47,7 +47,16 @@ export const timeEntries = sqliteTable(
   ]
 );
 
+export const userSettings = sqliteTable('user_settings', {
+  userId: text('user_id').primaryKey(),
+  weeklyGoalHours: integer('weekly_goal_hours').notNull().default(40),
+  updatedAt: text('updated_at')
+    .notNull()
+    .default(sql`(datetime('now'))`),
+});
+
 export type CategoryRow = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
 export type TimeEntryRow = typeof timeEntries.$inferSelect;
 export type NewTimeEntry = typeof timeEntries.$inferInsert;
+export type UserSettingsRow = typeof userSettings.$inferSelect;

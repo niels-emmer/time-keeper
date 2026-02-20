@@ -30,11 +30,13 @@ export interface CategoryRounded {
  *
  * @param categories  Raw minutes per category for the day (only unrounded entries)
  * @param weekMinutesSoFar  Total minutes booked earlier in the week (excluding this day)
+ * @param weeklyGoalMinutes  Weekly cap in minutes (defaults to WEEKLY_GOAL_MINUTES = 2400)
  * @returns Per-category rounding result
  */
 export function computeRounding(
   categories: CategoryRaw[],
-  weekMinutesSoFar: number
+  weekMinutesSoFar: number,
+  weeklyGoalMinutes: number = WEEKLY_GOAL_MINUTES
 ): { result: CategoryRounded[]; weekWouldExceed: boolean; capped: boolean } {
   if (categories.length === 0 || categories.every((c) => c.minutes === 0)) {
     return {
@@ -54,12 +56,12 @@ export function computeRounding(
   const dayRoundedTotal = rounded.reduce((sum, c) => sum + c.roundedMinutes, 0);
   const projectedWeekTotal = weekMinutesSoFar + dayRoundedTotal;
 
-  if (projectedWeekTotal <= WEEKLY_GOAL_MINUTES) {
+  if (projectedWeekTotal <= weeklyGoalMinutes) {
     return { result: rounded, weekWouldExceed: false, capped: false };
   }
 
-  // Step 2: Week would exceed 40h — cap at remaining headroom
-  const headroom = Math.max(0, WEEKLY_GOAL_MINUTES - weekMinutesSoFar);
+  // Step 2: Week would exceed goal — cap at remaining headroom
+  const headroom = Math.max(0, weeklyGoalMinutes - weekMinutesSoFar);
   let excess = dayRoundedTotal - headroom;
 
   // Remove excess from categories with the most rounded minutes (largest first),
