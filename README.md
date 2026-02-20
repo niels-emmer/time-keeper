@@ -78,6 +78,7 @@ The short version:
 | [docs/integration/pwa.md](docs/integration/pwa.md) | Installing on macOS and Android |
 | [docs/operations/deployment.md](docs/operations/deployment.md) | Production deployment guide |
 | [docs/operations/runbooks.md](docs/operations/runbooks.md) | Common break/fix procedures |
+| [SECURITY.md](SECURITY.md) | Security posture, risks, and dependency audit |
 
 ## Customising categories
 
