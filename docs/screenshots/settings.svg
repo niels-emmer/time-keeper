@@ -1,0 +1,158 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="720" viewBox="0 0 390 720">
+  <defs>
+    <style>
+      text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+      .mono { font-family: 'SF Mono', 'Fira Code', monospace; }
+    </style>
+    <linearGradient id="logo-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0F1E35"/>
+      <stop offset="100%" stop-color="#0A1628"/>
+    </linearGradient>
+    <linearGradient id="logo-ring" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#00D4FF"/>
+      <stop offset="100%" stop-color="#0099CC"/>
+    </linearGradient>
+    <!-- slider track gradient -->
+    <linearGradient id="slider-fill" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="hsl(239,84%,67%)"/>
+      <stop offset="87.5%" stop-color="hsl(239,84%,67%)"/>
+      <stop offset="87.5%" stop-color="hsl(222,47%,22%)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Screen background -->
+  <rect width="390" height="720" fill="hsl(222,47%,11%)"/>
+
+  <!-- ── TOP BAR ── -->
+  <rect width="390" height="56" fill="hsl(222,47%,14%)" stroke="hsl(222,47%,18%)" stroke-width="1"/>
+  <g transform="translate(16,14)">
+    <rect x="0" y="0" width="28" height="28" rx="7" fill="url(#logo-bg)"/>
+    <rect x="0" y="0" width="28" height="28" rx="7" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="0.5"/>
+    <circle cx="14" cy="14" r="7.5" fill="none" stroke="url(#logo-ring)" stroke-width="1.5"/>
+    <circle cx="14" cy="7.5" r="0.7" fill="#00D4FF" opacity="0.7"/>
+    <circle cx="20.5" cy="14" r="0.7" fill="#00D4FF" opacity="0.7"/>
+    <circle cx="14" cy="20.5" r="0.7" fill="#00D4FF" opacity="0.7"/>
+    <circle cx="7.5" cy="14" r="0.7" fill="#00D4FF" opacity="0.7"/>
+    <line x1="14" y1="14" x2="9.8" y2="8.5" stroke="#E8F4FF" stroke-width="1.1" stroke-linecap="round"/>
+    <line x1="14" y1="14" x2="17.5" y2="10.8" stroke="#FFAA00" stroke-width="1.3" stroke-linecap="round"/>
+    <circle cx="14" cy="14" r="1.3" fill="#FFAA00"/>
+    <circle cx="14" cy="14" r="0.65" fill="#FFD966"/>
+  </g>
+  <text x="52" y="32" font-size="15" font-weight="700" fill="hsl(213,31%,91%)" letter-spacing="-0.3">Time Keeper</text>
+  <text x="310" y="32" font-size="13" fill="hsl(213,31%,65%)" class="mono">23:15</text>
+  <text x="348" y="32" font-size="13" fill="hsl(213,31%,40%)" class="mono"> / 35</text>
+
+  <!-- ── CATEGORIES SECTION ── -->
+  <text x="16" y="84" font-size="17" font-weight="600" fill="hsl(213,31%,91%)">Categories</text>
+
+  <!-- Category list card -->
+  <rect x="16" y="96" width="358" height="236" rx="12" fill="hsl(222,47%,14%)" stroke="hsl(222,47%,20%)" stroke-width="1"/>
+
+  <!-- Category row 1: Development -->
+  <g transform="translate(0,0)">
+    <text x="32" y="122" font-size="14" fill="hsl(213,31%,40%)">⠿</text>
+    <circle cx="54" cy="119" r="5" fill="#6366f1"/>
+    <text x="66" y="124" font-size="13" font-weight="500" fill="hsl(213,31%,85%)">Development</text>
+    <text x="168" y="122" font-size="11" fill="hsl(213,31%,40%)">DEV</text>
+    <text x="330" y="124" font-size="14" fill="hsl(213,31%,50%)" text-anchor="middle">✎</text>
+    <text x="358" y="124" font-size="14" fill="hsl(0,63%,55%)" text-anchor="middle">🗑</text>
+    <line x1="28" y1="132" x2="366" y2="132" stroke="hsl(222,47%,18%)" stroke-width="1"/>
+  </g>
+
+  <!-- Category row 2: Meetings -->
+  <g transform="translate(0,36)">
+    <text x="32" y="122" font-size="14" fill="hsl(213,31%,40%)">⠿</text>
+    <circle cx="54" cy="119" r="5" fill="#ec4899"/>
+    <text x="66" y="124" font-size="13" font-weight="500" fill="hsl(213,31%,85%)">Meetings</text>
+    <text x="154" y="122" font-size="11" fill="hsl(213,31%,40%)">MTG</text>
+    <text x="330" y="124" font-size="14" fill="hsl(213,31%,50%)" text-anchor="middle">✎</text>
+    <text x="358" y="124" font-size="14" fill="hsl(0,63%,55%)" text-anchor="middle">🗑</text>
+    <line x1="28" y1="132" x2="366" y2="132" stroke="hsl(222,47%,18%)" stroke-width="1"/>
+  </g>
+
+  <!-- Category row 3: Documentation -->
+  <g transform="translate(0,72)">
+    <text x="32" y="122" font-size="14" fill="hsl(213,31%,40%)">⠿</text>
+    <circle cx="54" cy="119" r="5" fill="#14b8a6"/>
+    <text x="66" y="124" font-size="13" font-weight="500" fill="hsl(213,31%,85%)">Documentation</text>
+    <text x="194" y="122" font-size="11" fill="hsl(213,31%,40%)">DOC</text>
+    <text x="330" y="124" font-size="14" fill="hsl(213,31%,50%)" text-anchor="middle">✎</text>
+    <text x="358" y="124" font-size="14" fill="hsl(0,63%,55%)" text-anchor="middle">🗑</text>
+    <line x1="28" y1="132" x2="366" y2="132" stroke="hsl(222,47%,18%)" stroke-width="1"/>
+  </g>
+
+  <!-- Category row 4: Review -->
+  <g transform="translate(0,108)">
+    <text x="32" y="122" font-size="14" fill="hsl(213,31%,40%)">⠿</text>
+    <circle cx="54" cy="119" r="5" fill="#f97316"/>
+    <text x="66" y="124" font-size="13" font-weight="500" fill="hsl(213,31%,85%)">Review</text>
+    <text x="130" y="122" font-size="11" fill="hsl(213,31%,40%)">REV</text>
+    <text x="330" y="124" font-size="14" fill="hsl(213,31%,50%)" text-anchor="middle">✎</text>
+    <text x="358" y="124" font-size="14" fill="hsl(0,63%,55%)" text-anchor="middle">🗑</text>
+    <line x1="28" y1="132" x2="366" y2="132" stroke="hsl(222,47%,18%)" stroke-width="1"/>
+  </g>
+
+  <!-- Category row 5: Planning -->
+  <g transform="translate(0,144)">
+    <text x="32" y="122" font-size="14" fill="hsl(213,31%,40%)">⠿</text>
+    <circle cx="54" cy="119" r="5" fill="#8b5cf6"/>
+    <text x="66" y="124" font-size="13" font-weight="500" fill="hsl(213,31%,85%)">Planning</text>
+    <text x="148" y="122" font-size="11" fill="hsl(213,31%,40%)">PLAN</text>
+    <text x="330" y="124" font-size="14" fill="hsl(213,31%,50%)" text-anchor="middle">✎</text>
+    <text x="358" y="124" font-size="14" fill="hsl(0,63%,55%)" text-anchor="middle">🗑</text>
+  </g>
+
+  <!-- Add category button -->
+  <rect x="16" y="340" width="358" height="38" rx="8" fill="hsl(239,84%,67%,0.15)" stroke="hsl(239,84%,67%,0.4)" stroke-width="1"/>
+  <text x="195" y="364" font-size="13" font-weight="500" fill="hsl(239,84%,75%)" text-anchor="middle">+ Add category</text>
+
+  <!-- ── WORK WEEK SECTION ── -->
+  <text x="16" y="406" font-size="17" font-weight="600" fill="hsl(213,31%,91%)">Work week</text>
+
+  <rect x="16" y="418" width="358" height="100" rx="12" fill="hsl(222,47%,14%)" stroke="hsl(222,47%,20%)" stroke-width="1"/>
+
+  <!-- Label + input row -->
+  <text x="32" y="446" font-size="13" font-weight="500" fill="hsl(213,31%,85%)">Weekly goal</text>
+  <text x="32" y="461" font-size="11" fill="hsl(213,31%,45%)">Used for progress display and rounding cap (0–40 h)</text>
+
+  <!-- number input -->
+  <rect x="308" y="433" width="44" height="28" rx="6" fill="hsl(222,47%,10%)" stroke="hsl(222,47%,28%)" stroke-width="1"/>
+  <text x="330" y="452" font-size="14" font-weight="600" fill="hsl(213,31%,91%)" class="mono" text-anchor="middle">35</text>
+  <text x="358" y="452" font-size="12" fill="hsl(213,31%,50%)">h</text>
+
+  <!-- slider track -->
+  <rect x="32" y="482" width="326" height="4" rx="2" fill="hsl(222,47%,22%)"/>
+  <!-- filled portion (35/40 = 87.5%) -->
+  <rect x="32" y="482" width="285" height="4" rx="2" fill="hsl(239,84%,67%)"/>
+  <!-- thumb -->
+  <circle cx="317" cy="484" r="8" fill="hsl(239,84%,67%)" stroke="hsl(222,47%,11%)" stroke-width="2"/>
+  <circle cx="317" cy="484" r="4" fill="white" opacity="0.9"/>
+
+  <!-- ── ABOUT SECTION ── -->
+  <text x="16" y="546" font-size="17" font-weight="600" fill="hsl(213,31%,91%)">About</text>
+
+  <rect x="16" y="558" width="358" height="100" rx="12" fill="hsl(222,47%,14%)" stroke="hsl(222,47%,20%)" stroke-width="1"/>
+
+  <!-- Signed in as -->
+  <text x="32" y="582" font-size="12" fill="hsl(213,31%,45%)">Signed in as</text>
+  <text x="362" y="582" font-size="12" font-weight="500" fill="hsl(213,31%,80%)" text-anchor="end">user@example.com</text>
+  <line x1="28" y1="590" x2="366" y2="590" stroke="hsl(222,47%,18%)" stroke-width="1"/>
+
+  <!-- Version -->
+  <text x="32" y="612" font-size="12" fill="hsl(213,31%,45%)">Version</text>
+  <text x="362" y="612" font-size="12" font-weight="500" fill="hsl(213,31%,80%)" class="mono" text-anchor="end">v0.6.0</text>
+  <line x1="28" y1="620" x2="366" y2="620" stroke="hsl(222,47%,18%)" stroke-width="1"/>
+
+  <!-- Source -->
+  <text x="32" y="642" font-size="12" fill="hsl(213,31%,45%)">Source</text>
+  <text x="362" y="642" font-size="12" font-weight="500" fill="hsl(239,84%,67%)" text-anchor="end">GitHub ↗</text>
+
+  <!-- ── BOTTOM NAV ── -->
+  <rect y="662" width="390" height="58" fill="hsl(222,47%,14%)" stroke="hsl(222,47%,18%)" stroke-width="1"/>
+  <text x="65" y="687" font-size="20" fill="hsl(213,31%,45%)" text-anchor="middle">⏱</text>
+  <text x="65" y="704" font-size="11" fill="hsl(213,31%,45%)" text-anchor="middle">Track</text>
+  <text x="195" y="687" font-size="20" fill="hsl(213,31%,45%)" text-anchor="middle">📊</text>
+  <text x="195" y="704" font-size="11" fill="hsl(213,31%,45%)" text-anchor="middle">Weekly</text>
+  <text x="325" y="687" font-size="20" fill="hsl(239,84%,67%)" text-anchor="middle">⚙</text>
+  <text x="325" y="704" font-size="11" font-weight="600" fill="hsl(239,84%,67%)" text-anchor="middle">Settings</text>
+</svg>

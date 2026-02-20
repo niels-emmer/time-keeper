@@ -6,6 +6,18 @@ A self-hosted personal work-timer PWA. Track time against named categories from 
 
 Runs as a PWA — installs to the macOS Dock and Android home screen with no app store required.
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/track.svg" width="220" alt="Track tab — category grid with active timer"/><br/><sub><b>Track</b> — tap a category to start</sub></td>
+    <td align="center"><img src="docs/screenshots/weekly.svg" width="220" alt="Weekly tab — hours per category per day"/><br/><sub><b>Weekly</b> — hours by category × day</sub></td>
+    <td align="center"><img src="docs/screenshots/settings.svg" width="220" alt="Settings tab — categories and weekly goal"/><br/><sub><b>Settings</b> — categories &amp; weekly goal</sub></td>
+  </tr>
+</table>
+
+> These are SVG mockups generated from source code. Replace with real screenshots once deployed.
+
 ## Features
 
 - **One-tap timer** — tap a category to start, tap Stop to finish; starting a new category auto-stops the previous one
