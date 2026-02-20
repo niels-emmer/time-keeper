@@ -27,6 +27,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `packages/backend/drizzle/` | Migration SQL files — committed, run on startup |
 | `packages/shared/src/utils/rounding.test.ts` | Unit tests for the rounding algorithm (Vitest) |
 | `packages/backend/src/routes/settings.test.ts` | Unit tests for the settings route (Vitest) |
+| `SECURITY.md` | Security posture — **must be kept current** (see task routing below) |
 
 ## Task routing
 
@@ -41,6 +42,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | Deploy | `docs/operations/deployment.md` |
 | Understand Docker layout | `docs/integration/docker.md` |
 | Fix a recurring incident | `docs/memory/incidents.md` |
+| Added a dependency / changed API / changed auth or storage | Update `SECURITY.md` (dep table, audit date, threat model, or "not done" list as appropriate) |
 
 ## API routes
 

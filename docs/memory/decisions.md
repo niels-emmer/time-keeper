@@ -119,3 +119,25 @@ Why a DB table rather than an env variable or localStorage:
 The `computeRounding()` function now accepts an optional `weeklyGoalMinutes` parameter (default 2400) so existing unit tests continue to work without changes, and callers that need the user value pass it explicitly.
 
 The frontend reads the goal via `GET /api/settings` and exposes a number input + range slider (0–40) in Settings → Work week. Changes are saved on blur/release and invalidate both the `settings` and `summary` React Query caches.
+
+## D-011: SECURITY.md is a living document, maintained by every agent session
+
+**Date:** 2026-02
+**Status:** Accepted
+
+`SECURITY.md` must reflect the current state of the codebase at all times, not just at the moment it was created. This is enforced as a standing requirement in `AGENTS.md`.
+
+Triggers for an update (any one is sufficient):
+
+| Change | Section to update |
+|--------|-----------------|
+| New npm dependency | Dependency table; re-run `yarn npm audit`; update audit date |
+| Dependency removed or upgraded | Same |
+| New or removed API endpoint | Threat model (authenticated surface) |
+| Auth or middleware change | Authentication section |
+| Schema or persistence change | Data storage section |
+| New capability not yet audited | "What has not been done" list |
+
+If none of these apply in a session, explicitly confirm before closing — do not silently skip.
+
+Rationale: security docs that are written once and never updated give visitors a false sense of confidence. A stale doc is worse than none because it misleads. Keeping it in sync with `AGENTS.md` makes maintenance automatic rather than optional.
