@@ -58,6 +58,17 @@ yarn workspace @time-keeper/backend db:generate
 
 This creates a new SQL file in `packages/backend/drizzle/`. Commit it alongside the schema change. Migrations run automatically when the backend starts.
 
+## Running tests
+
+```bash
+# Shared utilities (rounding algorithm, etc.)
+yarn workspace @time-keeper/shared test          # run once
+yarn workspace @time-keeper/shared test:watch    # watch mode
+
+# Backend (settings route, validation, auth middleware)
+yarn workspace @time-keeper/backend test
+```
+
 ## TypeScript
 
 The workspace uses TypeScript project references. If your editor shows type errors in the frontend for shared types, make sure `packages/shared` is built or pointed to via the `exports` field in its `package.json`.

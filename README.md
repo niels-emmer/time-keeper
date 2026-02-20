@@ -23,7 +23,7 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
 - **One-tap timer** — tap a category to start, tap Stop to finish; starting a new category auto-stops the previous one
 - **Weekly goal** — configurable hours per week (0–40); shown in the top bar and weekly summary, drives the rounding cap
 - **Weekly overview** — time per category per day, copy to clipboard in a format ready to paste into your time registration tool
-- **End-of-day rounding** — round tracked minutes up to whole hours, capped at your configurable weekly goal (default 40 h)
+- **End-of-day rounding** — round tracked minutes up to the nearest 30 or 60 minutes (configurable), capped at your weekly goal
 - **PWA** — installable on macOS and Android, runs in standalone mode (no browser chrome)
 - **Self-hosted** — runs in Docker, no external services or accounts required beyond your own Authentik instance
 

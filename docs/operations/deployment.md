@@ -10,7 +10,7 @@
 ## Step 1: Clone the repository
 
 ```bash
-git clone https://github.com/your-username/time-keeper.git /opt/time-keeper
+git clone https://github.com/niels-emmer/time-keeper.git /opt/time-keeper
 cd /opt/time-keeper
 ```
 

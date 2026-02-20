@@ -65,8 +65,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 |----------|------|---------|
 | `GET /api/health` | No | Docker healthcheck; returns `{"status":"ok","version":"0.1.0"}` |
 | `GET /api/info` | Yes | Returns `{ version, repoUrl, user }` — shown in Settings → About |
-| `GET /api/settings` | Yes | Returns `{ weeklyGoalHours }` — user's configurable weekly target |
-| `PUT /api/settings` | Yes | Update `{ weeklyGoalHours }` (integer, 0–40) |
+| `GET /api/settings` | Yes | Returns `{ weeklyGoalHours, roundingIncrementMinutes }` — user's configurable weekly target and rounding granularity |
+| `PUT /api/settings` | Yes | Update `{ weeklyGoalHours }` (integer, 0–40) and/or `{ roundingIncrementMinutes }` (30 or 60) |
 | `GET /api/categories` | Yes | List categories ordered by `sort_order ASC` |
 | `POST /api/categories` | Yes | Create category (auto-assigns `sort_order`) |
 | `PUT /api/categories/:id` | Yes | Update a category |
