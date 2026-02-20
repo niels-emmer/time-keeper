@@ -16,7 +16,7 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
   </tr>
 </table>
 
-> These are SVG mockups generated from source code. Replace with real screenshots once deployed.
+> These are SVG mockups generated from source code, to protect the innocent. Results may vary ;-)
 
 ## Features
 
