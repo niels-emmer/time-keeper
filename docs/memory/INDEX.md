@@ -48,7 +48,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | Debug session-expiry UX | `packages/frontend/src/lib/api.ts` (`AuthError`), `src/lib/authContext.ts`, `src/components/SessionExpiredOverlay.tsx` |
 | Debug timer accuracy / background tab | `packages/frontend/src/workers/timer.worker.ts`, `src/components/ActiveTimer.tsx` |
 | Debug PWA / service worker / notifications | `packages/frontend/src/sw.ts`, `src/lib/notifications.ts`, `vite.config.ts` |
-| Regenerate screenshot mockups | `docs/screenshots/` — see Screenshot SVG conventions section below |
+| Regenerate screenshot mockups | `docs/screenshots/` — see Screenshot conventions section below |
 | Deploy | `docs/operations/deployment.md` |
 | Understand Docker layout | `docs/integration/docker.md` |
 | Fix a recurring incident | `docs/memory/incidents.md` |
@@ -83,14 +83,15 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 APP_VERSION=$(git describe --tags --abbrev=0) docker compose up -d --build
 ```
 
-## Screenshot SVG conventions
+## Screenshot conventions
 
-`docs/screenshots/` contains three 390×820px dark-theme mockups (track.svg, weekly.svg, settings.svg). Key rules for regenerating them:
+`docs/screenshots/` contains three real PNG screenshots (track.png, weekly.png, settings.png) captured at 390×844px using Chrome DevTools device emulation (390×844 iPhone viewport) with html2canvas. To regenerate:
 
-- **Nav icons**: use inline SVG paths — never emoji (emoji ignore `stroke`/`fill` so active/inactive styling is impossible). Track = Timer icon `(55,770)`, Weekly = BarChart2 `(185,770)`, Settings = gear `(315,770)`. Active tab: `stroke/fill hsl(239,84%,67%)` + `font-weight 600`. Inactive: `hsl(213,31%,45%)`.
-- **Category cards** (track.svg): left 6 px colour stripe clipped via `<clipPath>` to rounded card rect. Active blinking dot at `cx = card_right − 12, cy = card_top + 12`. Name/code bottom-aligned (`y = card_top + 51 / +65`).
-- **Weekly table** (weekly.svg): category col fixed 60 px (x=28–88); 7 day cols + Total share remaining 286 px (35 px each); centers Mon=105 Tue=140 Wed=175 Thu=210 Fri=245 Sat=280 Sun=315; Total right-aligned x=370. Abbreviate long names (e.g. "Docs").
-- **Colour palette**: bg `hsl(222,47%,11%)`, card `hsl(222,47%,14%)`, card border `hsl(222,47%,20%)`, header row `hsl(222,47%,16%)`, active indigo `hsl(239,84%,67%)`, text primary `hsl(213,31%,91%)`, secondary `hsl(213,31%,85%)`, muted `hsl(213,31%,50%)`, dim `hsl(213,31%,40%)`.
+1. Start dev servers: `DEV_USER_ID=dev@example.com yarn workspace @time-keeper/backend dev` + `yarn workspace @time-keeper/frontend dev`
+2. Seed sample data via the API (categories + an active timer)
+3. Open Chrome, enable DevTools device emulation at 390×844, undock DevTools to a separate window
+4. For each page (`/`, `/weekly`, `/settings`): inject html2canvas from CDN, capture `document.body`, POST base64 PNG to a temporary `/api/dev/screenshot` endpoint on the backend (add CORS header for localhost:5173), save to `docs/screenshots/{name}.png`
+5. Update `README.md` if filenames change
 
 ## Read next
 
