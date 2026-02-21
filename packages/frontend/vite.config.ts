@@ -17,7 +17,10 @@ export default defineConfig({
         name: 'Time Keeper',
         short_name: 'TimeKeeper',
         description: 'Track work time by category for Workday',
-        theme_color: '#0B1220',
+        // Primary brand colour — works across both light and dark themes.
+        // The <meta name="theme-color"> tags in index.html handle per-scheme
+        // browser chrome colour while browsing (media query aware).
+        theme_color: '#4f5aea',
         background_color: '#0B1220',
         display: 'standalone',
         orientation: 'portrait',

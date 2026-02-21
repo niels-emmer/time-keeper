@@ -163,6 +163,32 @@ Retry behaviour: `AuthError` disables React Query's retry logic (`retry: false` 
 
 No new npm dependencies were added.
 
+## D-014: Light / dark / system theme — client-side only, localStorage
+
+**Date:** 2026-02
+**Status:** Accepted
+
+The app shipped dark-only. A three-way preference (Light / Dark / Follow System) was added as a purely client-side feature.
+
+**Storage:** `localStorage['time-keeper-theme']` ('light' | 'dark' | 'system'). Default when absent: 'system'.
+
+**Mechanism:** Tailwind's `darkMode: ['class']` strategy is used. The `.dark` class is toggled on `<html>` by `applyTheme()` in `src/lib/theme.ts`. A `ThemeProvider` in `src/context/ThemeContext.tsx` wraps the whole app, tracks preference in React state, and listens to the `prefers-color-scheme` media-query event so a 'system' selection responds to OS changes in real time.
+
+**Flash prevention:** A tiny inline `<script>` in `<head>` (before any CSS or JS loads) reads localStorage and conditionally adds `class="dark"` to `<html>`. This runs synchronously so the correct theme is applied before the first paint, eliminating any flash-of-wrong-theme.
+
+**CSS variables:** `index.css` now defines `:root` as the light palette and `.dark` as the original dark palette. All other Tailwind / shadcn/ui colour references (`bg-background`, `text-muted-foreground`, etc.) automatically resolve to the active palette via `hsl(var(--name))`.
+
+**PWA manifest:** `theme_color` updated to the primary brand colour (`#4f5aea`), which is neutral between the two schemes. Two `<meta name="theme-color">` tags with `media` attributes in `index.html` control the browser chrome colour per scheme while browsing (Chrome 76+ supports this).
+
+**No backend changes:** theme is a display preference with no effect on server-side logic.
+
+Why localStorage rather than the `user_settings` table (used for weekly goal and rounding increment):
+- Theme is a device/browser preference — the same user might want different themes on phone vs desktop
+- No server round-trip needed; the preference is applied synchronously on first paint
+- Storing it server-side would require a `GET /api/settings` response before the correct theme could be applied, causing a flash
+
+---
+
 ## D-012: Configurable rounding increment (30 or 60 min) stored in user_settings
 
 **Date:** 2026-02

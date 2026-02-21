@@ -3,7 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0B1220" />
+    <!-- theme-color: browser chrome matches the active colour scheme -->
+    <meta name="theme-color" content="#f3f6fb" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0B1220" media="(prefers-color-scheme: dark)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <!-- Icons -->
@@ -11,6 +13,19 @@
     <link rel="icon" type="image/svg+xml" href="/icons/timekeeper.svg" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title>Time Keeper</title>
+    <!--
+      Inline theme script: runs before React mounts to prevent a flash of the
+      wrong theme. Reads localStorage, falls back to prefers-color-scheme.
+    -->
+    <script>
+      (function () {
+        var t = localStorage.getItem('time-keeper-theme');
+        var dark =
+          t === 'dark' ||
+          (t !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (dark) document.documentElement.classList.add('dark');
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
