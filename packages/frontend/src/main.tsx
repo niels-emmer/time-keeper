@@ -4,6 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App.tsx';
 import { AuthContext } from './lib/authContext.ts';
 import { AuthError } from './lib/api.ts';
+import { ThemeProvider } from './context/ThemeContext.tsx';
 import './index.css';
 
 function Root() {
@@ -47,11 +48,13 @@ function Root() {
   }, [queryClient, markSessionExpired]);
 
   return (
-    <AuthContext.Provider value={{ sessionExpired, markSessionExpired }}>
-      <QueryClientProvider client={queryClient}>
-        <App />
-      </QueryClientProvider>
-    </AuthContext.Provider>
+    <ThemeProvider>
+      <AuthContext.Provider value={{ sessionExpired, markSessionExpired }}>
+        <QueryClientProvider client={queryClient}>
+          <App />
+        </QueryClientProvider>
+      </AuthContext.Provider>
+    </ThemeProvider>
   );
 }
 

@@ -25,6 +25,8 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `packages/frontend/src/components/CategoryManager.tsx` | Category CRUD + drag-to-reorder + A-Z sort |
 | `packages/frontend/src/components/WeeklyGoalSetting.tsx` | Settings UI for weekly goal (number input + slider) + rounding increment toggle |
 | `packages/frontend/src/components/SessionExpiredOverlay.tsx` | Full-screen overlay shown on 401/403; prompts user to log in again |
+| `packages/frontend/src/lib/theme.ts` | Pure theme utilities — `getStoredTheme`, `setStoredTheme`, `applyTheme`, `resolveTheme` |
+| `packages/frontend/src/context/ThemeContext.tsx` | `ThemeProvider` + `useTheme` hook — manages light/dark/system preference and applies `.dark` class |
 | `packages/frontend/src/lib/authContext.ts` | React context carrying `sessionExpired` flag; set by global React Query error handler |
 | `packages/frontend/src/lib/api.ts` | Base fetch wrapper; throws `AuthError` on 401/403 |
 | `packages/frontend/src/workers/timer.worker.ts` | Off-thread 1 s tick — keeps elapsed time accurate when tab is hidden |
@@ -34,6 +36,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `packages/backend/drizzle/` | Migration SQL files — committed, run on startup |
 | `packages/shared/src/utils/rounding.test.ts` | Unit tests for the rounding algorithm (Vitest) |
 | `packages/backend/src/routes/settings.test.ts` | Unit tests for the settings route (Vitest) |
+| `packages/frontend/src/lib/__tests__/theme.test.ts` | Unit tests for theme utilities — 18 tests covering get/set/apply/resolve |
 | `SECURITY.md` | Security posture — **must be kept current** (see task routing below) |
 
 ## Task routing
@@ -44,6 +47,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | Change the rounding logic | `packages/shared/src/utils/rounding.ts` |
 | Add an API endpoint | Add route in `packages/backend/src/routes/`, register in `app.ts` |
 | Add a UI feature | `packages/frontend/src/pages/` or `components/` |
+| Change the theme / add colour tokens | `packages/frontend/src/index.css` (`:root` = light, `.dark` = dark), `src/lib/theme.ts` |
 | Change the weekly goal setting | `packages/backend/src/routes/settings.ts` + `WeeklyGoalSetting.tsx` |
 | Debug auth issues | `docs/integration/auth.md`, `packages/backend/src/middleware/auth.ts` |
 | Debug session-expiry UX | `packages/frontend/src/lib/api.ts` (`AuthError`), `src/lib/authContext.ts`, `src/components/SessionExpiredOverlay.tsx` |
@@ -122,3 +126,5 @@ yarn workspace @time-keeper/shared test:watch  # watch mode
 Tests live in `packages/shared/src/utils/rounding.test.ts`. They cover the core rounding algorithm (`computeRounding`): basic ceiling rounding, zero-minute no-ops, the configurable weekly cap, idempotency, and the configurable rounding increment (30 or 60 min). The `computeRounding` function accepts optional `weeklyGoalMinutes` (default 2400) and `roundingIncrementMinutes` (default 60) parameters.
 
 Backend tests live in `packages/backend/src/routes/settings.test.ts` and cover getOrCreate, upsert, and Zod validation for both `weeklyGoalHours` and `roundingIncrementMinutes`.
+
+Frontend tests live in `packages/frontend/src/lib/__tests__/theme.test.ts` and cover all pure theme utilities (`getStoredTheme`, `setStoredTheme`, `getSystemTheme`, `resolveTheme`, `applyTheme`). Vitest config is in `packages/frontend/vitest.config.ts` (jsdom environment, global APIs).
