@@ -20,7 +20,8 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `packages/backend/src/middleware/auth.ts` | Auth boundary — reads `X-authentik-email` header |
 | `packages/backend/src/routes/settings.ts` | GET/PUT `/api/settings` — weekly goal hours + rounding increment |
 | `packages/backend/src/services/summaryService.ts` | Builds weekly summary; reads weekly goal + rounding increment from DB |
-| `packages/frontend/src/components/CategoryGrid.tsx` | Primary UX surface — 2-col card grid; left colour stripe + active blinking dot |
+| `packages/frontend/src/components/CategoryGrid.tsx` | Primary UX surface — 2-col card grid; pill badge (workday code / initials) + active glow |
+| `packages/frontend/src/components/WeeklySummary.tsx` | Weekly tab — stacked bar chart, hours-by-category table, CSV export, round-week |
 | `packages/frontend/src/components/CategoryManager.tsx` | Category CRUD + drag-to-reorder + A-Z sort |
 | `packages/frontend/src/components/WeeklyGoalSetting.tsx` | Settings UI for weekly goal (number input + slider) + rounding increment toggle |
 | `packages/frontend/src/components/SessionExpiredOverlay.tsx` | Full-screen overlay shown on 401/403; prompts user to log in again |
