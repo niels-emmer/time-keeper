@@ -75,7 +75,8 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `PATCH /api/entries/:id` | Yes | Update a time entry |
 | `DELETE /api/entries/:id` | Yes | Delete a time entry |
 | `GET /api/summary/weekly` | Yes | Weekly summary (goalMinutes comes from user_settings) |
-| `POST /api/summary/round` | Yes | Apply end-of-day rounding (cap = user's weekly goal) |
+| `POST /api/summary/round` | Yes | Apply end-of-day rounding for a single date (cap = user's weekly goal) |
+| `POST /api/summary/round-week` | Yes | Apply rounding to all 7 days of an ISO week; idempotent, skips already-rounded entries |
 
 ## Deploy command
 

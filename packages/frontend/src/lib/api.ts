@@ -71,6 +71,8 @@ export const api = {
       request<WeeklySummary>(`/summary/weekly${week ? `?week=${week}` : ''}`),
     round: (date: string) =>
       request<RoundingResult>('/summary/round', { method: 'POST', body: JSON.stringify({ date }) }),
+    roundWeek: (week: string) =>
+      request<{ week: string; results: RoundingResult[] }>('/summary/round-week', { method: 'POST', body: JSON.stringify({ week }) }),
   },
 
   info: {

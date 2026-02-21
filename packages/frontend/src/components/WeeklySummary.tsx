@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Copy, Check, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useWeeklySummary, useRoundDay } from '@/hooks/useSummary';
-import { toISOWeek, formatDuration } from '@time-keeper/shared';
+import { Card, CardContent } from '@/components/ui/card';
+import { useWeeklySummary, useRoundWeek } from '@/hooks/useSummary';
+import { toISOWeek } from '@time-keeper/shared';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -20,25 +20,58 @@ function getWeekOffset(baseWeek: string, offset: number): string {
 export function WeeklySummary() {
   const [week, setWeek] = useState(() => toISOWeek(new Date()));
   const { data: summary, isLoading } = useWeeklySummary(week);
-  const roundDay = useRoundDay();
-  const [copied, setCopied] = useState(false);
+  const roundWeek = useRoundWeek();
 
-  function copyToClipboard() {
+  function exportCsv() {
     if (!summary) return;
-    const lines: string[] = [`Week ${summary.week}`, ''];
+
+    // Collect all categories that appear this week (preserving order)
+    const allCats = new Map<number, { name: string; workdayCode: string | null }>();
     for (const day of summary.days) {
-      if (day.categories.length === 0) continue;
-      lines.push(day.date);
       for (const cat of day.categories) {
-        const h = (cat.minutes / 60).toFixed(1);
-        lines.push(`  ${cat.name}${cat.workdayCode ? ` (${cat.workdayCode})` : ''}: ${h}h`);
+        if (!allCats.has(cat.categoryId)) {
+          allCats.set(cat.categoryId, { name: cat.name, workdayCode: cat.workdayCode });
+        }
       }
-      lines.push('');
     }
-    lines.push(`Total: ${(summary.totalMinutes / 60).toFixed(1)}h / ${summary.goalMinutes / 60}h`);
-    navigator.clipboard.writeText(lines.join('\n'));
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+
+    const dayLabels = summary.days.map((d) => d.date);
+
+    // Header row
+    const rows: string[][] = [
+      ['Category', 'Workday Code', ...dayLabels, 'Total'],
+    ];
+
+    // One row per category
+    for (const [catId, cat] of allCats.entries()) {
+      const dayHours = summary.days.map((d) => {
+        const c = d.categories.find((c) => c.categoryId === catId);
+        return c && c.minutes > 0 ? (c.minutes / 60).toFixed(2) : '0.00';
+      });
+      const totalHours = summary.days.reduce((sum, d) => {
+        const c = d.categories.find((c) => c.categoryId === catId);
+        return sum + (c?.minutes ?? 0);
+      }, 0);
+      rows.push([cat.name, cat.workdayCode ?? '', ...dayHours, (totalHours / 60).toFixed(2)]);
+    }
+
+    // Totals row
+    const dayTotals = summary.days.map((d) => (d.totalMinutes / 60).toFixed(2));
+    const weekTotal = (summary.totalMinutes / 60).toFixed(2);
+    rows.push(['Total', '', ...dayTotals, weekTotal]);
+
+    // Serialize to CSV
+    const csv = rows
+      .map((row) => row.map((cell) => `"${cell.replace(/"/g, '""')}"`).join(','))
+      .join('\r\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `time-keeper-${summary.week}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   if (isLoading) {
@@ -156,20 +189,16 @@ export function WeeklySummary() {
 
       {/* Actions */}
       <div className="flex gap-2">
-        <Button className="flex-1" onClick={copyToClipboard} variant="outline">
-          {copied ? <Check className="mr-2 h-4 w-4" /> : <Copy className="mr-2 h-4 w-4" />}
-          {copied ? 'Copied!' : 'Copy for Workday'}
+        <Button className="flex-1" onClick={exportCsv} variant="outline">
+          <Download className="mr-2 h-4 w-4" />
+          Export this week
         </Button>
         <Button
           variant="secondary"
-          onClick={() =>
-            roundDay.mutate(
-              new Date().toISOString().slice(0, 10)
-            )
-          }
-          disabled={roundDay.isPending}
+          onClick={() => roundWeek.mutate(week)}
+          disabled={roundWeek.isPending}
         >
-          Round today
+          {roundWeek.isPending ? 'Rounding…' : 'Round week'}
         </Button>
       </div>
     </div>

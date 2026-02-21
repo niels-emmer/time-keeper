@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { getWeeklySummary } from '../services/summaryService.js';
+import { getWeeklySummary, getWeekDateRange } from '../services/summaryService.js';
 import { applyRounding } from '../services/roundingService.js';
 import { toISOWeek } from '@time-keeper/shared';
 
@@ -25,6 +25,20 @@ summaryRouter.post('/round', (req, res, next) => {
 
     const result = applyRounding(req.userId, date);
     res.json(result);
+  } catch (err) {
+    next(err);
+  }
+});
+
+summaryRouter.post('/round-week', (req, res, next) => {
+  try {
+    const { week } = z
+      .object({ week: z.string().regex(/^\d{4}-W\d{2}$/) })
+      .parse(req.body);
+
+    const { dates } = getWeekDateRange(week);
+    const results = dates.map((date) => applyRounding(req.userId, date));
+    res.json({ week, results });
   } catch (err) {
     next(err);
   }

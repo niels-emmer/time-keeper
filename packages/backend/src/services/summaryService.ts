@@ -136,3 +136,17 @@ export { getWeeklyGoalMinutes };
  * Get the user's rounding increment in minutes (30 or 60).
  */
 export { getRoundingIncrementMinutes };
+
+/**
+ * Return the 7 YYYY-MM-DD date strings for the given ISO week.
+ */
+export function getWeekDateRange(week: string): { dates: string[] } {
+  const { start } = isoWeekBounds(week);
+  const dates: string[] = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(start);
+    d.setUTCDate(start.getUTCDate() + i);
+    dates.push(toDateString(d));
+  }
+  return { dates };
+}

@@ -20,3 +20,14 @@ export function useRoundDay() {
     },
   });
 }
+
+export function useRoundWeek() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (week: string) => api.summary.roundWeek(week),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['summary'] });
+      qc.invalidateQueries({ queryKey: ['entries'] });
+    },
+  });
+}
