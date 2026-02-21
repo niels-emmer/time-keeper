@@ -20,11 +20,15 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `packages/backend/src/middleware/auth.ts` | Auth boundary — reads `X-authentik-email` header |
 | `packages/backend/src/routes/settings.ts` | GET/PUT `/api/settings` — weekly goal hours + rounding increment |
 | `packages/backend/src/services/summaryService.ts` | Builds weekly summary; reads weekly goal + rounding increment from DB |
-| `packages/frontend/src/components/CategoryGrid.tsx` | Primary UX surface |
+| `packages/frontend/src/components/CategoryGrid.tsx` | Primary UX surface — 2-col card grid; left colour stripe + active blinking dot |
 | `packages/frontend/src/components/CategoryManager.tsx` | Category CRUD + drag-to-reorder + A-Z sort |
 | `packages/frontend/src/components/WeeklyGoalSetting.tsx` | Settings UI for weekly goal (number input + slider) + rounding increment toggle |
 | `packages/frontend/src/components/SessionExpiredOverlay.tsx` | Full-screen overlay shown on 401/403; prompts user to log in again |
 | `packages/frontend/src/lib/authContext.ts` | React context carrying `sessionExpired` flag; set by global React Query error handler |
+| `packages/frontend/src/lib/api.ts` | Base fetch wrapper; throws `AuthError` on 401/403 |
+| `packages/frontend/src/workers/timer.worker.ts` | Off-thread 1 s tick — keeps elapsed time accurate when tab is hidden |
+| `packages/frontend/src/sw.ts` | Custom service worker (Workbox + persistent timer notification) |
+| `packages/frontend/vite.config.ts` | Vite + VitePWA config (injectManifest strategy); must stay in sync with sw.ts |
 | `docker-compose.yml` | Service wiring; nginx must pass `X-authentik-email` |
 | `packages/backend/drizzle/` | Migration SQL files — committed, run on startup |
 | `packages/shared/src/utils/rounding.test.ts` | Unit tests for the rounding algorithm (Vitest) |
@@ -42,10 +46,14 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | Change the weekly goal setting | `packages/backend/src/routes/settings.ts` + `WeeklyGoalSetting.tsx` |
 | Debug auth issues | `docs/integration/auth.md`, `packages/backend/src/middleware/auth.ts` |
 | Debug session-expiry UX | `packages/frontend/src/lib/api.ts` (`AuthError`), `src/lib/authContext.ts`, `src/components/SessionExpiredOverlay.tsx` |
+| Debug timer accuracy / background tab | `packages/frontend/src/workers/timer.worker.ts`, `src/components/ActiveTimer.tsx` |
+| Debug PWA / service worker / notifications | `packages/frontend/src/sw.ts`, `src/lib/notifications.ts`, `vite.config.ts` |
+| Regenerate screenshot mockups | `docs/screenshots/` — see Screenshot SVG conventions section below |
 | Deploy | `docs/operations/deployment.md` |
 | Understand Docker layout | `docs/integration/docker.md` |
 | Fix a recurring incident | `docs/memory/incidents.md` |
 | Added a dependency / changed API / changed auth or storage | Update `SECURITY.md` (dep table, audit date, threat model, or "not done" list as appropriate) |
+| Changed dev setup, tooling, or style rules | Update `CONTRIBUTING.md` |
 
 ## API routes
 
@@ -74,6 +82,15 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 ```bash
 APP_VERSION=$(git describe --tags --abbrev=0) docker compose up -d --build
 ```
+
+## Screenshot SVG conventions
+
+`docs/screenshots/` contains three 390×820px dark-theme mockups (track.svg, weekly.svg, settings.svg). Key rules for regenerating them:
+
+- **Nav icons**: use inline SVG paths — never emoji (emoji ignore `stroke`/`fill` so active/inactive styling is impossible). Track = Timer icon `(55,770)`, Weekly = BarChart2 `(185,770)`, Settings = gear `(315,770)`. Active tab: `stroke/fill hsl(239,84%,67%)` + `font-weight 600`. Inactive: `hsl(213,31%,45%)`.
+- **Category cards** (track.svg): left 6 px colour stripe clipped via `<clipPath>` to rounded card rect. Active blinking dot at `cx = card_right − 12, cy = card_top + 12`. Name/code bottom-aligned (`y = card_top + 51 / +65`).
+- **Weekly table** (weekly.svg): category col fixed 60 px (x=28–88); 7 day cols + Total share remaining 286 px (35 px each); centers Mon=105 Tue=140 Wed=175 Thu=210 Fri=245 Sat=280 Sun=315; Total right-aligned x=370. Abbreviate long names (e.g. "Docs").
+- **Colour palette**: bg `hsl(222,47%,11%)`, card `hsl(222,47%,14%)`, card border `hsl(222,47%,20%)`, header row `hsl(222,47%,16%)`, active indigo `hsl(239,84%,67%)`, text primary `hsl(213,31%,91%)`, secondary `hsl(213,31%,85%)`, muted `hsl(213,31%,50%)`, dim `hsl(213,31%,40%)`.
 
 ## Read next
 

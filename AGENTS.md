@@ -8,9 +8,13 @@ This file is the entry point for AI coding agents working in this repository.
 2. Check **`docs/memory/invariants.md`** before making architectural changes.
 3. Check **`docs/memory/decisions.md`** to understand past choices before proposing alternatives.
 
-## Standing requirement — SECURITY.md
+## Standing requirements — living documents
 
-**`SECURITY.md` must be kept up to date.** After any work session that touches dependencies, API surface, auth flow, data storage, or new libraries, review `SECURITY.md` and update it before committing. Specifically:
+The following files must be kept in sync with the codebase. Update them in the same commit as the feature or fix they describe — never let them lag behind.
+
+### SECURITY.md
+
+After any work session that touches dependencies, API surface, auth flow, data storage, or new libraries:
 
 - **New dependency added** → add a row to the dependency table with its risk profile; run `yarn npm audit` and update the audit date/result.
 - **New API endpoint** → check whether it changes the authenticated surface; note it in the threat model if relevant.
@@ -19,6 +23,18 @@ This file is the entry point for AI coding agents working in this repository.
 - **Anything not yet audited** → add it to the "What has not been done" list.
 
 If none of those apply to a session, no update is needed — but explicitly confirm this before finishing.
+
+### CONTRIBUTING.md
+
+Update when: dev setup changes, new tooling is added, code style rules change, or the contribution process itself changes.
+
+### README.md
+
+Update when: the feature set changes visibly, UI screenshots are regenerated, or setup/deploy instructions change.
+
+### docs/screenshots/ (track.svg, weekly.svg, settings.svg)
+
+After any release that visibly changes the UI, suggest regenerating these mockups. See `docs/memory/INDEX.md` for the screenshot SVG conventions.
 
 ## Quick facts
 
@@ -53,11 +69,21 @@ yarn workspace @time-keeper/frontend build
 ## Repository layout
 
 ```
-packages/shared    # Shared TypeScript types + rounding algorithm
-packages/backend   # Express API
-packages/frontend  # React PWA
-docs/memory/       # Architectural memory (read every session)
-docs/integration/  # Auth, Docker, PWA integration details
-docs/operations/   # How to run, deploy, fix
-SECURITY.md        # Security posture — keep current (see standing requirement above)
+packages/shared       # Shared TypeScript types + rounding algorithm + unit tests
+packages/backend      # Express API (routes, services, Drizzle ORM, SQLite)
+packages/frontend     # React PWA (Vite, Tailwind, shadcn/ui, service worker)
+docs/memory/          # Architectural memory — read every session
+  INDEX.md            #   Start here: project overview, critical files, API routes
+  decisions.md        #   ADR log — why things are the way they are
+  invariants.md       #   Hard rules that must never be broken
+  incidents.md        #   Root causes of past problems and fixes
+docs/integration/     # Auth, Docker, PWA integration details
+  auth.md             #   Authentik + NPM forward auth setup
+  docker.md           #   Container layout and networking
+docs/operations/      # How to run, deploy, troubleshoot
+  local-dev.md        #   Full local development guide
+  deployment.md       #   Production deploy steps
+docs/screenshots/     # SVG mockup screenshots (track, weekly, settings)
+SECURITY.md           # Security posture — keep current (see standing requirements above)
+CONTRIBUTING.md       # Contributor guide — keep current
 ```
