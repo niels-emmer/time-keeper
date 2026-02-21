@@ -36,6 +36,7 @@ Open http://localhost:5173.
 ```bash
 yarn workspace @time-keeper/shared test
 yarn workspace @time-keeper/backend test
+yarn workspace @time-keeper/frontend test
 ```
 
 ## Code style

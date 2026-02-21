@@ -53,7 +53,9 @@ See [docs/integration/auth.md](docs/integration/auth.md) for the exact configura
 
 ## Dependency audit
 
-Audited with `yarn npm audit` on **2026-02-20**: **no vulnerabilities found**.
+Audited with `yarn npm audit` on **2026-02-21**: **no vulnerabilities found**.
+
+`vitest` and `jsdom` were added in v0.10.0 as **dev-only** dependencies (not shipped in the production Docker image). They are omitted from the runtime table below.
 
 Runtime dependencies and their risk profiles:
 

@@ -34,17 +34,29 @@ Key settings in `packages/frontend/vite.config.ts`:
 
 ## Icons
 
+All icons live under `packages/frontend/public/icons/`.
+
 | File | Size | Purpose |
 |------|------|---------|
-| `public/icon-192.png` | 192×192 | Standard PWA icon |
-| `public/icon-512.png` | 512×512 | High-res icon; also used as maskable for Android adaptive icons |
-| `public/favicon.ico` | 32×32 | Browser tab icon |
+| `icons/icon-192x192.png` | 192×192 | Standard PWA icon |
+| `icons/icon-512x512.png` | 512×512 | High-res PWA icon |
+| `icons/maskable-192x192.png` | 192×192 | Android adaptive icon (maskable) |
+| `icons/maskable-512x512.png` | 512×512 | Android adaptive icon, high-res (maskable) |
+| `icons/apple-touch-icon.png` | 180×180 | iOS home screen icon |
+| `icons/favicon.ico` | 32×32 | Browser tab icon |
 
-The `purpose: 'any maskable'` on the 512px icon tells Android to apply the adaptive icon mask (rounded square, circle, etc.) depending on the launcher. The icon design has sufficient padding for all common mask shapes.
+Maskable icons have sufficient padding for all common launcher mask shapes (rounded square, circle, etc.).
 
-## Theme color
+## Theme colour
 
-`theme_color: '#0f172a'` (Tailwind `slate-900`) matches the app's dark navigation bar color, preventing a visual gap in the Android status bar area when using standalone mode.
+The browser chrome colour adapts to the active colour scheme via two `<meta name="theme-color">` tags in `index.html`:
+
+```html
+<meta name="theme-color" content="#f3f6fb" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#0B1220" media="(prefers-color-scheme: dark)" />
+```
+
+The PWA manifest `theme_color` is set to `#4f5aea` (the primary brand colour), which applies when the app is installed and the browser reads the manifest. See [D-014 in decisions.md](../memory/decisions.md) for the full rationale.
 
 ## Service worker update flow
 
@@ -53,4 +65,4 @@ The app uses `registerType: 'autoUpdate'`. When a new version is deployed:
 2. It downloads and activates the new version automatically.
 3. The next navigation within the app shows the new version.
 
-No manual cache clearing is needed by the user.
+No manual cache clearing is needed by the user. See [RB-004 in runbooks.md](../operations/runbooks.md) for force-clearing if needed.

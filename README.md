@@ -26,6 +26,7 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
 - **Weekly goal** — configurable hours per week (0–40); shown in the top bar and weekly summary, drives the rounding cap
 - **Weekly overview** — time per category per day, copy to clipboard in a format ready to paste into your time registration tool
 - **End-of-day rounding** — round tracked minutes up to the nearest 30 or 60 minutes (configurable), capped at your weekly goal
+- **Light / dark / system theme** — follows your OS preference by default; override per-device in Settings
 - **PWA** — installable on macOS and Android, runs in standalone mode (no browser chrome)
 - **Self-hosted** — runs in Docker, no external services or accounts required beyond your own Authentik instance
 
@@ -85,6 +86,7 @@ The short version:
 
 | Path | Contents |
 |------|----------|
+| [Wiki](https://github.com/niels-emmer/time-keeper/wiki) | Full user and operator documentation |
 | [AGENTS.md](AGENTS.md) | Entry point for AI coding agents |
 | [docs/memory/INDEX.md](docs/memory/INDEX.md) | Architecture overview and session guide |
 | [docs/integration/auth.md](docs/integration/auth.md) | Authentik + NPM wiring |

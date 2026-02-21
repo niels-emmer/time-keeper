@@ -67,6 +67,9 @@ yarn workspace @time-keeper/shared test:watch    # watch mode
 
 # Backend (settings route, validation, auth middleware)
 yarn workspace @time-keeper/backend test
+
+# Frontend (theme utilities)
+yarn workspace @time-keeper/frontend test
 ```
 
 ## TypeScript

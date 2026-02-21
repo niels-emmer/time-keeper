@@ -63,7 +63,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 | Endpoint | Auth | Purpose |
 |----------|------|---------|
-| `GET /api/health` | No | Docker healthcheck; returns `{"status":"ok","version":"0.1.0"}` |
+| `GET /api/health` | No | Docker healthcheck; returns `{"status":"ok","version":"<current>"}` |
 | `GET /api/info` | Yes | Returns `{ version, repoUrl, user }` — shown in Settings → About |
 | `GET /api/settings` | Yes | Returns `{ weeklyGoalHours, roundingIncrementMinutes }` — user's configurable weekly target and rounding granularity |
 | `PUT /api/settings` | Yes | Update `{ weeklyGoalHours }` (integer, 0–40) and/or `{ roundingIncrementMinutes }` (30 or 60) |
@@ -80,6 +80,7 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 | `DELETE /api/entries/:id` | Yes | Delete a time entry |
 | `GET /api/summary/weekly` | Yes | Weekly summary (optionally `?week=YYYY-WNN`); `goalMinutes` reflects user setting |
 | `POST /api/summary/round` | Yes | Apply end-of-day rounding with `{ date }`; cap = user's weekly goal |
+| `POST /api/summary/round-week` | Yes | Apply rounding to all days of an ISO week `{ week: 'YYYY-WNN' }`; idempotent |
 
 Manual verification:
 ```bash

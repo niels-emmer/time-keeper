@@ -32,9 +32,9 @@ Update when: dev setup changes, new tooling is added, code style rules change, o
 
 Update when: the feature set changes visibly, UI screenshots are regenerated, or setup/deploy instructions change.
 
-### docs/screenshots/ (track.svg, weekly.svg, settings.svg)
+### docs/screenshots/ (track.png, weekly.png, settings.png)
 
-After any release that visibly changes the UI, suggest regenerating these mockups. See `docs/memory/INDEX.md` for the screenshot SVG conventions.
+After any release that visibly changes the UI, suggest regenerating these screenshots. See `docs/memory/INDEX.md` for the screenshot capture conventions.
 
 ## Quick facts
 
@@ -61,6 +61,11 @@ yarn workspace @time-keeper/frontend dev
 # Generate DB migrations after schema changes
 yarn workspace @time-keeper/backend db:generate
 
+# Run tests
+yarn workspace @time-keeper/shared test
+yarn workspace @time-keeper/backend test
+yarn workspace @time-keeper/frontend test
+
 # Build all
 yarn workspace @time-keeper/backend build
 yarn workspace @time-keeper/frontend build
@@ -80,10 +85,12 @@ docs/memory/          # Architectural memory — read every session
 docs/integration/     # Auth, Docker, PWA integration details
   auth.md             #   Authentik + NPM forward auth setup
   docker.md           #   Container layout and networking
+  pwa.md              #   Installing on macOS and Android
 docs/operations/      # How to run, deploy, troubleshoot
   local-dev.md        #   Full local development guide
   deployment.md       #   Production deploy steps
-docs/screenshots/     # SVG mockup screenshots (track, weekly, settings)
+  runbooks.md         #   Common break/fix procedures
+docs/screenshots/     # PNG screenshots (track, weekly, settings) — 390×844px
 SECURITY.md           # Security posture — keep current (see standing requirements above)
 CONTRIBUTING.md       # Contributor guide — keep current
 ```

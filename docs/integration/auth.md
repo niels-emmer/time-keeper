@@ -96,7 +96,7 @@ const user = req.headers['x-authentik-email'] as string | undefined;
 2. **Details tab:**
    - Domain: `timekeeper.yourdomain.com`
    - Scheme: `http`
-   - Forward Hostname/IP: `127.0.0.1`
+   - Forward Hostname/IP: your server's LAN IP (e.g. `192.168.x.x`) — **not** `127.0.0.1` if NPM runs in Docker (see INC-006)
    - Forward Port: `38521`
    - Websockets Support: on
 3. **SSL tab:** select or request your certificate, force SSL on
