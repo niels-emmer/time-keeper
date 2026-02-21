@@ -155,10 +155,24 @@
 
   <!-- ── BOTTOM NAV ── -->
   <rect y="762" width="390" height="58" fill="hsl(222,47%,14%)" stroke="hsl(222,47%,18%)" stroke-width="1"/>
-  <text x="65" y="787" font-size="20" fill="hsl(213,31%,45%)" text-anchor="middle">⏱</text>
+  <!-- Track — Timer icon (inactive) -->
+  <g transform="translate(55,770)" fill="none" stroke="hsl(213,31%,45%)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="10" cy="10" r="8"/>
+    <polyline points="10,5 10,10 13,13"/>
+  </g>
   <text x="65" y="804" font-size="11" fill="hsl(213,31%,45%)" text-anchor="middle">Track</text>
-  <text x="195" y="787" font-size="20" fill="hsl(213,31%,45%)" text-anchor="middle">📊</text>
+  <!-- Weekly — BarChart2 icon (inactive) -->
+  <g transform="translate(185,770)" fill="none" stroke="hsl(213,31%,45%)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <line x1="18" y1="20" x2="18" y2="10"/>
+    <line x1="12" y1="20" x2="12" y2="4"/>
+    <line x1="6" y1="20" x2="6" y2="14"/>
+    <line x1="3" y1="20" x2="21" y2="20"/>
+  </g>
   <text x="195" y="804" font-size="11" fill="hsl(213,31%,45%)" text-anchor="middle">Weekly</text>
-  <text x="325" y="787" font-size="20" fill="hsl(239,84%,67%)" text-anchor="middle">⚙</text>
+  <!-- Settings — gear icon (active) -->
+  <g transform="translate(315,770)" fill="none" stroke="hsl(239,84%,67%)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="10" cy="10" r="3"/>
+    <path d="M10 1.5v3M10 15.5v3M1.5 10h3M15.5 10h3M4.1 4.1l2.1 2.1M13.8 13.8l2.1 2.1M4.1 15.9l2.1-2.1M13.8 6.2l2.1-2.1"/>
+  </g>
   <text x="325" y="804" font-size="11" font-weight="600" fill="hsl(239,84%,67%)" text-anchor="middle">Settings</text>
 </svg>
