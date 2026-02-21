@@ -27,18 +27,27 @@ export function CategoryGrid({ categories, activeEntry }: Props) {
             key={cat.id}
             onClick={() => start.mutate(cat.id)}
             disabled={start.isPending}
-            className="relative flex min-h-[5.5rem] flex-col items-start justify-end overflow-hidden rounded-xl border p-4 text-left transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+            className="relative flex min-h-[5.5rem] flex-col items-start justify-end rounded-xl border-2 p-4 text-left transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
             style={{
-              borderColor: isActive ? cat.color : 'transparent',
-              backgroundColor: `${cat.color}1a`, // 10% opacity
+              borderColor: isActive ? cat.color : 'hsl(var(--border))',
+              backgroundColor: isActive ? `${cat.color}18` : 'hsl(var(--card))',
+              boxShadow: isActive ? `0 0 0 1px ${cat.color}40, 0 4px 16px ${cat.color}25` : 'none',
             }}
           >
-            {/* Left colour stripe */}
+            {/* Pill badge — colour-tinted, shows workday code or first 3 chars of name */}
             <span
-              className="absolute left-0 top-0 h-full w-1.5 rounded-l-xl"
-              style={{ backgroundColor: cat.color }}
-            />
-            {/* Active blinking dot — top-right, unchanged */}
+              className="absolute left-3 top-3 rounded-full px-2 py-0.5 text-xs font-semibold"
+              style={{
+                backgroundColor: `${cat.color}28`,
+                color: cat.color,
+                border: `1px solid ${cat.color}60`,
+              }}
+            >
+              {cat.workdayCode ?? (cat.name.includes(' ')
+                ? cat.name.split(' ').map((w: string) => w[0]).join('').toUpperCase()
+                : cat.name.slice(0, 2).toUpperCase())}
+            </span>
+            {/* Active blinking dot — top-right */}
             {isActive && (
               <span
                 className="absolute right-3 top-3 inline-block h-2 w-2 animate-pulse rounded-full"
@@ -46,9 +55,6 @@ export function CategoryGrid({ categories, activeEntry }: Props) {
               />
             )}
             <span className="text-sm font-semibold leading-tight">{cat.name}</span>
-            {cat.workdayCode && (
-              <span className="mt-0.5 text-xs text-muted-foreground">{cat.workdayCode}</span>
-            )}
           </button>
         );
       })}
