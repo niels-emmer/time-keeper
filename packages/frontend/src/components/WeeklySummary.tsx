@@ -96,6 +96,18 @@ export function WeeklySummary() {
   const totalHours = (summary.totalMinutes / 60).toFixed(1);
   const goalHours = summary.goalMinutes / 60;
 
+  // Build stacked-bar segments: one per category, ordered by total minutes desc
+  const barSegments = catList
+    .map(([catId, cat]) => {
+      const minutes = summary.days.reduce(
+        (sum, d) => sum + (d.categories.find((c) => c.categoryId === catId)?.minutes ?? 0),
+        0
+      );
+      return { catId, name: cat.name, color: cat.color, minutes };
+    })
+    .filter((s) => s.minutes > 0)
+    .sort((a, b) => b.minutes - a.minutes);
+
   return (
     <div className="space-y-4">
       {/* Week navigation */}
@@ -113,6 +125,46 @@ export function WeeklySummary() {
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
+
+      {/* Stacked bar chart */}
+      <Card>
+        <CardContent className="p-4 space-y-3">
+          {/* Bar */}
+          <div className="flex h-4 w-full overflow-hidden rounded-full bg-muted">
+            {summary.totalMinutes === 0 ? null : barSegments.map((seg, i) => (
+              <div
+                key={seg.catId}
+                title={`${seg.name}: ${(seg.minutes / 60).toFixed(1)}h`}
+                style={{
+                  width: `${(seg.minutes / summary.totalMinutes) * 100}%`,
+                  backgroundColor: seg.color,
+                  borderRadius:
+                    i === 0 && i === barSegments.length - 1
+                      ? '9999px'
+                      : i === 0
+                      ? '9999px 0 0 9999px'
+                      : i === barSegments.length - 1
+                      ? '0 9999px 9999px 0'
+                      : '0',
+                }}
+              />
+            ))}
+          </div>
+          {/* Legend */}
+          <div className="flex flex-wrap gap-x-4 gap-y-1">
+            {barSegments.map((seg) => (
+              <div key={seg.catId} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <span
+                  className="inline-block h-2 w-2 rounded-full flex-shrink-0"
+                  style={{ backgroundColor: seg.color }}
+                />
+                <span>{seg.name}</span>
+                <span className="tabular-nums">{(seg.minutes / 60).toFixed(1)}h</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Summary table */}
       <Card>
