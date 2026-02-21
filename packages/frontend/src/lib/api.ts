@@ -9,12 +9,26 @@ import type {
 
 const BASE = '/api';
 
+/**
+ * Thrown when the server returns 401 or 403 — signals that the Authentik
+ * session has expired and the user must re-authenticate.
+ */
+export class AuthError extends Error {
+  constructor(status: number) {
+    super(`Session expired (HTTP ${status})`);
+    this.name = 'AuthError';
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
     ...init,
   });
   if (!res.ok) {
+    if (res.status === 401 || res.status === 403) {
+      throw new AuthError(res.status);
+    }
     const body = await res.json().catch(() => ({}));
     throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
   }

@@ -142,6 +142,27 @@ If none of these apply in a session, explicitly confirm before closing — do no
 
 Rationale: security docs that are written once and never updated give visitors a false sense of confidence. A stale doc is worse than none because it misleads. Keeping it in sync with `AGENTS.md` makes maintenance automatic rather than optional.
 
+## D-013: Global session-expiry detection in the frontend
+
+**Date:** 2026-02
+**Status:** Accepted
+
+When the Authentik session expires overnight (or due to a token timeout), the PWA's periodic React Query fetches continue running but all API calls return 401. Previously, the UI silently showed empty state — the user had no indication the session had ended.
+
+**Solution:** A dedicated `AuthError` class (thrown by `api.ts` on 401/403) is caught by a global React Query cache subscriber in `main.tsx`. Once any query or mutation surfaces an `AuthError`, a React state flag `sessionExpired` is set on the `AuthContext` (provided above `<App>`). `App.tsx` renders a full-screen `SessionExpiredOverlay` covering the entire app, with a "Log in again" button that does `window.location.href = '/'` — a hard navigation that NPM + Authentik's forward-auth intercepts and redirects to the Authentik login page.
+
+Why a hard navigation (not `navigate('/')` from React Router):
+- A client-side route change stays within the SPA and never reaches NPM/Authentik
+- `window.location.href = '/'` issues a real HTTP GET, which NPM forward-auth intercepts and redirects to the Authentik login page when the session cookie is absent
+
+Why a full-screen overlay (not a toast):
+- The PWA is unusable when unauthenticated; a dismissible toast would leave the user on an empty screen with no path forward
+- The overlay is intentionally not dismissible — the only valid action is to re-authenticate
+
+Retry behaviour: `AuthError` disables React Query's retry logic (`retry: false` when error is `AuthError`) so the app stops hammering the backend with doomed requests after the session ends.
+
+No new npm dependencies were added.
+
 ## D-012: Configurable rounding increment (30 or 60 min) stored in user_settings
 
 **Date:** 2026-02

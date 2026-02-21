@@ -23,6 +23,8 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `packages/frontend/src/components/CategoryGrid.tsx` | Primary UX surface |
 | `packages/frontend/src/components/CategoryManager.tsx` | Category CRUD + drag-to-reorder + A-Z sort |
 | `packages/frontend/src/components/WeeklyGoalSetting.tsx` | Settings UI for weekly goal (number input + slider) + rounding increment toggle |
+| `packages/frontend/src/components/SessionExpiredOverlay.tsx` | Full-screen overlay shown on 401/403; prompts user to log in again |
+| `packages/frontend/src/lib/authContext.ts` | React context carrying `sessionExpired` flag; set by global React Query error handler |
 | `docker-compose.yml` | Service wiring; nginx must pass `X-authentik-email` |
 | `packages/backend/drizzle/` | Migration SQL files — committed, run on startup |
 | `packages/shared/src/utils/rounding.test.ts` | Unit tests for the rounding algorithm (Vitest) |
@@ -39,6 +41,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | Add a UI feature | `packages/frontend/src/pages/` or `components/` |
 | Change the weekly goal setting | `packages/backend/src/routes/settings.ts` + `WeeklyGoalSetting.tsx` |
 | Debug auth issues | `docs/integration/auth.md`, `packages/backend/src/middleware/auth.ts` |
+| Debug session-expiry UX | `packages/frontend/src/lib/api.ts` (`AuthError`), `src/lib/authContext.ts`, `src/components/SessionExpiredOverlay.tsx` |
 | Deploy | `docs/operations/deployment.md` |
 | Understand Docker layout | `docs/integration/docker.md` |
 | Fix a recurring incident | `docs/memory/incidents.md` |
