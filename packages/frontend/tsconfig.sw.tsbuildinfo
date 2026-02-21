@@ -1,0 +1,1 @@
+{"root":["./src/sw.ts","./src/workers/timer.worker.ts"],"version":"5.9.3"}
