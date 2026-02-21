@@ -50,81 +50,82 @@
   <rect x="16" y="116" width="358" height="36" rx="12" fill="hsl(222,47%,16%)"/>
   <rect x="16" y="136" width="358" height="16" fill="hsl(222,47%,16%)"/>
 
-  <!-- Column headers — 7 day cols + Category + Total
-       Category: 28–90, Mon:104, Tue:130, Wed:156, Thu:182, Fri:208, Sat:234, Sun:260, Total:right-align 370 -->
+  <!-- Column layout: Category col x=28–88 (60px), then 7 day cols + Total
+       spread evenly across x=88–374 (286px → 35px/col, 7 days + ~51px Total)
+       Day centers: Mon=105 Tue=140 Wed=175 Thu=210 Fri=245 Sat=280 Sun=315 Total=370(end) -->
   <text x="28" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500">Category</text>
-  <text x="104" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500" text-anchor="middle">Mon</text>
-  <text x="130" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500" text-anchor="middle">Tue</text>
-  <text x="156" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500" text-anchor="middle">Wed</text>
-  <text x="182" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500" text-anchor="middle">Thu</text>
-  <text x="208" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500" text-anchor="middle">Fri</text>
-  <text x="234" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500" text-anchor="middle">Sat</text>
-  <text x="260" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500" text-anchor="middle">Sun</text>
+  <text x="105" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500" text-anchor="middle">Mon</text>
+  <text x="140" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500" text-anchor="middle">Tue</text>
+  <text x="175" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500" text-anchor="middle">Wed</text>
+  <text x="210" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500" text-anchor="middle">Thu</text>
+  <text x="245" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500" text-anchor="middle">Fri</text>
+  <text x="280" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500" text-anchor="middle">Sat</text>
+  <text x="315" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500" text-anchor="middle">Sun</text>
   <text x="370" y="139" font-size="10" fill="hsl(213,31%,45%)" font-weight="500" text-anchor="end">Total</text>
   <line x1="16" y1="152" x2="374" y2="152" stroke="hsl(222,47%,20%)" stroke-width="1"/>
 
-  <!-- Row 1: Development — colour dot (circle, table context) -->
+  <!-- Row 1: Development -->
   <circle cx="32" cy="170" r="4" fill="#6366f1"/>
   <text x="42" y="174" font-size="11" font-weight="500" fill="hsl(213,31%,85%)">Development</text>
-  <text x="104" y="174" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">3.0h</text>
-  <text x="130" y="174" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">4.0h</text>
-  <text x="156" y="174" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">2.0h</text>
-  <text x="182" y="174" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="208" y="174" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">3.0h</text>
-  <text x="234" y="174" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="260" y="174" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="105" y="174" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">3.0h</text>
+  <text x="140" y="174" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">4.0h</text>
+  <text x="175" y="174" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">2.0h</text>
+  <text x="210" y="174" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="245" y="174" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">3.0h</text>
+  <text x="280" y="174" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="315" y="174" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
   <text x="370" y="174" font-size="11" font-weight="600" fill="hsl(213,31%,91%)" class="mono" text-anchor="end">12.0h</text>
   <line x1="16" y1="184" x2="374" y2="184" stroke="hsl(222,47%,18%)" stroke-width="1"/>
 
   <!-- Row 2: Meetings -->
   <circle cx="32" cy="202" r="4" fill="#ec4899"/>
   <text x="42" y="206" font-size="11" font-weight="500" fill="hsl(213,31%,85%)">Meetings</text>
-  <text x="104" y="206" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
-  <text x="130" y="206" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="156" y="206" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">2.0h</text>
-  <text x="182" y="206" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
-  <text x="208" y="206" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="234" y="206" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="260" y="206" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="105" y="206" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
+  <text x="140" y="206" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="175" y="206" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">2.0h</text>
+  <text x="210" y="206" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
+  <text x="245" y="206" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="280" y="206" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="315" y="206" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
   <text x="370" y="206" font-size="11" font-weight="600" fill="hsl(213,31%,91%)" class="mono" text-anchor="end">4.0h</text>
   <line x1="16" y1="216" x2="374" y2="216" stroke="hsl(222,47%,18%)" stroke-width="1"/>
 
   <!-- Row 3: Documentation -->
   <circle cx="32" cy="234" r="4" fill="#14b8a6"/>
-  <text x="42" y="238" font-size="11" font-weight="500" fill="hsl(213,31%,85%)">Documentation</text>
-  <text x="104" y="238" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="130" y="238" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">2.0h</text>
-  <text x="156" y="238" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="182" y="238" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
-  <text x="208" y="238" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">2.0h</text>
-  <text x="234" y="238" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="260" y="238" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="42" y="238" font-size="11" font-weight="500" fill="hsl(213,31%,85%)">Docs</text>
+  <text x="105" y="238" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="140" y="238" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">2.0h</text>
+  <text x="175" y="238" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="210" y="238" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
+  <text x="245" y="238" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">2.0h</text>
+  <text x="280" y="238" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="315" y="238" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
   <text x="370" y="238" font-size="11" font-weight="600" fill="hsl(213,31%,91%)" class="mono" text-anchor="end">5.0h</text>
   <line x1="16" y1="248" x2="374" y2="248" stroke="hsl(222,47%,18%)" stroke-width="1"/>
 
   <!-- Row 4: Review -->
   <circle cx="32" cy="266" r="4" fill="#f97316"/>
   <text x="42" y="270" font-size="11" font-weight="500" fill="hsl(213,31%,85%)">Review</text>
-  <text x="104" y="270" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
-  <text x="130" y="270" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="156" y="270" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
-  <text x="182" y="270" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
-  <text x="208" y="270" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="234" y="270" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="260" y="270" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="105" y="270" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
+  <text x="140" y="270" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="175" y="270" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
+  <text x="210" y="270" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
+  <text x="245" y="270" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="280" y="270" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="315" y="270" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
   <text x="370" y="270" font-size="11" font-weight="600" fill="hsl(213,31%,91%)" class="mono" text-anchor="end">3.0h</text>
   <line x1="16" y1="280" x2="374" y2="280" stroke="hsl(222,47%,18%)" stroke-width="1"/>
 
   <!-- Row 5: Planning -->
   <circle cx="32" cy="298" r="4" fill="#8b5cf6"/>
   <text x="42" y="302" font-size="11" font-weight="500" fill="hsl(213,31%,85%)">Planning</text>
-  <text x="104" y="302" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="130" y="302" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="156" y="302" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
-  <text x="182" y="302" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
-  <text x="208" y="302" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="234" y="302" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="260" y="302" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="105" y="302" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="140" y="302" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="175" y="302" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
+  <text x="210" y="302" font-size="11" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">1.0h</text>
+  <text x="245" y="302" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="280" y="302" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="315" y="302" font-size="11" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
   <text x="370" y="302" font-size="11" font-weight="600" fill="hsl(213,31%,91%)" class="mono" text-anchor="end">2.0h</text>
   <line x1="16" y1="312" x2="374" y2="312" stroke="hsl(222,47%,20%)" stroke-width="1.5"/>
 
@@ -132,14 +133,14 @@
   <rect x="17" y="313" width="356" height="36" fill="hsl(222,47%,16%)"/>
   <rect x="17" y="337" width="356" height="16" fill="hsl(222,47%,16%)"/>
   <text x="28" y="335" font-size="11" font-weight="600" fill="hsl(213,31%,85%)">Total</text>
-  <text x="104" y="335" font-size="11" font-weight="600" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">5.0h</text>
-  <text x="130" y="335" font-size="11" font-weight="600" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">6.0h</text>
-  <text x="156" y="335" font-size="11" font-weight="600" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">6.0h</text>
-  <text x="182" y="335" font-size="11" font-weight="600" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">4.0h</text>
+  <text x="105" y="335" font-size="11" font-weight="600" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">5.0h</text>
+  <text x="140" y="335" font-size="11" font-weight="600" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">6.0h</text>
+  <text x="175" y="335" font-size="11" font-weight="600" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">6.0h</text>
+  <text x="210" y="335" font-size="11" font-weight="600" fill="hsl(213,31%,70%)" class="mono" text-anchor="middle">4.0h</text>
   <!-- Friday: at/over daily goal → green -->
-  <text x="208" y="335" font-size="11" font-weight="600" fill="#4ade80" class="mono" text-anchor="middle">5.0h</text>
-  <text x="234" y="335" font-size="11" font-weight="600" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
-  <text x="260" y="335" font-size="11" font-weight="600" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="245" y="335" font-size="11" font-weight="600" fill="#4ade80" class="mono" text-anchor="middle">5.0h</text>
+  <text x="280" y="335" font-size="11" font-weight="600" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
+  <text x="315" y="335" font-size="11" font-weight="600" fill="hsl(213,31%,40%)" class="mono" text-anchor="middle">–</text>
   <text x="370" y="335" font-size="11" font-weight="600" fill="hsl(213,31%,85%)" class="mono" text-anchor="end">26.0h</text>
 
   <!-- bottom card filler to round bottom corners -->
