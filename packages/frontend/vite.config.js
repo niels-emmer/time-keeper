@@ -7,34 +7,32 @@ export default defineConfig({
         react(),
         VitePWA({
             registerType: 'autoUpdate',
-            includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],
+            // Use our custom SW entry point so we can handle notificationclick
+            strategies: 'injectManifest',
+            srcDir: 'src',
+            filename: 'sw.ts',
+            includeAssets: ['icons/favicon.ico', 'icons/timekeeper.svg', 'icons/apple-touch-icon.png'],
             manifest: {
                 name: 'Time Keeper',
                 short_name: 'TimeKeeper',
                 description: 'Track work time by category for Workday',
-                theme_color: '#0f172a',
-                background_color: '#0f172a',
+                // Primary brand colour — works across both light and dark themes.
+                // The <meta name="theme-color"> tags in index.html handle per-scheme
+                // browser chrome colour while browsing (media query aware).
+                theme_color: '#4f5aea',
+                background_color: '#0B1220',
                 display: 'standalone',
                 orientation: 'portrait',
                 start_url: '/',
                 scope: '/',
                 icons: [
-                    { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
-                    {
-                        src: 'icon-512.png',
-                        sizes: '512x512',
-                        type: 'image/png',
-                        purpose: 'any maskable',
-                    },
+                    { src: 'icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+                    { src: 'icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
+                    { src: 'icons/maskable-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+                    { src: 'icons/maskable-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
                 ],
             },
-            workbox: {
-                runtimeCaching: [
-                    {
-                        urlPattern: /^\/api\//,
-                        handler: 'NetworkOnly',
-                    },
-                ],
+            injectManifest: {
                 globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
             },
         }),

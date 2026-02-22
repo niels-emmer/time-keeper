@@ -20,7 +20,7 @@ export function ThemeSetting() {
           <div>
             <span className="font-medium">Theme</span>
             <p className="text-muted-foreground text-xs mt-0.5">
-              Choose a colour scheme or follow your system setting
+              Choose a colour scheme
             </p>
           </div>
 

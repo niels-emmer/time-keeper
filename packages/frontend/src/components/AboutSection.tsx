@@ -38,6 +38,20 @@ export function AboutSection() {
             <ExternalLink className="h-3 w-3" />
           </a>
         </div>
+
+        {/* Wiki link */}
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-muted-foreground">Docs</span>
+          <a
+            href="https://github.com/niels-emmer/time-keeper/wiki"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1 font-medium text-primary hover:underline"
+          >
+            Wiki
+            <ExternalLink className="h-3 w-3" />
+          </a>
+        </div>
       </div>
     </div>
   );
