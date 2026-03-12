@@ -73,6 +73,23 @@ Learning: Authentik's **embedded outpost** sets `X-authentik-*` headers. Authent
 
 ---
 
+## INC-007: Session expiry silently leaves the app in a broken state — no login redirect
+
+Date: 2026-03-12
+Symptom: After the Authentik session expires, reopening the PWA shows the app UI but all data is empty or stale. No login redirect and no "Session expired" overlay appear. Workaround: manually navigating to the Settings tab and doing a hard refresh triggers authentication.
+Root cause: Two independent failures, both in the frontend:
+
+1. **Service worker bypasses Authentik on initial navigation.** Workbox's `precacheAndRoute` intercepts every navigation request (full-page loads, PWA launches) and immediately returns the cached `index.html` — before the request ever reaches NPM or Authentik. Authentik therefore never sees the request and cannot issue the `302 → login` redirect. The stale app shell loads successfully from cache.
+
+2. **API auth redirects are invisible to the app.** When the Authentik session is expired, NPM's `error_page 401` directive returns an HTTP `302` (redirect to `/outpost.goauthentik.io/start?rd=…`) for API fetch calls — not a `401`. With the default `redirect: 'follow'`, `fetch()` chases the redirect chain to the Authentik login page (cross-origin). This either throws a CORS `TypeError` or returns `200 OK` with HTML. Neither path triggers the `AuthError` class, so `sessionExpired` is never set and `SessionExpiredOverlay` is never rendered.
+
+Fix:
+- `sw.ts`: Register a `NetworkFirst` route for `request.mode === 'navigate'` **before** `precacheAndRoute`. Explicit routes take precedence; this lets initial navigations hit NPM so Authentik can redirect to login. Falls back to the precached shell after 3 s for offline use.
+- `api.ts`: Add `redirect: 'manual'` to every `fetch()` call. An `opaqueredirect` response (`res.type === 'opaqueredirect'`) is detected and thrown as `AuthError(302)`, flowing through the existing `QueryCache` subscriber → `sessionExpired` state → `SessionExpiredOverlay`.
+Learning: In a Workbox PWA behind a forward-auth proxy (Authentik / Authelia / Cloudflare Access), always register `NetworkFirst` (with timeout) for navigation requests. Without it, the proxy's login redirect can never reach the browser. Also: forward-auth proxies return `302` (not `401`) for unauthenticated API calls — `fetch()` with `redirect: 'follow'` silently follows this, so always use `redirect: 'manual'` and check `res.type === 'opaqueredirect'`.
+
+---
+
 ## INC-006: 502 Bad Gateway — NPM cannot reach frontend via LAN IP
 
 Date: 2026-02-19

@@ -22,11 +22,22 @@
 
 import { precacheAndRoute } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
-import { NetworkOnly } from 'workbox-strategies';
+import { NetworkFirst, NetworkOnly } from 'workbox-strategies';
 
 declare const self: ServiceWorkerGlobalScope;
 
 // ── Workbox setup ──────────────────────────────────────────────────────────
+
+// Navigation requests (full-page loads) must hit the network first so that
+// Authentik's forward-auth proxy can issue a login redirect when the session
+// has expired.  Without this, Workbox serves the cached index.html and
+// Authentik never gets a chance to redirect.  Falls back to the precached
+// shell after 3 s so the app still loads when the network is unavailable.
+registerRoute(
+  ({ request }) => request.mode === 'navigate',
+  new NetworkFirst({ networkTimeoutSeconds: 3 })
+);
+
 precacheAndRoute(self.__WB_MANIFEST);
 
 registerRoute(

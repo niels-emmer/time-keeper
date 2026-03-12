@@ -24,7 +24,17 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
     ...init,
+    // Manual redirect mode so we can detect when Authentik's forward-auth
+    // proxy issues a 302 → login redirect instead of passing the request
+    // through.  With the default 'follow' the browser chases the redirect
+    // chain to the Authentik login page (cross-origin), which either throws
+    // a CORS TypeError or returns 200 HTML — neither surfaces as an AuthError.
+    redirect: 'manual',
   });
+  if (res.type === 'opaqueredirect') {
+    // NPM's error_page 401 returned a redirect to the Authentik login page.
+    throw new AuthError(302);
+  }
   if (!res.ok) {
     if (res.status === 401 || res.status === 403) {
       throw new AuthError(res.status);

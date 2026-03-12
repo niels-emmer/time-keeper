@@ -179,6 +179,10 @@ Retry behaviour: `AuthError` disables React Query's retry logic (`retry: false` 
 
 No new npm dependencies were added.
 
+**Amendment (2026-03-12):** The original implementation had two gaps, both fixed in INC-007:
+- The Workbox service worker was serving the cached app shell on every navigation request, preventing Authentik from issuing its `302 → login` redirect. Fixed by registering `NetworkFirst` (3 s timeout) for navigation requests before `precacheAndRoute`.
+- Forward-auth proxies return `302` (not `401`) for unauthenticated API calls. `fetch()` with the default `redirect: 'follow'` silently chased the redirect and never surfaced an `AuthError`. Fixed by adding `redirect: 'manual'` to all API calls and treating `res.type === 'opaqueredirect'` as `AuthError(302)`.
+
 ## D-014: Light / dark / system theme — client-side only, localStorage
 
 **Date:** 2026-02
