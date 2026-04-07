@@ -32,7 +32,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `packages/frontend/src/workers/timer.worker.ts` | Off-thread 1 s tick — keeps elapsed time accurate when tab is hidden |
 | `packages/frontend/src/sw.ts` | Custom service worker (Workbox + persistent timer notification) |
 | `packages/frontend/vite.config.ts` | Vite + VitePWA config (injectManifest strategy); must stay in sync with sw.ts |
-| `docker-compose.yml` | Service wiring; nginx must pass `X-authentik-email` |
+| `docker-compose.yml` | Service wiring; nginx must pass `X-authentik-email`; backend also exposes `127.0.0.1:38522` for api.* subdomain |
 | `packages/backend/drizzle/` | Migration SQL files — committed, run on startup |
 | `packages/shared/src/utils/rounding.test.ts` | Unit tests for the rounding algorithm (Vitest) |
 | `packages/backend/src/routes/settings.test.ts` | Unit tests for the settings route (Vitest) |
@@ -64,7 +64,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 
 | Route | Auth | Notes |
 |-------|------|-------|
-| `GET /api/health` | No | Docker healthcheck |
+| `GET /api/health` | No | Docker healthcheck; also used by macOS app to verify connectivity |
 | `GET /api/info` | Yes | Version, repo URL, current user — drives Settings → About |
 | `GET /api/settings` | Yes | Returns `{ weeklyGoalHours, roundingIncrementMinutes }` |
 | `PUT /api/settings` | Yes | Update `{ weeklyGoalHours, roundingIncrementMinutes }` (increment: 30 or 60) |
@@ -82,6 +82,9 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `GET /api/summary/weekly` | Yes | Weekly summary (goalMinutes comes from user_settings) |
 | `POST /api/summary/round` | Yes | Apply end-of-day rounding for a single date (cap = user's weekly goal) |
 | `POST /api/summary/round-week` | Yes | Apply rounding to all 7 days of an ISO week; idempotent, skips already-rounded entries |
+| `GET /api/tokens` | Yes (header-only) | List personal access tokens for the current user |
+| `POST /api/tokens` | Yes (header-only) | Create a token; returns raw token once; label required |
+| `DELETE /api/tokens/:id` | Yes (header-only) | Revoke a token |
 
 ## Deploy command
 

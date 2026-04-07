@@ -26,6 +26,11 @@ services:
         # Falls back to 'dev' if no tags exist.
         APP_VERSION: ${APP_VERSION:-dev}
     restart: unless-stopped
+    ports:
+      # Direct backend access for the api.* subdomain (no Authentik in the path).
+      # NPM proxies api.timekeeper.yourdomain.com → 127.0.0.1:38522 with HTTPS + no forward auth.
+      # Bound to loopback only so other LAN devices cannot reach it directly.
+      - "127.0.0.1:38522:3001"
     environment:
       NODE_ENV: production
       PORT: "3001"

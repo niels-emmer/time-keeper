@@ -1,6 +1,7 @@
 import { CategoryManager } from '@/components/CategoryManager';
 import { WeeklyGoalSetting } from '@/components/WeeklyGoalSetting';
 import { ThemeSetting } from '@/components/ThemeSetting';
+import { ApiTokenManager } from '@/components/ApiTokenManager';
 import { AboutSection } from '@/components/AboutSection';
 
 export function Settings() {
@@ -9,6 +10,7 @@ export function Settings() {
       <CategoryManager />
       <WeeklyGoalSetting />
       <ThemeSetting />
+      <ApiTokenManager />
       <AboutSection />
     </div>
   );

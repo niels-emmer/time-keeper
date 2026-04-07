@@ -97,4 +97,15 @@ export const api = {
         body: JSON.stringify(settings),
       }),
   },
+
+  tokens: {
+    list: () =>
+      request<{ id: number; label: string; createdAt: string; lastUsedAt: string | null }[]>('/tokens'),
+    create: (label: string) =>
+      request<{ id: number; label: string; createdAt: string; token: string }>('/tokens', {
+        method: 'POST',
+        body: JSON.stringify({ label }),
+      }),
+    revoke: (id: number) => request<void>(`/tokens/${id}`, { method: 'DELETE' }),
+  },
 } as const;

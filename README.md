@@ -28,6 +28,7 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
 - **End-of-day rounding** — round tracked minutes up to the nearest 30 or 60 minutes (configurable), capped at your weekly goal
 - **Light / dark / system theme** — follows your OS preference by default; override per-device in Settings
 - **PWA** — installable on macOS and Android, runs in standalone mode (no browser chrome)
+- **macOS status bar app** — native Flutter app lives in the menu bar; icon shows active timer color + `CODE hh:mm`; click to open a popover panel with full Track / Weekly / Settings functionality
 - **Self-hosted** — runs in Docker, no external services or accounts required beyond your own Authentik instance
 
 ## Tech stack
@@ -92,6 +93,8 @@ The short version:
 | [docs/integration/auth.md](docs/integration/auth.md) | Authentik + NPM wiring |
 | [docs/integration/docker.md](docs/integration/docker.md) | Docker services and volumes |
 | [docs/integration/pwa.md](docs/integration/pwa.md) | Installing on macOS and Android |
+| [docs/integration/api-subdomain.md](docs/integration/api-subdomain.md) | API subdomain setup for the native app |
+| [packages/macos_app/README.md](packages/macos_app/README.md) | macOS status bar app — build &amp; setup |
 | [docs/operations/deployment.md](docs/operations/deployment.md) | Production deployment guide |
 | [docs/operations/runbooks.md](docs/operations/runbooks.md) | Common break/fix procedures |
 | [SECURITY.md](SECURITY.md) | Security posture, risks, and dependency audit |

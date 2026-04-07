@@ -51,4 +51,19 @@ This is set in the NPM proxy template and differs from the standalone outpost's 
 
 ## I-008: No users table
 
-Authentik owns user management. The app has no `users` table. User identity is a plain text `user_id` column in `categories`, `time_entries`, and `user_settings`. Deactivating a user in Authentik is sufficient to lock them out (the outpost blocks them before the app sees the request).
+Authentik owns user management. The app has no `users` table. User identity is a plain text `user_id` column in `categories`, `time_entries`, `user_settings`, and `api_tokens`. Deactivating a user in Authentik is sufficient to lock them out via the browser (the outpost blocks them before the app sees the request); any Bearer tokens they hold must be revoked separately.
+
+## I-009: Token management endpoints require Authentik-header auth
+
+The endpoints `GET /api/tokens`, `POST /api/tokens`, and `DELETE /api/tokens/:id` must only be accessible when `req.authMethod === 'header'` (i.e. authenticated via the `X-authentik-email` header set by the Authentik outpost).
+
+A request authenticated with a Bearer token (`req.authMethod === 'token'`) must receive `403 Forbidden` on these endpoints. This is enforced by the `requireHeaderAuth` middleware in `packages/backend/src/middleware/auth.ts`.
+
+**Why:** prevents a compromised Bearer token from creating additional tokens (privilege escalation), listing existing tokens (information disclosure), or locking out the user by revoking all tokens.
+
+## I-001 / I-002 amendment (Bearer token path)
+
+I-001 and I-002 were written when Authentik was the only auth mechanism. They remain true for the browser/PWA path and the token management path. The amendment:
+
+- The backend now also accepts `Authorization: Bearer <token>` for API endpoints (except token management). This is an intentional second auth path for native clients — not a security bypass.
+- A Bearer token in the request header takes precedence over `X-authentik-email`. If an `Authorization: Bearer` header is present but the token is not found in the DB, the request is rejected with 401 (does not fall through to the Authentik header check — prevents header injection on the api.* path).

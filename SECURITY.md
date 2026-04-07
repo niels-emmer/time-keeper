@@ -16,29 +16,50 @@ This is a single-user (or small-team) personal productivity tool, not a public-f
 
 | Threat | Likelihood | Mitigation |
 |--------|-----------|------------|
-| Unauthorised access to your time data | Low | Authentik auth blocks the app entirely before any request reaches it |
+| Unauthorised access to your time data via browser | Low | Authentik auth blocks the app entirely before any request reaches it |
+| Unauthorised access via API token | Low | 256-bit tokens; HTTPS enforced on api.* subdomain; rate-limited; token never stored in plain text |
+| API token brute-forced | Negligible | 2^256 keyspace; rate limit (120 req/min per IP) further constrains attempts |
+| Bearer token stolen from device | Low | Stored in macOS Keychain (not plaintext); revoke immediately from web app Settings |
+| Token used to create more tokens | None | Token management endpoints require Authentik header auth — Bearer tokens receive 403 |
 | SQL injection | Low | All queries use Drizzle ORM with parameterised statements; no raw SQL with user input |
 | XSS | Low | React escapes output by default; no `dangerouslySetInnerHTML` is used |
 | Supply chain attack on a dependency | Very low | Standard npm ecosystem risk; see dependency audit below |
 | Server-side request forgery | N/A | The backend makes no outbound HTTP requests |
-| Data exfiltration via the API | Low | All API routes require the `X-authentik-email` header set by the proxy; there is no unauthenticated write surface |
 | Secrets in the repo | None | No API keys, tokens, or credentials are stored in the codebase |
 
 ---
 
 ## Authentication
 
-Auth is **not implemented in this application**. It is entirely delegated to [Authentik](https://goauthentik.io) via Nginx Proxy Manager's forward-auth integration:
+The application supports two auth paths:
+
+### Path 1 — Browser / PWA (Authentik forward auth)
 
 ```
-Internet → NPM (TLS termination + forward auth) → Authentik outpost → app
+Internet → NPM (TLS + Authentik forward auth) → frontend nginx → backend
 ```
 
-The backend only reads the `X-authentik-email` header that the outpost sets on authenticated requests. If that header is absent in production, the backend returns 401 and nothing else runs.
+The backend reads the `X-authentik-email` header set by the Authentik outpost. If absent in production, the backend returns 401. Auth is entirely delegated to Authentik — there is no second line of defence if forward auth is misconfigured.
 
-**Implication:** the security of this app is only as good as your Authentik + NPM setup. If you misconfigure forward auth so that requests can reach the app without passing through Authentik, there is no second line of defence in the application layer.
+See [docs/integration/auth.md](docs/integration/auth.md).
 
-See [docs/integration/auth.md](docs/integration/auth.md) for the exact configuration.
+### Path 2 — Native app (Bearer token via api.* subdomain)
+
+```
+Internet → NPM (TLS only, no forward auth) → backend:38522 → Bearer token check
+```
+
+Added to support the macOS status bar app. The `api.*` subdomain bypasses Authentik but the backend validates the `Authorization: Bearer <token>` header itself:
+
+- Tokens are 32 random bytes encoded as base64url (256-bit entropy)
+- Only the SHA-256 hash is stored in the database — a DB breach does not expose usable tokens
+- Tokens are shown once on creation and cannot be retrieved again
+- Tokens are revocable from the web app (Settings → Personal Access Tokens)
+- Token management endpoints require Authentik-header auth — a Bearer token cannot create or list tokens
+- The backend port (38522) is bound to `127.0.0.1` — not reachable from other LAN devices
+- HTTPS is enforced by NPM on the api.* subdomain
+
+See [docs/integration/api-subdomain.md](docs/integration/api-subdomain.md).
 
 ---
 
@@ -53,7 +74,7 @@ See [docs/integration/auth.md](docs/integration/auth.md) for the exact configura
 
 ## Dependency audit
 
-Audited with `yarn npm audit` on **2026-02-21**: **no vulnerabilities found**.
+Audited with `yarn npm audit` on **2026-04-07**: **no vulnerabilities found**.
 
 `vitest` and `jsdom` were added in v0.10.0 as **dev-only** dependencies (not shipped in the production Docker image). They are omitted from the runtime table below.
 

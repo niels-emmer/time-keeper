@@ -8,6 +8,7 @@ import { entriesRouter } from './routes/entries.js';
 import { summaryRouter } from './routes/summary.js';
 import { infoRouter } from './routes/info.js';
 import { settingsRouter } from './routes/settings.js';
+import { tokensRouter } from './routes/tokens.js';
 
 export function createApp() {
   const app = express();
@@ -40,6 +41,7 @@ export function createApp() {
   app.use('/api/summary', summaryRouter);
   app.use('/api/info', infoRouter);
   app.use('/api/settings', settingsRouter);
+  app.use('/api/tokens', tokensRouter);
 
   app.use(errorHandler);
 

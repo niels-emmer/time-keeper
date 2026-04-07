@@ -206,3 +206,32 @@ Why localStorage rather than the `user_settings` table (used for weekly goal and
 - Theme is a device/browser preference — the same user might want different themes on phone vs desktop
 - No server round-trip needed; the preference is applied synchronously on first paint
 - Storing it server-side would require a `GET /api/settings` response before the correct theme could be applied, causing a flash
+
+## D-015: Bearer token auth for native clients (api.* subdomain)
+
+**Date:** 2026-04-07
+**Status:** Accepted
+
+Added a second authentication path alongside the existing Authentik header auth, to support a native macOS status bar app that cannot participate in browser-based OIDC/forward-auth flows.
+
+**Design:**
+- `api_tokens` table stores SHA-256 hashes of tokens (never the raw tokens)
+- Raw tokens are 32-byte `randomBytes` encoded as base64url (256-bit entropy, ~43 chars)
+- The `authMiddleware` checks `Authorization: Bearer <token>` first, then falls through to `X-authentik-email`
+- A new `req.authMethod: 'header' | 'token'` field distinguishes the two paths
+- Token management endpoints (`GET/POST/DELETE /api/tokens`) require `authMethod === 'header'` — a Bearer token cannot create, list, or revoke tokens (see I-009)
+- The backend is also exposed on port `127.0.0.1:38522` so NPM can proxy `api.*` directly to it without going through the frontend nginx (which is the Authentik forward-auth hop)
+
+**Why Option A2 (separate subdomain) over A1 (bypass path on same host):**
+- Cleaner separation of concerns — the Authentik-protected domain remains 100% behind the proxy
+- Easier to configure in NPM (separate proxy host, no location block surgery)
+- Clear operational mental model: `timekeeper.*` = browser/PWA, `api.*` = native app
+
+**Security properties:**
+- HTTPS enforced by NPM (Let's Encrypt cert on the api subdomain)
+- Port 38522 bound to `127.0.0.1` — only the local NPM host can reach it
+- 120 req/min rate limit applies (existing `express-rate-limit` on all `/api/` routes)
+- Tokens are one-way hashed — a DB breach does not expose usable tokens
+- Token management is Authentik-only — a leaked token cannot bootstrap more tokens
+
+**No new npm dependencies:** Node.js built-in `crypto` module used for SHA-256 and `randomBytes`.

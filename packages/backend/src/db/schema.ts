@@ -56,8 +56,25 @@ export const userSettings = sqliteTable('user_settings', {
     .default(sql`(datetime('now'))`),
 });
 
+export const apiTokens = sqliteTable(
+  'api_tokens',
+  {
+    id: integer('id').primaryKey({ autoIncrement: true }),
+    userId: text('user_id').notNull(),
+    tokenHash: text('token_hash').notNull(), // sha256 hex of the raw token — never store the raw token
+    label: text('label').notNull(),
+    createdAt: text('created_at')
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    lastUsedAt: text('last_used_at'), // null until first use
+  },
+  (t) => [uniqueIndex('idx_api_tokens_hash').on(t.tokenHash)]
+);
+
 export type CategoryRow = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;
 export type TimeEntryRow = typeof timeEntries.$inferSelect;
 export type NewTimeEntry = typeof timeEntries.$inferInsert;
 export type UserSettingsRow = typeof userSettings.$inferSelect;
+export type ApiTokenRow = typeof apiTokens.$inferSelect;
+export type NewApiToken = typeof apiTokens.$inferInsert;
