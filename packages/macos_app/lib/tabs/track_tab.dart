@@ -17,17 +17,23 @@ class TrackTab extends StatelessWidget {
         // Active timer card
         if (timer.active && timer.entry != null) ...[
           _ActiveTimerCard(entry: timer.entry!, state: state),
-          const Divider(height: 1),
+          Divider(
+            height: 1,
+            thickness: 0.5,
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
         ],
 
-        // TkCategory grid
+        // Category grid
         Expanded(
           child: categories.isEmpty
               ? Center(
                   child: Text(
                     'No categories yet.\nCreate some in the web app.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
+                    style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontSize: 13),
                   ),
                 )
               : GridView.builder(
@@ -67,11 +73,11 @@ class _ActiveTimerCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cat = state.categoryById(entry.categoryId);
-    final color = cat != null ? _hexColor(cat.color) : Colors.grey;
+    final color = cat != null ? _hexColor(cat.color) : const Color(0xFF6366F1);
     final elapsed = state.elapsedHHMM;
 
     return Container(
-      color: color.withValues(alpha: 0.08),
+      color: color.withValues(alpha: 0.06),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
@@ -87,11 +93,18 @@ class _ActiveTimerCard extends StatelessWidget {
               children: [
                 Text(
                   cat?.name ?? 'Unknown',
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w600, fontSize: 13),
                 ),
                 Text(
-                  cat?.workdayCode != null ? '${cat!.workdayCode} · $elapsed' : elapsed,
-                  style: TextStyle(fontSize: 12, color: color, fontFeatures: const [FontFeature.tabularFigures()]),
+                  cat?.workdayCode != null
+                      ? '${cat!.workdayCode} · $elapsed'
+                      : elapsed,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: color,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
                 ),
               ],
             ),
@@ -103,7 +116,8 @@ class _ActiveTimerCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               minimumSize: Size.zero,
               tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+              textStyle:
+                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
             ),
             child: const Text('Stop'),
           ),
@@ -134,44 +148,67 @@ class _TkCategoryCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
-          color: isActive ? color.withValues(alpha: 0.15) : cs.surface,
+          color: isActive
+              ? color.withValues(alpha: 0.12)
+              : cs.surfaceContainerLow,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isActive ? color : cs.outlineVariant,
-            width: isActive ? 1.5 : 1,
-          ),
         ),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        child: Row(
-          children: [
-            Container(
-              width: 8,
-              height: 8,
-              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    category.name,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: cs.onSurface),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Row(
+            children: [
+              // Left color bar
+              Container(
+                width: 3,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: isActive ? 1.0 : 0.5),
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(8),
+                    bottomLeft: Radius.circular(8),
                   ),
-                  if (category.workdayCode != null)
-                    Text(
-                      category.workdayCode!,
-                      style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.5)),
-                    ),
-                ],
+                ),
               ),
-            ),
-            if (isActive)
-              Icon(Icons.stop_circle_outlined, color: color, size: 16),
-          ],
+              // Card content
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              category.name,
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: cs.onSurface),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            if (category.workdayCode != null)
+                              Text(
+                                category.workdayCode!,
+                                style: TextStyle(
+                                    fontSize: 10,
+                                    color: cs.onSurface
+                                        .withValues(alpha: 0.5)),
+                              ),
+                          ],
+                        ),
+                      ),
+                      if (isActive)
+                        Icon(Icons.stop_circle_outlined,
+                            color: color, size: 16),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );

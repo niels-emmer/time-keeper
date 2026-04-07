@@ -55,25 +55,74 @@ class _SettingsTabState extends State<SettingsTab> {
         ],
 
         const _SectionHeader('Account'),
-        Card(
-          child: ListTile(
-            dense: true,
-            title: const Text('Disconnect', style: TextStyle(fontSize: 13, color: Colors.red)),
-            subtitle: const Text(
-              'Removes the stored token from Keychain.',
-              style: TextStyle(fontSize: 11),
+        _GroupedSection(
+          children: [
+            InkWell(
+              onTap: _disconnecting ? null : _disconnect,
+              borderRadius: BorderRadius.circular(10),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 14, vertical: 12),
+                child: Row(
+                  children: [
+                    Text(
+                      'Disconnect',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.red.shade400,
+                      ),
+                    ),
+                    const Spacer(),
+                    _disconnecting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child:
+                                CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Icon(Icons.logout,
+                            size: 16, color: Colors.red.shade400),
+                  ],
+                ),
+              ),
             ),
-            trailing: _disconnecting
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.logout, size: 18, color: Colors.red),
-            onTap: _disconnecting ? null : _disconnect,
-          ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+// ── Grouped section ───────────────────────────────────────────────────────────
+
+class _GroupedSection extends StatelessWidget {
+  final List<Widget> children;
+  const _GroupedSection({required this.children});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          for (int i = 0; i < children.length; i++) ...[
+            children[i],
+            if (i < children.length - 1)
+              Divider(
+                height: 0.5,
+                thickness: 0.5,
+                indent: 14,
+                endIndent: 0,
+                color: cs.outlineVariant,
+              ),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -86,12 +135,12 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 6),
+        padding: const EdgeInsets.only(bottom: 6, left: 2),
         child: Text(
-          title,
+          title.toUpperCase(),
           style: TextStyle(
             fontSize: 11,
-            fontWeight: FontWeight.w600,
+            fontWeight: FontWeight.w500,
             color: Theme.of(context).colorScheme.onSurfaceVariant,
             letterSpacing: 0.5,
           ),
@@ -105,39 +154,57 @@ class _ConnectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final isOk = appState.isConnected;
     final isError = appState.connection == app_state.ConnectionState.error ||
         appState.connection == app_state.ConnectionState.authError;
-    final dotColor = isOk
-        ? Colors.green
-        : (isError ? Colors.red : Colors.orange);
-    final label = isOk
-        ? 'Connected'
-        : (isError ? 'Error' : 'Connecting…');
+    final dotColor =
+        isOk ? Colors.green : (isError ? Colors.red : Colors.orange);
+    final label = isOk ? 'Connected' : (isError ? 'Error' : 'Connecting…');
+    final apiHost = Uri.tryParse(appState.apiUrl ?? '')?.host ?? '';
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.circle, size: 8, color: dotColor),
-                const SizedBox(width: 6),
-                Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
-              ],
-            ),
-            if (appState.connectionError.isNotEmpty) ...[
-              const SizedBox(height: 4),
-              Text(
-                appState.connectionError,
-                style: const TextStyle(fontSize: 11, color: Colors.red),
+    return _GroupedSection(
+      children: [
+        Padding(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: dotColor,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(label,
+                      style: const TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w500)),
+                  const Spacer(),
+                  if (apiHost.isNotEmpty)
+                    Text(
+                      apiHost,
+                      style: TextStyle(
+                          fontSize: 11, color: cs.onSurfaceVariant),
+                    ),
+                ],
               ),
+              if (appState.connectionError.isNotEmpty) ...[
+                const SizedBox(height: 4),
+                Text(
+                  appState.connectionError,
+                  style: const TextStyle(fontSize: 11, color: Colors.red),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
-      ),
+      ],
     );
   }
 }
@@ -172,49 +239,72 @@ class _WorkWeekCardState extends State<_WorkWeekCard> {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text('Weekly goal', style: TextStyle(fontSize: 13)),
-                Text(
-                  '${_goalHours}h',
-                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+    final cs = Theme.of(context).colorScheme;
+    return _GroupedSection(
+      children: [
+        // Weekly goal row (label + value + slider stacked)
+        Padding(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Text('Weekly goal',
+                      style: TextStyle(fontSize: 13)),
+                  const Spacer(),
+                  Text(
+                    '${_goalHours}h',
+                    style: TextStyle(
+                        fontSize: 13, color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  trackHeight: 2,
+                  overlayShape: SliderComponentShape.noOverlay,
                 ),
-              ],
-            ),
-            Slider(
-              value: _goalHours.toDouble(),
-              min: 0,
-              max: 40,
-              divisions: 40,
-              onChanged: (v) => setState(() => _goalHours = v.round()),
-              onChangeEnd: (_) => _save(),
-            ),
-            const SizedBox(height: 8),
-            const Text('Rounding increment', style: TextStyle(fontSize: 13)),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                _ToggleButton('30 min', _rounding == 30, () {
-                  setState(() => _rounding = 30);
-                  _save();
-                }),
-                const SizedBox(width: 8),
-                _ToggleButton('60 min', _rounding == 60, () {
-                  setState(() => _rounding = 60);
-                  _save();
-                }),
-              ],
-            ),
-          ],
+                child: Slider(
+                  value: _goalHours.toDouble(),
+                  min: 0,
+                  max: 40,
+                  divisions: 40,
+                  onChanged: (v) =>
+                      setState(() => _goalHours = v.round()),
+                  onChangeEnd: (_) => _save(),
+                ),
+              ),
+            ],
+          ),
         ),
-      ),
+        // Rounding row
+        Padding(
+          padding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          child: Row(
+            children: [
+              const Text('Rounding', style: TextStyle(fontSize: 13)),
+              const Spacer(),
+              Row(
+                children: [
+                  _ToggleButton('30 min', _rounding == 30, () {
+                    setState(() => _rounding = 30);
+                    _save();
+                  }),
+                  const SizedBox(width: 6),
+                  _ToggleButton('60 min', _rounding == 60, () {
+                    setState(() => _rounding = 60);
+                    _save();
+                  }),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -232,9 +322,12 @@ class _ToggleButton extends StatelessWidget {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: selected ? Theme.of(context).colorScheme.primary : Colors.transparent,
+          color: selected
+              ? Theme.of(context).colorScheme.primary
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
             color: selected
@@ -246,8 +339,11 @@ class _ToggleButton extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: selected ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface,
-            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+            color: selected
+                ? Theme.of(context).colorScheme.onPrimary
+                : Theme.of(context).colorScheme.onSurface,
+            fontWeight:
+                selected ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
       ),

@@ -255,21 +255,112 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
 
   @override
   Widget build(BuildContext context) {
-    const seed = Color(0xFF4f5aea);
+    ThemeData buildTheme(Brightness b) {
+      final isLight = b == Brightness.light;
 
-    ThemeData buildTheme(Brightness brightness) => ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: seed,
-            brightness: brightness,
-          ),
-          useMaterial3: true,
-          cardTheme: const CardThemeData(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(8)),
-            ),
-          ),
-        );
+      // macOS color tokens — never use ColorScheme.fromSeed; accent blue is exact.
+      const surfaceLight = Color(0xFFFFFFFF);
+      const surfaceContainerLowLight = Color(0xFFF2F2F7);
+      const surfaceContainerHighLight = Color(0xFFFFFFFF);
+      const outlineVariantLight = Color(0x1A000000);
+      const onSurfaceLight = Color(0xD9000000);
+      const onSurfaceVariantLight = Color(0x80000000);
+      const primaryLight = Color(0xFF007AFF);
+      const onPrimaryLight = Color(0xFFFFFFFF);
+
+      const surfaceDark = Color(0xFF1C1C1E);
+      const surfaceContainerLowDark = Color(0xFF2C2C2E);
+      const surfaceContainerHighDark = Color(0xFF3A3A3C);
+      const outlineVariantDark = Color(0x1AFFFFFF);
+      const onSurfaceDark = Color(0xE6FFFFFF);
+      const onSurfaceVariantDark = Color(0x8CFFFFFF);
+      const primaryDark = Color(0xFF0A84FF);
+      const onPrimaryDark = Color(0xFFFFFFFF);
+
+      final cs = isLight
+          ? const ColorScheme(
+              brightness: Brightness.light,
+              surface: surfaceLight,
+              surfaceContainerLow: surfaceContainerLowLight,
+              surfaceContainerHigh: surfaceContainerHighLight,
+              outlineVariant: outlineVariantLight,
+              onSurface: onSurfaceLight,
+              onSurfaceVariant: onSurfaceVariantLight,
+              primary: primaryLight,
+              onPrimary: onPrimaryLight,
+              // required fields — map to sensible macOS equivalents
+              secondary: primaryLight,
+              onSecondary: onPrimaryLight,
+              error: Color(0xFFFF3B30),
+              onError: Color(0xFFFFFFFF),
+              primaryContainer: Color(0xFFD1E8FF),
+              onPrimaryContainer: Color(0xFF001F3F),
+              secondaryContainer: Color(0xFFD1E8FF),
+              onSecondaryContainer: Color(0xFF001F3F),
+              errorContainer: Color(0xFFFFDAD6),
+              onErrorContainer: Color(0xFF410002),
+              surfaceContainerHighest: surfaceContainerHighLight,
+              outline: outlineVariantLight,
+              shadow: Color(0x33000000),
+              inverseSurface: Color(0xFF2C2C2E),
+              onInverseSurface: Color(0xFFFFFFFF),
+              inversePrimary: primaryDark,
+              scrim: Color(0xFF000000),
+              surfaceTint: primaryLight,
+            )
+          : const ColorScheme(
+              brightness: Brightness.dark,
+              surface: surfaceDark,
+              surfaceContainerLow: surfaceContainerLowDark,
+              surfaceContainerHigh: surfaceContainerHighDark,
+              outlineVariant: outlineVariantDark,
+              onSurface: onSurfaceDark,
+              onSurfaceVariant: onSurfaceVariantDark,
+              primary: primaryDark,
+              onPrimary: onPrimaryDark,
+              secondary: primaryDark,
+              onSecondary: onPrimaryDark,
+              error: Color(0xFFFF453A),
+              onError: Color(0xFFFFFFFF),
+              primaryContainer: Color(0xFF003060),
+              onPrimaryContainer: Color(0xFFD1E8FF),
+              secondaryContainer: Color(0xFF003060),
+              onSecondaryContainer: Color(0xFFD1E8FF),
+              errorContainer: Color(0xFF93000A),
+              onErrorContainer: Color(0xFFFFDAD6),
+              surfaceContainerHighest: surfaceContainerHighDark,
+              outline: outlineVariantDark,
+              shadow: Color(0x66000000),
+              inverseSurface: Color(0xFFF2F2F7),
+              onInverseSurface: Color(0xFF1C1C1E),
+              inversePrimary: primaryLight,
+              scrim: Color(0xFF000000),
+              surfaceTint: primaryDark,
+            );
+
+      final outlineVariant = isLight ? outlineVariantLight : outlineVariantDark;
+
+      return ThemeData(
+        colorScheme: cs,
+        useMaterial3: true,
+        dividerColor: outlineVariant,
+        dividerTheme: DividerThemeData(
+          color: outlineVariant,
+          space: 1,
+          thickness: 0.5,
+        ),
+        cardTheme: CardThemeData(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          color: cs.surfaceContainerLow,
+        ),
+        listTileTheme: const ListTileThemeData(
+          dense: true,
+          contentPadding: EdgeInsets.symmetric(horizontal: 14),
+        ),
+      );
+    }
 
     return MultiProvider(
       providers: [

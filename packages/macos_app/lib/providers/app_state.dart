@@ -25,6 +25,7 @@ class AppStateProvider extends ChangeNotifier {
   ConnectionState get connection => _connection;
   String get connectionError => _connectionError;
   bool get isConnected => _connection == ConnectionState.connected;
+  String? get apiUrl => _api?.baseUrl;
 
   // ── Categories ─────────────────────────────────────────────────────────────
 

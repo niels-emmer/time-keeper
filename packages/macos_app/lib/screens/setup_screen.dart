@@ -58,7 +58,9 @@ class _SetupScreenState extends State<SetupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
+      backgroundColor: cs.surface,
       body: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 340),
@@ -67,28 +69,62 @@ class _SetupScreenState extends State<SetupScreen> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'Connect to Time Keeper',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+              // App icon
+              Center(
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset(
+                    'assets/images/app_icon.png',
+                    width: 56,
+                    height: 56,
+                    filterQuality: FilterQuality.high,
+                  ),
+                ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Enter your API URL and a personal access token.\n'
-                'Create one in the web app under Settings → Personal Access Tokens.',
-                style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              const SizedBox(height: 16),
+
+              const Center(
+                child: Text(
+                  'Connect to Time Keeper',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Center(
+                child: Text(
+                  'Enter your API URL and a personal access token.\n'
+                  'Create one in the web app under Settings → Personal Access Tokens.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 13, color: cs.onSurfaceVariant, height: 1.45),
+                ),
               ),
               const SizedBox(height: 20),
 
               // API URL
-              const Text('API URL', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              Text('API URL',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: cs.onSurface)),
               const SizedBox(height: 4),
               TextField(
                 controller: _urlController,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'https://api.timekeeper.yourdomain.com',
-                  border: OutlineInputBorder(),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: cs.outlineVariant),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: cs.outlineVariant),
+                  ),
+                  filled: true,
+                  fillColor: cs.surfaceContainerLow,
                   isDense: true,
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                 ),
                 autocorrect: false,
                 keyboardType: TextInputType.url,
@@ -97,19 +133,38 @@ class _SetupScreenState extends State<SetupScreen> {
               const SizedBox(height: 14),
 
               // Token
-              const Text('Access token', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+              Text('Access token',
+                  style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: cs.onSurface)),
               const SizedBox(height: 4),
               TextField(
                 controller: _tokenController,
                 obscureText: !_tokenVisible,
                 decoration: InputDecoration(
                   hintText: 'Paste your token here',
-                  border: const OutlineInputBorder(),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: cs.outlineVariant),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: cs.outlineVariant),
+                  ),
+                  filled: true,
+                  fillColor: cs.surfaceContainerLow,
                   isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                   suffixIcon: IconButton(
-                    icon: Icon(_tokenVisible ? Icons.visibility_off : Icons.visibility, size: 18),
-                    onPressed: () => setState(() => _tokenVisible = !_tokenVisible),
+                    icon: Icon(
+                        _tokenVisible
+                            ? Icons.visibility_off
+                            : Icons.visibility,
+                        size: 18),
+                    onPressed: () =>
+                        setState(() => _tokenVisible = !_tokenVisible),
                   ),
                 ),
                 style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
@@ -132,7 +187,8 @@ class _SetupScreenState extends State<SetupScreen> {
                       ? const SizedBox(
                           height: 16,
                           width: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white),
                         )
                       : const Text('Connect'),
                 ),

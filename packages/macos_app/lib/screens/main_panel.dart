@@ -21,7 +21,8 @@ class _MainPanelState extends State<MainPanel> {
     final appState = context.watch<app_state.AppStateProvider>();
 
     // Show auth error banner if token is no longer valid
-    final isAuthError = appState.connection == app_state.ConnectionState.authError;
+    final isAuthError =
+        appState.connection == app_state.ConnectionState.authError;
 
     return Column(
       children: [
@@ -32,9 +33,22 @@ class _MainPanelState extends State<MainPanel> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             child: Text(
               'Token invalid or expired — reconnect in Settings.',
-              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onErrorContainer),
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(context).colorScheme.onErrorContainer),
             ),
           ),
+
+        // Top tab bar
+        _TopTabBar(
+          selectedIndex: _tab,
+          onTap: (i) => setState(() => _tab = i),
+        ),
+        Divider(
+          height: 1,
+          thickness: 0.5,
+          color: Theme.of(context).colorScheme.outlineVariant,
+        ),
 
         // Tab content
         Expanded(
@@ -47,47 +61,54 @@ class _MainPanelState extends State<MainPanel> {
             ],
           ),
         ),
-
-        // Bottom tab bar
-        const Divider(height: 1),
-        _BottomTabBar(
-          selectedIndex: _tab,
-          onTap: (i) => setState(() => _tab = i),
-        ),
       ],
     );
   }
 }
 
-class _BottomTabBar extends StatelessWidget {
+class _TopTabBar extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onTap;
 
-  const _BottomTabBar({required this.selectedIndex, required this.onTap});
+  const _TopTabBar({required this.selectedIndex, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 44,
-      child: Row(
-        children: [
-          _Tab(icon: Icons.access_time, label: 'Track', selected: selectedIndex == 0, onTap: () => onTap(0)),
-          _Tab(icon: Icons.calendar_view_week, label: 'Weekly', selected: selectedIndex == 1, onTap: () => onTap(1)),
-          _Tab(icon: Icons.settings_outlined, label: 'Settings', selected: selectedIndex == 2, onTap: () => onTap(2)),
-        ],
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      color: cs.surface,
+      child: SizedBox(
+        height: 36,
+        child: Row(
+          children: [
+            _TabItem(
+              label: 'Track',
+              selected: selectedIndex == 0,
+              onTap: () => onTap(0),
+            ),
+            _TabItem(
+              label: 'Weekly',
+              selected: selectedIndex == 1,
+              onTap: () => onTap(1),
+            ),
+            _TabItem(
+              label: 'Settings',
+              selected: selectedIndex == 2,
+              onTap: () => onTap(2),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _Tab extends StatelessWidget {
-  final IconData icon;
+class _TabItem extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
 
-  const _Tab({
-    required this.icon,
+  const _TabItem({
     required this.label,
     required this.selected,
     required this.onTap,
@@ -95,28 +116,45 @@ class _Tab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = selected
-        ? Theme.of(context).colorScheme.primary
-        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45);
+    final cs = Theme.of(context).colorScheme;
+    final textColor = selected ? cs.primary : cs.onSurfaceVariant;
 
     return Expanded(
-      child: GestureDetector(
+      child: InkWell(
         onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 18, color: color),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                color: color,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        child: Center(
+          child: Stack(
+            alignment: Alignment.bottomCenter,
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 2),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: textColor,
+                    fontWeight:
+                        selected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
               ),
-            ),
-          ],
+              if (selected)
+                Positioned(
+                  bottom: 0,
+                  left: 8,
+                  right: 8,
+                  child: Container(
+                    height: 2,
+                    decoration: BoxDecoration(
+                      color: cs.primary,
+                      borderRadius: BorderRadius.circular(1),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
