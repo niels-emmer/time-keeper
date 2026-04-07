@@ -8,10 +8,8 @@ services:
       context: .
       dockerfile: packages/frontend/Dockerfile
     restart: unless-stopped
-    ports:
-      - "38521:80"  # Bind on all interfaces so NPM can reach via LAN IP (192.168.101.252)
     networks:
-      - app
+      - proxy-net
     depends_on:
       backend:
         condition: service_healthy
@@ -26,11 +24,6 @@ services:
         # Falls back to 'dev' if no tags exist.
         APP_VERSION: ${APP_VERSION:-dev}
     restart: unless-stopped
-    ports:
-      # Direct backend access for the api.* subdomain (no Authentik in the path).
-      # NPM proxies api.timekeeper.yourdomain.com → 127.0.0.1:38522 with HTTPS + no forward auth.
-      # Bound to loopback only so other LAN devices cannot reach it directly.
-      - "127.0.0.1:38522:3001"
     environment:
       NODE_ENV: production
       PORT: "3001"
@@ -44,12 +37,12 @@ services:
       retries: 3
       start_period: 10s
     networks:
-      - app
+      - proxy-net
 
 volumes:
   db-data:
     driver: local
 
 networks:
-  app:
-    driver: bridge
+  proxy-net:
+    external: true

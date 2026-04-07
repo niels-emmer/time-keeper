@@ -7,27 +7,21 @@ This guide explains how to set up the separate API subdomain used by the macOS s
 The main domain (`timekeeper.yourdomain.com`) runs through Authentik's forward-auth proxy, which is browser-session-based. Native apps cannot participate in that flow. The `api.*` subdomain exposes the same backend directly, protected by a per-user API token.
 
 ```
-Native app → https://api.timekeeper.yourdomain.com → NPM (TLS only) → backend:38522 → Bearer token check
-Browser    → https://timekeeper.yourdomain.com    → NPM (TLS + Authentik) → backend:38521/nginx → X-authentik-email
+Native app → https://api.timekeeper.yourdomain.com → NPM (TLS only, proxy-net) → backend:3001 → Bearer token check
+Browser    → https://timekeeper.yourdomain.com    → NPM (TLS + Authentik, proxy-net) → frontend:80/nginx → backend:3001 → X-authentik-email
 ```
+
+Both NPM and the Time Keeper containers share the external `proxy-net` Docker network. No host ports are published — all traffic stays inside Docker.
 
 ## Prerequisites
 
 - The main Time Keeper deployment is already running
-- NPM (Nginx Proxy Manager) is in place
+- NPM (Nginx Proxy Manager) is in place and on the same Docker network as Time Keeper (`proxy-net`)
 - A DNS A/CNAME record for `api.timekeeper.yourdomain.com` pointing to your server
-- Port 38522 is accessible from the NPM host (it is bound to `127.0.0.1:38522` on the server; if NPM runs on the same host, this is fine — if NPM is on a different host, change the port binding in `docker-compose.yml` to your server's LAN IP)
 
-## Step 1 — Update docker-compose.yml
+## Step 1 — Deploy
 
-The backend already exposes port 38522 in the provided `docker-compose.yml`:
-
-```yaml
-ports:
-  - "127.0.0.1:38522:3001"
-```
-
-Rebuild and restart:
+No port changes needed. Both services communicate via the shared `proxy-net` Docker network:
 
 ```bash
 APP_VERSION=$(git describe --tags --abbrev=0) docker compose up -d --build
@@ -39,8 +33,8 @@ In Nginx Proxy Manager:
 
 1. **Add Proxy Host**
 2. **Domain Names**: `api.timekeeper.yourdomain.com`
-3. **Forward Hostname / IP**: `127.0.0.1` (or your server's LAN IP)
-4. **Forward Port**: `38522`
+3. **Forward Hostname / IP**: `backend` (the Docker service name — resolved via Docker DNS on `proxy-net`)
+4. **Forward Port**: `3001`
 5. **Cache Assets**: off
 6. **Block Common Exploits**: on
 
@@ -74,7 +68,7 @@ The app will test the connection before saving.
 | Token brute-forced | 256-bit entropy (43-char base64url); rate-limiting applies (120 req/min) |
 | Token stolen from device | Stored in macOS Keychain (not in plain text); revoke from web app immediately |
 | Compromised token creates new tokens | Token management endpoints (`/api/tokens/*`) require Authentik header auth — a Bearer token cannot create or list tokens |
-| Backend exposed on LAN | Port bound to `127.0.0.1` — not reachable from other LAN devices; only the local NPM host can reach it |
+| Backend exposed on network | Backend is on `proxy-net` Docker network — reachable by NPM and other containers on that network, but not from the host or LAN directly (no published ports) |
 
 ## Revoking a token
 
@@ -84,7 +78,7 @@ In the web app, go to **Settings → Personal Access Tokens** and click the revo
 
 | Symptom | Likely cause |
 |---------|-------------|
-| App shows "grey icon" / connection error | Wrong API URL, or port 38522 not reachable from NPM host |
+| App shows "grey icon" / connection error | Wrong API URL, or NPM not on the same `proxy-net` Docker network as the backend |
 | App shows "Invalid or expired token" (red) | Token was revoked, or wrong token entered |
 | `curl -H "Authorization: Bearer <token>" https://api.timekeeper.yourdomain.com/api/health` returns `{"status":"ok"}` but app still fails | Check the token — health check doesn't require auth; try `/api/info` instead |
 | NPM logs show 502 | Backend container is down or port binding incorrect |
