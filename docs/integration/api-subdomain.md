@@ -44,7 +44,21 @@ In Nginx Proxy Manager:
 - HTTP/2 Support: on
 - HSTS Enabled: on (recommended)
 
-> **Important — do NOT add Authentik forward auth** to this proxy host. Leave the "Access List" and "Advanced" Authentik forward-auth config completely empty. The backend handles authentication via the Bearer token.
+> **Important — do NOT add Authentik forward auth** to this proxy host. Leave the "Access List" empty and do not paste the Authentik forward-auth block into Advanced.
+
+**Advanced tab — required security config:**
+
+```nginx
+# Strip any Authentik identity headers the client may have injected.
+# Without this, an attacker could forge X-authentik-email and bypass token auth entirely.
+proxy_set_header X-authentik-email    "";
+proxy_set_header X-authentik-username "";
+proxy_set_header X-authentik-uid      "";
+proxy_set_header X-authentik-groups   "";
+proxy_set_header X-authentik-name     "";
+```
+
+This is **not optional**. The backend trusts `X-authentik-email` for the main (Authentik-protected) domain; without stripping it here, any client can forge that header and gain full access without a token.
 
 ## Step 3 — Create a personal access token
 
