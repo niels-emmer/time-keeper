@@ -9,11 +9,6 @@
 	<key>com.apple.security.network.client</key>
 	<true/>
 	<key>com.apple.security.network.server</key>
-	<false/>
-	<!-- Keychain access for flutter_secure_storage -->
-	<key>keychain-access-groups</key>
-	<array>
-		<string>$(AppIdentifierPrefix)$(CFBundleIdentifier)</string>
-	</array>
+	<true/>
 </dict>
 </plist>

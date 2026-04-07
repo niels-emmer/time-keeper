@@ -38,12 +38,12 @@ class _SettingsTabState extends State<SettingsTab> {
     return ListView(
       padding: const EdgeInsets.all(14),
       children: [
-        _SectionHeader('Connection'),
+        const _SectionHeader('Connection'),
         _ConnectionCard(appState: appState),
         const SizedBox(height: 16),
 
         if (settingsProv.settings != null) ...[
-          _SectionHeader('Work week'),
+          const _SectionHeader('Work week'),
           _WorkWeekCard(
             initial: settingsProv.settings!,
             onSave: (s) {
@@ -54,7 +54,7 @@ class _SettingsTabState extends State<SettingsTab> {
           const SizedBox(height: 16),
         ],
 
-        _SectionHeader('Account'),
+        const _SectionHeader('Account'),
         Card(
           child: ListTile(
             dense: true,

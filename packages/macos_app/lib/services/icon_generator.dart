@@ -21,7 +21,7 @@ class IconGenerator {
     const size = 32.0;
 
     final recorder = ui.PictureRecorder();
-    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, size, size));
+    final canvas = Canvas(recorder, const Rect.fromLTWH(0, 0, size, size));
 
     // Draw a filled circle with a subtle dark border for legibility on light menubar
     final paint = Paint()..color = color..style = PaintingStyle.fill;

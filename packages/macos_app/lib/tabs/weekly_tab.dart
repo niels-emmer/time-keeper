@@ -91,9 +91,8 @@ class _WeeklyTabState extends State<WeeklyTab> {
   Widget build(BuildContext context) {
     final categories = context.watch<AppStateProvider>().categories;
     final monday = _weekStart(_referenceDate);
-    final weekLabel = DateFormat('d MMM').format(monday) +
-        ' – ' +
-        DateFormat('d MMM').format(monday.add(const Duration(days: 6)));
+    final endOfWeek = monday.add(const Duration(days: 6));
+    final weekLabel = '${DateFormat('d MMM').format(monday)} – ${DateFormat('d MMM').format(endOfWeek)}';
     final isCurrentWeek = _isoWeek(_referenceDate) == _isoWeek(DateTime.now());
 
     return Column(
