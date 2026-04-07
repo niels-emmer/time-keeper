@@ -20,7 +20,7 @@ class TrackTab extends StatelessWidget {
           const Divider(height: 1),
         ],
 
-        // Category grid
+        // TkCategory grid
         Expanded(
           child: categories.isEmpty
               ? const Center(
@@ -43,7 +43,7 @@ class TrackTab extends StatelessWidget {
                     final cat = categories[i];
                     final isActive =
                         timer.active && timer.entry?.categoryId == cat.id;
-                    return _CategoryCard(
+                    return _TkCategoryCard(
                       category: cat,
                       isActive: isActive,
                       onTap: () => isActive
@@ -71,7 +71,7 @@ class _ActiveTimerCard extends StatelessWidget {
     final elapsed = state.elapsedHHMM;
 
     return Container(
-      color: color.withOpacity(0.08),
+      color: color.withValues(alpha: 0.08),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       child: Row(
         children: [
@@ -113,12 +113,12 @@ class _ActiveTimerCard extends StatelessWidget {
   }
 }
 
-class _CategoryCard extends StatelessWidget {
-  final Category category;
+class _TkCategoryCard extends StatelessWidget {
+  final TkCategory category;
   final bool isActive;
   final VoidCallback onTap;
 
-  const _CategoryCard({
+  const _TkCategoryCard({
     required this.category,
     required this.isActive,
     required this.onTap,
@@ -133,7 +133,7 @@ class _CategoryCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
-          color: isActive ? color.withOpacity(0.15) : Colors.white,
+          color: isActive ? color.withValues(alpha: 0.15) : Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
             color: isActive ? color : Colors.grey.shade200,

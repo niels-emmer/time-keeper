@@ -3,10 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 /// Wraps flutter_secure_storage (macOS Keychain) for API credentials.
 class SecureStorageService {
   static const _storage = FlutterSecureStorage(
-    mOptions: MacOsOptions(
-      accountName: 'time-keeper',
-      accessible: KeychainAccessibility.first_unlock,
-    ),
+    mOptions: MacOsOptions(accountName: 'time-keeper'),
   );
 
   static const _keyApiUrl = 'api_url';

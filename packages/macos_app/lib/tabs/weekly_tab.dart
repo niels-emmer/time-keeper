@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -188,7 +187,7 @@ class _WeeklyTabState extends State<WeeklyTab> {
 
 class _SummaryTable extends StatelessWidget {
   final WeeklySummary summary;
-  final List<Category> categories;
+  final List<TkCategory> categories;
 
   const _SummaryTable({required this.summary, required this.categories});
 
@@ -226,7 +225,7 @@ class _SummaryTable extends StatelessWidget {
                 const _Cell('∑', header: true),
               ],
             ),
-            // Category rows
+            // TkCategory rows
             for (final cat in active)
               TableRow(
                 children: [
@@ -281,7 +280,7 @@ class _Cell extends StatelessWidget {
 }
 
 class _CatCell extends StatelessWidget {
-  final Category cat;
+  final TkCategory cat;
   const _CatCell(this.cat);
 
   @override

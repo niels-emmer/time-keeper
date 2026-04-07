@@ -19,14 +19,14 @@ class NetworkError implements Exception {
 
 // ── Data models ──────────────────────────────────────────────────────────────
 
-class Category {
+class TkCategory {
   final int id;
   final String name;
   final String color; // hex e.g. '#6366f1'
   final String? workdayCode;
   final int sortOrder;
 
-  const Category({
+  const TkCategory({
     required this.id,
     required this.name,
     required this.color,
@@ -34,7 +34,7 @@ class Category {
     required this.sortOrder,
   });
 
-  factory Category.fromJson(Map<String, dynamic> j) => Category(
+  factory TkCategory.fromJson(Map<String, dynamic> j) => TkCategory(
         id: j['id'] as int,
         name: j['name'] as String,
         color: j['color'] as String,
@@ -260,9 +260,9 @@ class ApiService {
 
   // ── Categories ─────────────────────────────────────────────────────────────
 
-  Future<List<Category>> listCategories() async {
+  Future<List<TkCategory>> listCategories() async {
     final data = await _request('GET', '/categories');
-    return (data as List).map((e) => Category.fromJson(e as Map<String, dynamic>)).toList();
+    return (data as List).map((e) => TkCategory.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   // ── Timer ──────────────────────────────────────────────────────────────────

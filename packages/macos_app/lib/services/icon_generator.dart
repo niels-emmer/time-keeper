@@ -28,7 +28,7 @@ class IconGenerator {
     canvas.drawCircle(const Offset(size / 2, size / 2), size / 2 - 2, paint);
     // border
     final border = Paint()
-      ..color = color.withOpacity(0.6)..style = PaintingStyle.stroke..strokeWidth = 1.5;
+      ..color = color.withValues(alpha: 0.6)..style = PaintingStyle.stroke..strokeWidth = 1.5;
     canvas.drawCircle(const Offset(size / 2, size / 2), size / 2 - 2.75, border);
 
     final picture = recorder.endRecording();

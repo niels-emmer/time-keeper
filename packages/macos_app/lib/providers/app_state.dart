@@ -28,10 +28,10 @@ class AppStateProvider extends ChangeNotifier {
 
   // ── Categories ─────────────────────────────────────────────────────────────
 
-  List<Category> _categories = [];
-  List<Category> get categories => _categories;
+  List<TkCategory> _categories = [];
+  List<TkCategory> get categories => _categories;
 
-  Category? categoryById(int id) {
+  TkCategory? categoryById(int id) {
     try {
       return _categories.firstWhere((c) => c.id == id);
     } catch (_) {
@@ -42,7 +42,6 @@ class AppStateProvider extends ChangeNotifier {
   // ── Timer state ────────────────────────────────────────────────────────────
 
   TimerStatus _timerStatus = const TimerStatus(active: false);
-  DateTime? _lastTimerPoll;
   Timer? _pollTimer;
   Timer? _tickTimer;
 
@@ -155,7 +154,6 @@ class AppStateProvider extends ChangeNotifier {
 
   Future<void> _refreshTimer() async {
     _timerStatus = await _api!.getTimerStatus();
-    _lastTimerPoll = DateTime.now();
   }
 
   Future<void> _refreshCategories() async {

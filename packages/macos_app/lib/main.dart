@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:screen_retriever/screen_retriever.dart';
 import 'package:tray_manager/tray_manager.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -16,15 +17,19 @@ void main() async {
 
   // Initialise window manager before anything else
   await windowManager.ensureInitialized();
-  await windowManager.setOptions(const WindowOptions(
+  const windowOptions = WindowOptions(
     size: Size(380, 560),
     minimumSize: Size(320, 480),
-    center: false,             // we position it near the tray icon
+    center: false,
     title: 'Time Keeper',
     titleBarStyle: TitleBarStyle.hidden,
     alwaysOnTop: true,
-    skipTaskbar: true,         // no Dock bounce / taskbar entry
-  ));
+    skipTaskbar: true,
+  );
+  // Configure window then hide immediately — shown only when tray icon is clicked
+  await windowManager.waitUntilReadyToShow(windowOptions, () async {
+    await windowManager.hide();
+  });
 
   runApp(const TimeKeeperApp());
 }
@@ -198,11 +203,9 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
     }
 
     // Position the window near the tray icon (top-right of screen)
-    final screenBounds = await windowManager.getBounds();
-    await windowManager.setPosition(Offset(
-      screenBounds.right - 400,
-      28, // just below the macOS menu bar
-    ));
+    final display = await screenRetriever.getPrimaryDisplay();
+    final screenWidth = display.size.width;
+    await windowManager.setPosition(Offset(screenWidth - 395, 28));
     await windowManager.show();
     await windowManager.focus();
   }
