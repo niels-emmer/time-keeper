@@ -70,8 +70,24 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   }
 
   // --- Path 2: Authentik header ---
+  // Only trusted when the request carries the internal proxy secret — a shared
+  // secret set by the frontend nginx on every proxied request (nginx.conf:
+  // proxy_set_header X-Internal-Token "<secret>"). This ensures that even if
+  // the api.* NPM proxy host is misconfigured and fails to strip Authentik
+  // headers, an external caller still cannot forge X-authentik-email to bypass
+  // token auth. The secret is set via the INTERNAL_PROXY_SECRET env var.
+  //
+  // In development (NODE_ENV !== 'production') or when INTERNAL_PROXY_SECRET
+  // is not set, the check is skipped so local dev still works without the secret.
+  const proxySecret = process.env.INTERNAL_PROXY_SECRET;
+  const internalToken = req.headers['x-internal-token'] as string | undefined;
+  const proxyTrusted =
+    !proxySecret ||                         // secret not configured → skip check (dev / not yet set up)
+    process.env.NODE_ENV !== 'production' || // dev mode
+    internalToken === proxySecret;           // secret matches
+
   const headerUser = req.headers['x-authentik-email'] as string | undefined;
-  if (headerUser) {
+  if (headerUser && proxyTrusted) {
     req.userId = headerUser;
     req.authMethod = 'header';
     next();

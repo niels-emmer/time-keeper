@@ -14,27 +14,39 @@ git clone https://github.com/niels-emmer/time-keeper.git /opt/time-keeper
 cd /opt/time-keeper
 ```
 
-## Step 2: Start the containers
+## Step 2: Create the .env file
 
-No `.env` file is needed — there are no secrets to configure. Auth is handled entirely by Authentik and NPM.
+```bash
+cp .env.example .env
+```
+
+Generate the internal proxy secret and paste it in:
+
+```bash
+openssl rand -hex 32
+# → paste the output as INTERNAL_PROXY_SECRET in .env
+```
+
+This secret prevents header injection attacks on the `api.*` subdomain (see [docs/integration/api-subdomain.md](../integration/api-subdomain.md)).
+
+## Step 3: Start the containers
 
 ```bash
 APP_VERSION=$(git describe --tags --abbrev=0) docker compose up -d --build
 ```
 
-This starts two containers:
-- `frontend` — nginx serving the React SPA, proxies `/api/*` to the backend, bound on all interfaces at port `38521`
-- `backend` — Express API with SQLite, on the internal Docker network only
+This starts two containers on the external `proxy-net` Docker network:
+- `frontend` — nginx serving the React SPA, proxies `/api/*` to the backend
+- `backend` — Express API with SQLite
 
 Verify they're running:
 
 ```bash
 docker compose ps
 docker compose logs backend   # should show "Database migrations applied" and "running on port 3001"
-curl http://localhost:38521   # should return the app HTML
 ```
 
-## Step 3: Configure Authentik
+## Step 4: Configure Authentik
 
 See [docs/integration/auth.md](../integration/auth.md) for the full walkthrough. Summary:
 
@@ -42,7 +54,7 @@ See [docs/integration/auth.md](../integration/auth.md) for the full walkthrough.
 2. Create an **Application** linked to that provider
 3. Add the application to your existing **proxy outpost**
 
-## Step 4: Configure Nginx Proxy Manager
+## Step 5: Configure Nginx Proxy Manager
 
 Add a proxy host:
 - **Forward to:** `192.168.x.x:38521` (your server's LAN IP — use `ip a` to find it; do **not** use `127.0.0.1` if NPM runs in Docker)
@@ -51,7 +63,7 @@ Add a proxy host:
 
 See [docs/integration/auth.md](../integration/auth.md) for the exact NPM config.
 
-## Step 5: Verify
+## Step 6: Verify
 
 Open `https://timekeeper.yourdomain.com` in a browser. You should be redirected to Authentik's login page. After logging in you land on the Time Keeper home screen.
 

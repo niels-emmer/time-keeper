@@ -8,6 +8,13 @@ services:
       context: .
       dockerfile: packages/frontend/Dockerfile
     restart: unless-stopped
+    environment:
+      # Shared with the backend — nginx sets this as X-Internal-Token on every
+      # proxied request so the backend can distinguish trusted internal requests
+      # (via the frontend nginx) from direct api.* calls. Generate once with:
+      #   openssl rand -hex 32
+      # and set in a .env file or your deployment secrets manager.
+      INTERNAL_PROXY_SECRET: ${INTERNAL_PROXY_SECRET}
     networks:
       - proxy-net
     depends_on:
@@ -28,6 +35,11 @@ services:
       NODE_ENV: production
       PORT: "3001"
       DATABASE_PATH: "/data/time-keeper.db"
+      # Must match the frontend container's INTERNAL_PROXY_SECRET.
+      # When set, the backend only accepts X-authentik-email from requests that
+      # carry a matching X-Internal-Token header — preventing header injection
+      # via the api.* subdomain even if NPM is misconfigured.
+      INTERNAL_PROXY_SECRET: ${INTERNAL_PROXY_SECRET}
     volumes:
       - db-data:/data
     healthcheck:

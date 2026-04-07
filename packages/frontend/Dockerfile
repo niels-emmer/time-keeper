@@ -24,8 +24,10 @@ RUN yarn workspace @time-keeper/frontend build
 FROM nginx:alpine AS runtime
 
 COPY --from=builder /app/packages/frontend/dist /usr/share/nginx/html
-COPY packages/frontend/nginx.conf /etc/nginx/conf.d/default.conf
+
+# Place config in /etc/nginx/templates/ — the official nginx image's entrypoint
+# runs envsubst on *.template files and writes the result to /etc/nginx/conf.d/
+# at container startup. This expands ${INTERNAL_PROXY_SECRET} from the environment.
+COPY packages/frontend/nginx.conf /etc/nginx/templates/default.conf.template
 
 EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
