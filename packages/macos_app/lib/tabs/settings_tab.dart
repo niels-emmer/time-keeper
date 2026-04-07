@@ -89,10 +89,10 @@ class _SectionHeader extends StatelessWidget {
         padding: const EdgeInsets.only(bottom: 6),
         child: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 11,
             fontWeight: FontWeight.w600,
-            color: Colors.black45,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
             letterSpacing: 0.5,
           ),
         ),
@@ -239,14 +239,14 @@ class _ToggleButton extends StatelessWidget {
           border: Border.all(
             color: selected
                 ? Theme.of(context).colorScheme.primary
-                : Colors.grey.shade300,
+                : Theme.of(context).colorScheme.outlineVariant,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            color: selected ? Colors.white : Colors.black87,
+            color: selected ? Theme.of(context).colorScheme.onPrimary : Theme.of(context).colorScheme.onSurface,
             fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
           ),
         ),

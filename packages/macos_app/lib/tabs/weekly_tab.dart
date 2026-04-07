@@ -142,7 +142,7 @@ class _WeeklyTabState extends State<WeeklyTab> {
             ),
           )
         else if (_summary == null || categories.isEmpty)
-          const Expanded(child: Center(child: Text('No data', style: TextStyle(color: Colors.black38))))
+          Expanded(child: Center(child: Text('No data', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))))
         else ...[
           Expanded(child: _SummaryTable(summary: _summary!, categories: categories)),
           const Divider(height: 1),
@@ -198,8 +198,8 @@ class _SummaryTable extends StatelessWidget {
         .toList();
 
     if (active.isEmpty) {
-      return const Center(
-        child: Text('No entries this week', style: TextStyle(color: Colors.black38, fontSize: 13)),
+      return Center(
+        child: Text('No entries this week', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13)),
       );
     }
 
@@ -236,8 +236,8 @@ class _SummaryTable extends StatelessWidget {
               ),
             // Total row
             TableRow(
-              decoration: const BoxDecoration(
-                border: Border(top: BorderSide(color: Colors.black12)),
+              decoration: BoxDecoration(
+                border: Border(top: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
               ),
               children: [
                 const _Cell('Total', bold: true),
@@ -262,6 +262,7 @@ class _Cell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Text(
@@ -270,7 +271,7 @@ class _Cell extends StatelessWidget {
         style: TextStyle(
           fontSize: 11,
           fontWeight: (header || bold) ? FontWeight.w600 : FontWeight.normal,
-          color: header ? Colors.black54 : Colors.black87,
+          color: header ? cs.onSurfaceVariant : cs.onSurface,
           fontFeatures: const [FontFeature.tabularFigures()],
         ),
       ),

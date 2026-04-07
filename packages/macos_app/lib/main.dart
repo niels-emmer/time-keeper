@@ -11,24 +11,27 @@ import 'services/secure_storage.dart';
 import 'services/icon_generator.dart';
 import 'screens/setup_screen.dart';
 import 'screens/main_panel.dart';
+import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialise window manager before anything else
   await windowManager.ensureInitialized();
-  const windowOptions = WindowOptions(
-    size: Size(380, 560),
-    minimumSize: Size(320, 480),
-    center: false,
+
+  // Start with the splash window: centered, compact size.
+  // After the user dismisses it (or after 5s) we resize + hide and
+  // the app lives entirely in the menu bar.
+  const splashOptions = WindowOptions(
+    size: Size(320, 340),
+    minimumSize: Size(280, 300),
+    center: true,
     title: 'Time Keeper',
     titleBarStyle: TitleBarStyle.hidden,
     alwaysOnTop: true,
     skipTaskbar: true,
   );
-  // Configure window then hide immediately — shown only when tray icon is clicked
-  await windowManager.waitUntilReadyToShow(windowOptions, () async {
-    await windowManager.hide();
+  await windowManager.waitUntilReadyToShow(splashOptions, () async {
+    await windowManager.show();
   });
 
   runApp(const TimeKeeperApp());
@@ -46,6 +49,8 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
   final _storage = SecureStorageService();
   late final app_state.AppStateProvider _appState;
   late final SettingsProvider _settingsProvider;
+
+  bool _splashDone = false;
 
   // Track current icon so we only call setIcon when it actually changes
   String? _currentIconAsset;
@@ -75,12 +80,21 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
     super.dispose();
   }
 
+  // ── Splash dismissal ─────────────────────────────────────────────────────────
+
+  Future<void> _finishSplash() async {
+    // Resize to popover dimensions before hiding
+    await windowManager.setSize(const Size(380, 560));
+    await windowManager.hide();
+    setState(() => _splashDone = true);
+  }
+
+  // ── Icon management ─────────────────────────────────────────────────────────
+
   Future<void> _initTray() async {
     await _setGreyIcon();
     await trayManager.setContextMenu(_buildContextMenu());
   }
-
-  // ── Icon management ─────────────────────────────────────────────────────────
 
   Future<void> _setGreyIcon() async {
     if (_currentIconAsset == 'assets/tray/grey.png') return;
@@ -93,7 +107,6 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
 
   Future<void> _setInactiveIcon() async {
     if (_currentIconAsset == 'assets/tray/inactive.png') return;
-    // isTemplate=true lets macOS automatically invert the icon in dark mode
     await trayManager.setIcon('assets/tray/inactive.png', isTemplate: true);
     await trayManager.setTitle('');
     _currentIconAsset = 'assets/tray/inactive.png';
@@ -172,7 +185,9 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
       items.add(MenuItem(label: 'Start timer for…', disabled: true));
       for (final cat in _appState.categories.take(8)) {
         items.add(MenuItem(
-          label: cat.workdayCode != null ? '${cat.name}  (${cat.workdayCode})' : cat.name,
+          label: cat.workdayCode != null
+              ? '${cat.name}  (${cat.workdayCode})'
+              : cat.name,
           onClick: (_) => _appState.startTimer(cat.id),
         ));
       }
@@ -231,14 +246,31 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
 
   @override
   void onWindowBlur() {
-    // Close the popover when it loses focus (clicking elsewhere)
-    windowManager.hide();
+    // Close the popover when it loses focus (clicking elsewhere),
+    // but only once splash is done.
+    if (_splashDone) windowManager.hide();
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
+    const seed = Color(0xFF4f5aea);
+
+    ThemeData buildTheme(Brightness brightness) => ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+            seedColor: seed,
+            brightness: brightness,
+          ),
+          useMaterial3: true,
+          cardTheme: const CardThemeData(
+            elevation: 0,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.all(Radius.circular(8)),
+            ),
+          ),
+        );
+
     return MultiProvider(
       providers: [
         ChangeNotifierProvider.value(value: _appState),
@@ -247,28 +279,20 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
       child: MaterialApp(
         title: 'Time Keeper',
         debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF4f5aea), // brand primary
-            brightness: Brightness.light,
-          ),
-          useMaterial3: true,
-          cardTheme: const CardThemeData(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(8)),
-              side: BorderSide(color: Color(0xFFE5E7EB)),
-            ),
-          ),
-        ),
-        home: Consumer<app_state.AppStateProvider>(
-          builder: (context, state, _) {
-            if (state.connection == app_state.ConnectionState.unconfigured) {
-              return const SetupScreen();
-            }
-            return const MainPanel();
-          },
-        ),
+        theme: buildTheme(Brightness.light),
+        darkTheme: buildTheme(Brightness.dark),
+        themeMode: ThemeMode.system,
+        home: _splashDone
+            ? Consumer<app_state.AppStateProvider>(
+                builder: (context, state, _) {
+                  if (state.connection ==
+                      app_state.ConnectionState.unconfigured) {
+                    return const SetupScreen();
+                  }
+                  return const MainPanel();
+                },
+              )
+            : SplashScreen(onDismiss: _finishSplash),
       ),
     );
   }

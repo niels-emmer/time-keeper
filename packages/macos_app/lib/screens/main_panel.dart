@@ -28,11 +28,11 @@ class _MainPanelState extends State<MainPanel> {
         if (isAuthError)
           Container(
             width: double.infinity,
-            color: Colors.red.shade50,
+            color: Theme.of(context).colorScheme.errorContainer,
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            child: const Text(
+            child: Text(
               'Token invalid or expired — reconnect in Settings.',
-              style: TextStyle(fontSize: 12, color: Colors.red),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onErrorContainer),
             ),
           ),
 
@@ -97,7 +97,7 @@ class _Tab extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = selected
         ? Theme.of(context).colorScheme.primary
-        : Colors.black38;
+        : Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.45);
 
     return Expanded(
       child: GestureDetector(

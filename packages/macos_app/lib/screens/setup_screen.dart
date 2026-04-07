@@ -72,10 +72,10 @@ class _SetupScreenState extends State<SetupScreen> {
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: 4),
-              const Text(
+              Text(
                 'Enter your API URL and a personal access token.\n'
                 'Create one in the web app under Settings → Personal Access Tokens.',
-                style: TextStyle(fontSize: 13, color: Colors.black54),
+                style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               const SizedBox(height: 20),
 

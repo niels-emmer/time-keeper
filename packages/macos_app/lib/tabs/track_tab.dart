@@ -23,11 +23,11 @@ class TrackTab extends StatelessWidget {
         // TkCategory grid
         Expanded(
           child: categories.isEmpty
-              ? const Center(
+              ? Center(
                   child: Text(
                     'No categories yet.\nCreate some in the web app.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.black54, fontSize: 13),
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13),
                   ),
                 )
               : GridView.builder(
@@ -127,16 +127,17 @@ class _TkCategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _hexColor(category.color);
+    final cs = Theme.of(context).colorScheme;
 
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
-          color: isActive ? color.withValues(alpha: 0.15) : Colors.white,
+          color: isActive ? color.withValues(alpha: 0.15) : cs.surface,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(
-            color: isActive ? color : Colors.grey.shade200,
+            color: isActive ? color : cs.outlineVariant,
             width: isActive ? 1.5 : 1,
           ),
         ),
@@ -156,14 +157,14 @@ class _TkCategoryCard extends StatelessWidget {
                 children: [
                   Text(
                     category.name,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: cs.onSurface),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (category.workdayCode != null)
                     Text(
                       category.workdayCode!,
-                      style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                      style: TextStyle(fontSize: 10, color: cs.onSurface.withValues(alpha: 0.5)),
                     ),
                 ],
               ),
