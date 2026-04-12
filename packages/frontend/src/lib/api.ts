@@ -83,6 +83,8 @@ export const api = {
       request<RoundingResult>('/summary/round', { method: 'POST', body: JSON.stringify({ date }) }),
     roundWeek: (week: string) =>
       request<{ week: string; results: RoundingResult[] }>('/summary/round-week', { method: 'POST', body: JSON.stringify({ week }) }),
+    adjustCell: (dto: { date: string; categoryId: number; minutes: number }) =>
+      request<{ ok: boolean }>('/summary/adjust-cell', { method: 'PATCH', body: JSON.stringify(dto) }),
   },
 
   info: {

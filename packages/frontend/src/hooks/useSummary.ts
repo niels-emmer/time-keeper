@@ -31,3 +31,15 @@ export function useRoundWeek() {
     },
   });
 }
+
+export function useAdjustCell() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: { date: string; categoryId: number; minutes: number }) =>
+      api.summary.adjustCell(dto),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['summary'] });
+      qc.invalidateQueries({ queryKey: ['entries'] });
+    },
+  });
+}

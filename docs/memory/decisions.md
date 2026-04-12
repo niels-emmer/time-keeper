@@ -235,3 +235,31 @@ Added a second authentication path alongside the existing Authentik header auth,
 - Token management is Authentik-only — a leaked token cannot bootstrap more tokens
 
 **No new npm dependencies:** Node.js built-in `crypto` module used for SHA-256 and `randomBytes`.
+
+## D-016: Editable cells in the weekly summary table
+
+**Date:** 2026-04-12
+**Status:** Accepted
+
+The weekly overview table was read-only. Clicking any data cell in a category row now opens an inline `<input type="number">` pre-filled with the current hours. Totals (per-day and per-week) update live as the user types, before the value is saved.
+
+**Backend approach** — `PATCH /api/summary/adjust-cell` with `{ date, categoryId, minutes }`:
+- Minutes = 0 → delete all entries for that day/category
+- No entries exist → create a single synthetic entry anchored at 09:00 UTC with `endTime = startTime + minutes * 60000`
+- Entries exist → adjust the last entry's `endTime` so the total matches the requested value (all other entries are left unchanged)
+
+Category ownership is validated before any modification.
+
+**Frontend approach** — two pieces of state:
+1. `editingCell: { categoryId, date, value }` — which cell has a live text input
+2. `localOverrides: Map<string, number>` — key `${categoryId}-${date}`, value minutes — populated as the user types, so derived totals recalculate immediately
+
+On save, the override stays visible during the in-flight request; it is cleared once `invalidateQueries` delivers fresh server data. On cancel (Escape), the override is removed and the cell reverts to the server value.
+
+**Why adjust the last entry rather than replacing all entries:**
+- Preserves real start/end times on earlier entries — useful audit trail of when work actually happened
+- Simple, deterministic, and reversible — the user can set any value without losing original data structure
+
+**Trade-off:** if the sum of all-but-last entries already exceeds the requested total, the last entry is clamped to 0 duration (the cell would still show less than requested). Entering 0 explicitly deletes all entries cleanly.
+
+**No new npm dependencies.**

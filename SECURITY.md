@@ -21,6 +21,7 @@ This is a single-user (or small-team) personal productivity tool, not a public-f
 | API token brute-forced | Negligible | 2^256 keyspace; rate limit (120 req/min per IP) further constrains attempts |
 | Bearer token stolen from device | Low | Stored in macOS Keychain (not plaintext); revoke immediately from web app Settings |
 | Token used to create more tokens | None | Token management endpoints require Authentik header auth — Bearer tokens receive 403 |
+| Unauthorised modification of another user's time entries via adjust-cell | None | `PATCH /api/summary/adjust-cell` validates category ownership before any write; all DB operations are scoped to `req.userId` |
 | SQL injection | Low | All queries use Drizzle ORM with parameterised statements; no raw SQL with user input |
 | XSS | Low | React escapes output by default; no `dangerouslySetInnerHTML` is used |
 | Supply chain attack on a dependency | Very low | Standard npm ecosystem risk; see dependency audit below |

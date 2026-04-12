@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Download, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { useWeeklySummary, useRoundWeek } from '@/hooks/useSummary';
+import { useWeeklySummary, useRoundWeek, useAdjustCell } from '@/hooks/useSummary';
 import { toISOWeek } from '@time-keeper/shared';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -21,6 +21,25 @@ export function WeeklySummary() {
   const [week, setWeek] = useState(() => toISOWeek(new Date()));
   const { data: summary, isLoading } = useWeeklySummary(week);
   const roundWeek = useRoundWeek();
+  const adjustCell = useAdjustCell();
+
+  const [localOverrides, setLocalOverrides] = useState<Map<string, number>>(new Map());
+  const [editingCell, setEditingCell] = useState<{ categoryId: number; date: string; value: string } | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // Clear overrides and any active edit when navigating to a different week
+  useEffect(() => {
+    setLocalOverrides(new Map());
+    setEditingCell(null);
+  }, [week]);
+
+  // Auto-focus and select input text when a cell enters edit mode
+  useEffect(() => {
+    if (editingCell) {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }
+  }, [editingCell]);
 
   function exportCsv() {
     if (!summary) return;
@@ -93,7 +112,20 @@ export function WeeklySummary() {
   }
   const catList = Array.from(allCats.entries());
 
-  const totalHours = (summary.totalMinutes / 60).toFixed(1);
+  // Resolve effective minutes for a cell, giving priority to local (in-flight) overrides
+  const getDisplayMinutes = (categoryId: number, date: string): number => {
+    const key = `${categoryId}-${date}`;
+    if (localOverrides.has(key)) return localOverrides.get(key)!;
+    const day = summary.days.find((d) => d.date === date);
+    return day?.categories.find((c) => c.categoryId === categoryId)?.minutes ?? 0;
+  };
+
+  // Per-day and week totals derived from overrides so the totals row updates live
+  const computedDayMinutes = summary.days.map((day) =>
+    catList.reduce((sum, [catId]) => sum + getDisplayMinutes(catId, day.date), 0)
+  );
+  const computedWeekMinutes = computedDayMinutes.reduce((a, b) => a + b, 0);
+
   const goalHours = summary.goalMinutes / 60;
 
   // Build stacked-bar segments: one per category, ordered by total minutes desc
@@ -108,6 +140,59 @@ export function WeeklySummary() {
     .filter((s) => s.minutes > 0)
     .sort((a, b) => b.minutes - a.minutes);
 
+  // --- Edit handlers ---
+
+  function handleCellClick(categoryId: number, date: string) {
+    const m = getDisplayMinutes(categoryId, date);
+    setEditingCell({ categoryId, date, value: m === 0 ? '' : String(m / 60) });
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    if (!editingCell) return;
+    const raw = e.target.value;
+    setEditingCell({ ...editingCell, value: raw });
+    const hours = parseFloat(raw);
+    if (!isNaN(hours) && hours >= 0) {
+      setLocalOverrides((prev) =>
+        new Map(prev).set(
+          `${editingCell.categoryId}-${editingCell.date}`,
+          Math.round(hours * 60)
+        )
+      );
+    }
+  }
+
+  async function handleSave() {
+    if (!editingCell) return;
+    const hours = editingCell.value.trim() === '' ? 0 : parseFloat(editingCell.value);
+    if (isNaN(hours) || hours < 0) { handleCancel(); return; }
+    const minutes = Math.round(hours * 60);
+    const { categoryId, date } = editingCell;
+    const key = `${categoryId}-${date}`;
+    // Keep override visible while the request is in-flight
+    setLocalOverrides((prev) => new Map(prev).set(key, minutes));
+    setEditingCell(null);
+    try {
+      await adjustCell.mutateAsync({ date, categoryId, minutes });
+      // Once server confirms and query cache is invalidated, remove the override
+      // so fresh server data takes over
+      setLocalOverrides((prev) => { const m = new Map(prev); m.delete(key); return m; });
+    } catch {
+      // Revert on error
+      setLocalOverrides((prev) => { const m = new Map(prev); m.delete(key); return m; });
+    }
+  }
+
+  function handleCancel() {
+    if (!editingCell) return;
+    setLocalOverrides((prev) => {
+      const m = new Map(prev);
+      m.delete(`${editingCell.categoryId}-${editingCell.date}`);
+      return m;
+    });
+    setEditingCell(null);
+  }
+
   return (
     <div className="space-y-4">
       {/* Week navigation */}
@@ -118,7 +203,7 @@ export function WeeklySummary() {
         <div className="text-center">
           <p className="font-semibold">{week}</p>
           <p className="text-sm text-muted-foreground">
-            {totalHours}h / {goalHours}h
+            {(computedWeekMinutes / 60).toFixed(1)}h / {goalHours}h
           </p>
         </div>
         <Button variant="ghost" size="icon" onClick={() => setWeek(getWeekOffset(week, 1))}>
@@ -126,7 +211,7 @@ export function WeeklySummary() {
         </Button>
       </div>
 
-      {/* Stacked bar chart */}
+      {/* Stacked bar chart — uses server data, refreshes after save */}
       <Card>
         <CardContent className="p-4 space-y-3">
           {/* Bar */}
@@ -183,10 +268,8 @@ export function WeeklySummary() {
             </thead>
             <tbody>
               {catList.map(([catId, cat]) => {
-                const rowMinutes = summary.days.map(
-                  (d) => d.categories.find((c) => c.categoryId === catId)?.minutes ?? 0
-                );
-                const rowTotal = rowMinutes.reduce((a, b) => a + b, 0);
+                const rowDisplayMinutes = summary.days.map((day) => getDisplayMinutes(catId, day.date));
+                const rowTotal = rowDisplayMinutes.reduce((a, b) => a + b, 0);
                 if (rowTotal === 0) return null;
                 return (
                   <tr key={catId} className="border-b last:border-0">
@@ -202,11 +285,38 @@ export function WeeklySummary() {
                         )}
                       </div>
                     </td>
-                    {rowMinutes.map((m, i) => (
-                      <td key={i} className="p-3 text-center tabular-nums">
-                        {m > 0 ? `${(m / 60).toFixed(1)}h` : '–'}
-                      </td>
-                    ))}
+                    {summary.days.map((day, i) => {
+                      const isEditing = editingCell?.categoryId === catId && editingCell?.date === day.date;
+                      const displayMinutes = rowDisplayMinutes[i];
+                      return (
+                        <td
+                          key={i}
+                          className="p-0 text-center tabular-nums"
+                          onClick={() => !isEditing && handleCellClick(catId, day.date)}
+                        >
+                          {isEditing ? (
+                            <input
+                              ref={inputRef}
+                              type="number"
+                              min="0"
+                              step="0.5"
+                              value={editingCell!.value}
+                              onChange={handleInputChange}
+                              onBlur={handleSave}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') { e.preventDefault(); handleSave(); }
+                                if (e.key === 'Escape') { e.preventDefault(); handleCancel(); }
+                              }}
+                              className="w-16 text-center bg-transparent border border-ring rounded px-1 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-ring tabular-nums"
+                            />
+                          ) : (
+                            <span className="block cursor-pointer p-3 hover:bg-muted/50 rounded transition-colors">
+                              {displayMinutes > 0 ? `${(displayMinutes / 60).toFixed(1)}h` : '–'}
+                            </span>
+                          )}
+                        </td>
+                      );
+                    })}
                     <td className="p-3 text-right font-semibold tabular-nums">
                       {(rowTotal / 60).toFixed(1)}h
                     </td>
@@ -220,18 +330,18 @@ export function WeeklySummary() {
                   <td
                     key={i}
                     className={`p-3 text-center tabular-nums ${
-                      d.totalMinutes >= d.goalMinutes ? 'text-green-400' : ''
+                      computedDayMinutes[i] >= d.goalMinutes ? 'text-green-400' : ''
                     }`}
                   >
-                    {d.totalMinutes > 0 ? `${(d.totalMinutes / 60).toFixed(1)}h` : '–'}
+                    {computedDayMinutes[i] > 0 ? `${(computedDayMinutes[i] / 60).toFixed(1)}h` : '–'}
                   </td>
                 ))}
                 <td
                   className={`p-3 text-right tabular-nums ${
-                    summary.totalMinutes >= summary.goalMinutes ? 'text-green-400' : ''
+                    computedWeekMinutes >= summary.goalMinutes ? 'text-green-400' : ''
                   }`}
                 >
-                  {totalHours}h
+                  {(computedWeekMinutes / 60).toFixed(1)}h
                 </td>
               </tr>
             </tbody>

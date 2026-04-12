@@ -21,7 +21,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `packages/backend/src/routes/settings.ts` | GET/PUT `/api/settings` — weekly goal hours + rounding increment |
 | `packages/backend/src/services/summaryService.ts` | Builds weekly summary; reads weekly goal + rounding increment from DB |
 | `packages/frontend/src/components/CategoryGrid.tsx` | Primary UX surface — 2-col card grid; pill badge (workday code / initials) + active glow |
-| `packages/frontend/src/components/WeeklySummary.tsx` | Weekly tab — stacked bar chart, hours-by-category table, CSV export, round-week |
+| `packages/frontend/src/components/WeeklySummary.tsx` | Weekly tab — stacked bar chart, editable hours-by-category table (click-to-edit cells, live totals), CSV export, round-week |
 | `packages/frontend/src/components/CategoryManager.tsx` | Category CRUD + drag-to-reorder + A-Z sort |
 | `packages/frontend/src/components/WeeklyGoalSetting.tsx` | Settings UI for weekly goal (number input + slider) + rounding increment toggle |
 | `packages/frontend/src/components/SessionExpiredOverlay.tsx` | Full-screen overlay shown on 401/403; prompts user to log in again |
@@ -47,6 +47,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | Change the rounding logic | `packages/shared/src/utils/rounding.ts` |
 | Add an API endpoint | Add route in `packages/backend/src/routes/`, register in `app.ts` |
 | Add a UI feature | `packages/frontend/src/pages/` or `components/` |
+| Change weekly-cell edit behaviour | `packages/frontend/src/components/WeeklySummary.tsx` + `PATCH /api/summary/adjust-cell` in `routes/summary.ts` |
 | Change the theme / add colour tokens | `packages/frontend/src/index.css` (`:root` = light, `.dark` = dark), `src/lib/theme.ts` |
 | Change the weekly goal setting | `packages/backend/src/routes/settings.ts` + `WeeklyGoalSetting.tsx` |
 | Debug auth issues | `docs/integration/auth.md`, `packages/backend/src/middleware/auth.ts` |
@@ -82,6 +83,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `GET /api/summary/weekly` | Yes | Weekly summary (goalMinutes comes from user_settings) |
 | `POST /api/summary/round` | Yes | Apply end-of-day rounding for a single date (cap = user's weekly goal) |
 | `POST /api/summary/round-week` | Yes | Apply rounding to all 7 days of an ISO week; idempotent, skips already-rounded entries |
+| `PATCH /api/summary/adjust-cell` | Yes | Set total minutes for a (date, categoryId) cell; creates/adjusts/deletes underlying time entries |
 | `GET /api/tokens` | Yes (header-only) | List personal access tokens for the current user |
 | `POST /api/tokens` | Yes (header-only) | Create a token; returns raw token once; label required |
 | `DELETE /api/tokens/:id` | Yes (header-only) | Revoke a token |
