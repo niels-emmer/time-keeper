@@ -93,28 +93,33 @@ export function MonthlyGoalsCard() {
     return result;
   }, [monthEntries]);
 
-  // Fetch monthly goals for each category
-  const goalQueries = categories.map((cat) =>
-    useQuery({
-      queryKey: ['monthlyGoal', monthYear, cat.id],
-      queryFn: () => api.monthlyGoals.get(cat.id, monthYear),
-    })
-  );
+  // Fetch monthly goals for all categories in a single request
+  const { data: allGoals = [] } = useQuery({
+    queryKey: ['monthlyGoals', monthYear],
+    queryFn: async () => {
+      // Fetch all goals for the month
+      const goals = await Promise.all(
+        categories.map((cat) =>
+          api.monthlyGoals.get(cat.id, monthYear).then((res) => ({
+            categoryId: cat.id,
+            goal: res.goal,
+          }))
+        )
+      );
+      return goals;
+    },
+    enabled: categories.length > 0,
+  });
 
   const goalsByCategory = useMemo(() => {
     const result = new Map<number, { hours: number; minutes: number }>();
-    for (let i = 0; i < categories.length; i++) {
-      const goal = goalQueries[i].data?.goal;
-      if (goal) {
-        result.set(categories[i].id, { hours: goal.availableHours, minutes: goal.availableMinutes });
+    for (const item of allGoals) {
+      if (item.goal) {
+        result.set(item.categoryId, { hours: item.goal.availableHours, minutes: item.goal.availableMinutes });
       }
     }
     return result;
-  }, [categories, goalQueries]);
-
-  const activeCategoriesWithGoals = categories.filter(
-    (cat) => goalsByCategory.has(cat.id) || mtdByCategory.has(cat.id)
-  );
+  }, [allGoals]);
 
   return (
     <Card>
