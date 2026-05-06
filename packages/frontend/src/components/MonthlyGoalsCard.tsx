@@ -122,13 +122,13 @@ export function MonthlyGoalsCard() {
         <CardTitle className="text-base">Monthly Goals — {monthYear}</CardTitle>
       </CardHeader>
       <CardContent>
-        {activeCategoriesWithGoals.length === 0 ? (
+        {categories.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No monthly goals set yet. Click a row to set a goal for a category.
+            No categories yet. Create categories to set monthly goals.
           </p>
         ) : (
           <div className="space-y-3">
-            {activeCategoriesWithGoals.map((cat) => {
+            {categories.map((cat) => {
               const mtdMinutes = mtdByCategory.get(cat.id) ?? 0;
               const mtdHours = mtdMinutes / 60;
               const goal = goalsByCategory.get(cat.id);
