@@ -24,6 +24,8 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
 
 - **One-tap timer** — tap a category to start, tap Stop to finish; starting a new category auto-stops the previous one
 - **Weekly goal** — configurable hours per week (0–40); shown in the top bar and weekly summary, drives the rounding cap
+- **Monthly budgets** — set per-category hour targets by month; view month-to-date progress in the Weekly tab
+- **Bonus eligibility** — mark categories as bonus-eligible or non-eligible for end-of-year bonus calculations
 - **Weekly overview** — time per category per day; click any cell to edit hours inline (totals update live as you type); export as CSV ready to paste into your time registration tool
 - **End-of-day rounding** — round tracked minutes up to the nearest 30 or 60 minutes (configurable), capped at your weekly goal
 - **Light / dark / system theme** — follows your OS preference by default; override per-device in Settings

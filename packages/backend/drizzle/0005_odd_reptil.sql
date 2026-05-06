@@ -1,0 +1,1 @@
+ALTER TABLE `categories` ADD `bonus` integer DEFAULT false NOT NULL;

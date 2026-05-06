@@ -8,6 +8,8 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 
 - One active timer at a time per user
 - Configurable weekly goal (default 40 h) stored per user in `user_settings`
+- Per-category monthly hour budgets (`monthly_project_goals`) — plan time allocation month-by-month
+- Bonus-eligible categories — flag categories to include/exclude from EOY bonus calculations
 - End-of-day rounding: minutes → nearest 30 or 60 min interval (configurable, default 60; capped at user's weekly goal)
 - Auth: Authentik embedded outpost via NPM forward auth (no auth code in the app)
 
@@ -15,14 +17,15 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 
 | File | Why it matters |
 |------|---------------|
-| `packages/backend/src/db/schema.ts` | All data types flow from here (`categories`, `time_entries`, `user_settings`) |
+| `packages/backend/src/db/schema.ts` | All data types flow from here (`categories`, `time_entries`, `user_settings`, `monthly_project_goals`) |
 | `packages/shared/src/utils/rounding.ts` | Core business logic — the rounding algorithm |
 | `packages/backend/src/middleware/auth.ts` | Auth boundary — reads `X-authentik-email` header |
 | `packages/backend/src/routes/settings.ts` | GET/PUT `/api/settings` — weekly goal hours + rounding increment |
 | `packages/backend/src/services/summaryService.ts` | Builds weekly summary; reads weekly goal + rounding increment from DB |
 | `packages/frontend/src/components/CategoryGrid.tsx` | Primary UX surface — 2-col card grid; pill badge (workday code / initials) + active glow |
+| `packages/frontend/src/components/MonthlyGoalsCard.tsx` | Monthly Goals panel in Weekly tab — per-category budgets, M-T-D tracking, inline editing with dialogs |
 | `packages/frontend/src/components/WeeklySummary.tsx` | Weekly tab — stacked bar chart, editable hours-by-category table (click-to-edit cells, live totals), CSV export, round-week |
-| `packages/frontend/src/components/CategoryManager.tsx` | Category CRUD + drag-to-reorder + A-Z sort |
+| `packages/frontend/src/components/CategoryManager.tsx` | Category CRUD + drag-to-reorder + A-Z sort; bonus flag toggle in edit dialog |
 | `packages/frontend/src/components/WeeklyGoalSetting.tsx` | Settings UI for weekly goal (number input + slider) + rounding increment toggle |
 | `packages/frontend/src/components/SessionExpiredOverlay.tsx` | Full-screen overlay shown on 401/403; prompts user to log in again |
 | `packages/frontend/src/lib/theme.ts` | Pure theme utilities — `getStoredTheme`, `setStoredTheme`, `applyTheme`, `resolveTheme` |
@@ -50,6 +53,8 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | Change weekly-cell edit behaviour | `packages/frontend/src/components/WeeklySummary.tsx` + `PATCH /api/summary/adjust-cell` in `routes/summary.ts` |
 | Change the theme / add colour tokens | `packages/frontend/src/index.css` (`:root` = light, `.dark` = dark), `src/lib/theme.ts` |
 | Change the weekly goal setting | `packages/backend/src/routes/settings.ts` + `WeeklyGoalSetting.tsx` |
+| Add per-category monthly hour goals | `packages/backend/src/utils/monthlyGoalHelper.ts` + `api.monthlyGoals` + `MonthlyGoalsCard.tsx` |
+| Change bonus eligibility per category | `packages/frontend/src/components/CategoryManager.tsx` (checkbox in edit dialog) |
 | Debug auth issues | `docs/integration/auth.md`, `packages/backend/src/middleware/auth.ts` |
 | Debug session-expiry UX | `packages/frontend/src/lib/api.ts` (`AuthError`), `src/lib/authContext.ts`, `src/components/SessionExpiredOverlay.tsx` |
 | Debug timer accuracy / background tab | `packages/frontend/src/workers/timer.worker.ts`, `src/components/ActiveTimer.tsx` |
@@ -74,6 +79,8 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `PUT /api/categories/:id` | Yes | Update a category |
 | `DELETE /api/categories/:id` | Yes | Delete a category |
 | `PATCH /api/categories/reorder` | Yes | Bulk update `sort_order`; body: `[{id, sortOrder}]` |
+| `GET /api/settings/monthly-goals` | Yes | Fetch monthly budget for a category; query: `categoryId`, `monthYear` (YYYY-MM) |
+| `POST /api/settings/set-monthly-goal` | Yes | Set/update monthly budget for a category; body: `{categoryId, monthYear, availableHours, availableMinutes}` |
 | `GET /api/timer` | Yes | Active timer status |
 | `POST /api/timer/start` | Yes | Start timer |
 | `POST /api/timer/stop` | Yes | Stop timer |

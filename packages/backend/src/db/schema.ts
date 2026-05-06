@@ -9,6 +9,7 @@ export const categories = sqliteTable(
     name: text('name').notNull(),
     color: text('color').notNull().default('#6366f1'),
     workdayCode: text('workday_code'),
+    bonus: integer('bonus', { mode: 'boolean' }).notNull().default(false),
     sortOrder: integer('sort_order').notNull().default(0),
     createdAt: text('created_at')
       .notNull()
@@ -70,6 +71,22 @@ export const apiTokens = sqliteTable(
   },
   (t) => [uniqueIndex('idx_api_tokens_hash').on(t.tokenHash)]
 );
+
+export const monthlyProjectGoals = sqliteTable('monthly_project_goals', {
+  id: integer('id').primaryKey({ autoIncrement: true }),
+  userId: text('user_id').notNull(),
+  categoryId: integer('category_id')
+    .notNull()
+    .references(() => categories.id),
+  monthYear: text('month_year').notNull(), // Format: YYYY-MM (e.g., '2026-05')
+  availableHours: integer('available_hours').notNull(), // Total available hours for the month
+  availableMinutes: integer('available_minutes').notNull(), // Stored as minutes for calculations
+  lastUpdated: text('last_updated')
+    .notNull()
+    .default(sql`(datetime('now'))`)
+});
+
+export type NewMonthlyProjectGoal = typeof monthlyProjectGoals.$inferInsert;
 
 export type CategoryRow = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;

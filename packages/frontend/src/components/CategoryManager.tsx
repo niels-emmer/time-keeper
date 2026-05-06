@@ -41,8 +41,9 @@ interface FormState {
   name: string;
   color: string;
   workdayCode: string;
+  bonus: boolean;
 }
-const defaultForm: FormState = { name: '', color: '#6366f1', workdayCode: '' };
+const defaultForm: FormState = { name: '', color: '#6366f1', workdayCode: '', bonus: false };
 
 // ── Sortable row ─────────────────────────────────────────────────────────────
 interface SortableRowProps {
@@ -91,6 +92,13 @@ function SortableRow({ cat, onEdit, onDelete, deleteDisabled }: SortableRowProps
         )}
       </div>
 
+      {/* Bonus badge */}
+      {cat.bonus && (
+        <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 flex-shrink-0">
+          bonus
+        </span>
+      )}
+
       {/* Actions */}
       <Button variant="ghost" size="icon" onClick={() => onEdit(cat)}>
         <Pencil className="h-4 w-4" />
@@ -133,7 +141,7 @@ export function CategoryManager() {
   }
 
   function openEdit(cat: Category) {
-    setForm({ name: cat.name, color: cat.color, workdayCode: cat.workdayCode ?? '' });
+    setForm({ name: cat.name, color: cat.color, workdayCode: cat.workdayCode ?? '', bonus: cat.bonus });
     setDialog({ open: true, editing: cat });
   }
 
@@ -142,6 +150,7 @@ export function CategoryManager() {
       name: form.name.trim(),
       color: form.color,
       workdayCode: form.workdayCode.trim() || undefined,
+      bonus: form.bonus,
     };
     if (dialog.editing) {
       update.mutate({ id: dialog.editing.id, dto });
@@ -262,6 +271,19 @@ export function CategoryManager() {
                 onChange={(e) => setForm((f) => ({ ...f, workdayCode: e.target.value }))}
                 placeholder="e.g. IT-DEV-001"
               />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <input
+                id="bonus-toggle"
+                type="checkbox"
+                checked={form.bonus}
+                onChange={(e) => setForm((f) => ({ ...f, bonus: e.target.checked }))}
+                className="h-4 w-4 rounded border-input accent-amber-500"
+              />
+              <label htmlFor="bonus-toggle" className="text-sm font-medium cursor-pointer">
+                Count toward EOY bonus
+              </label>
             </div>
 
             <div>
