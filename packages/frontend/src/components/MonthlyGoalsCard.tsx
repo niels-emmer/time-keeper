@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { useCategories } from '@/hooks/useCategories';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { toISOWeek } from '@time-keeper/shared';
 import type { TimeEntry } from '@time-keeper/shared';
 
 // Get current month in YYYY-MM format
@@ -16,16 +17,9 @@ function getCurrentMonth(): string {
   return `${year}-${month}`;
 }
 
-// Get all time entries (by querying the week-start to month-end)
-function getMonthStartDate(month: string): string {
-  const [year, monthStr] = month.split('-');
-  return `${year}-${monthStr}-01`;
-}
-
 export function MonthlyGoalsCard() {
   const { data: categories = [] } = useCategories();
   const monthYear = useMemo(() => getCurrentMonth(), []);
-  const monthStart = useMemo(() => getMonthStartDate(monthYear), [monthYear]);
 
   const [editingGoal, setEditingGoal] = useState<{
     categoryId: number;
@@ -46,24 +40,50 @@ export function MonthlyGoalsCard() {
     },
   });
 
-  // Fetch entries for the current month (approx)
-  // We'll make a rough estimate: fetch from month start to end
+  // Fetch entries for the current month
+  // Get all weeks that overlap with this month and fetch them
   const { data: monthEntries = [] } = useQuery({
     queryKey: ['monthEntries', monthYear],
     queryFn: async () => {
-      // Fetch weekly summaries or use a different approach
-      // For now, we'll calculate from categories' entries by fetching week-by-week
-      // This is a simplification; ideally there'd be a dedicated month-by-date endpoint
-      const entries: TimeEntry[] = [];
       const now = new Date();
       const currentYear = now.getFullYear();
       const currentMonth = now.getMonth();
       const monthStart = new Date(Date.UTC(currentYear, currentMonth, 1));
       const monthEnd = new Date(Date.UTC(currentYear, currentMonth + 1, 0));
 
-      // For simplicity, we'll fetch from the API — but this would benefit from a dedicated endpoint
-      // For now, estimate from the weekly summary or return empty (user would see M-T-D as 0)
-      return entries;
+      const allEntries: TimeEntry[] = [];
+      const currentDate = new Date(monthStart);
+
+      // Fetch week-by-week for all weeks that overlap with the month
+      const fetchedWeeks = new Set<string>();
+      while (currentDate <= monthEnd) {
+        const weekStr = toISOWeek(currentDate);
+        
+        // Only fetch each week once
+        if (!fetchedWeeks.has(weekStr)) {
+          fetchedWeeks.add(weekStr);
+          try {
+            const weekEntries = await api.entries.listByWeek(weekStr);
+            // Only include entries that are actually in the target month
+            const monthEntries = weekEntries.filter((entry) => {
+              const entryDate = new Date(entry.startTime);
+              return (
+                entryDate.getUTCFullYear() === currentYear &&
+                entryDate.getUTCMonth() === currentMonth
+              );
+            });
+            allEntries.push(...monthEntries);
+          } catch (err) {
+            // Skip if week doesn't exist or other error
+            console.warn(`Failed to fetch week ${weekStr}:`, err);
+          }
+        }
+
+        // Move to next week
+        currentDate.setUTCDate(currentDate.getUTCDate() + 7);
+      }
+
+      return allEntries;
     },
   });
 
