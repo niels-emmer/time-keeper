@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Timer, BarChart2, Settings } from 'lucide-react';
+import { Timer, BarChart2, Calendar, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWeeklySummary } from '@/hooks/useSummary';
 import { useTimer } from '@/hooks/useTimer';
@@ -7,6 +7,7 @@ import { useTimer } from '@/hooks/useTimer';
 const navItems = [
   { to: '/', icon: Timer, label: 'Track' },
   { to: '/weekly', icon: BarChart2, label: 'Weekly' },
+  { to: '/monthly', icon: Calendar, label: 'Monthly' },
   { to: '/settings', icon: Settings, label: 'Settings' },
 ];
 
