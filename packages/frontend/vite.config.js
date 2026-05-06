@@ -15,8 +15,7 @@ export default defineConfig({
             name: 'version-install-assets',
             transformIndexHtml(html) {
                 return html
-                    .replace('/icons/favicon.ico', withAssetVersion('/icons/favicon.ico'))
-                    .replace('/icons/timekeeper.svg', withAssetVersion('/icons/timekeeper.svg'))
+                    .replace('/icons/icon-32x32.png', withAssetVersion('/icons/icon-32x32.png'))
                     .replace('/icons/apple-touch-icon.png', withAssetVersion('/icons/apple-touch-icon.png'));
             },
         },
@@ -26,7 +25,7 @@ export default defineConfig({
             strategies: 'injectManifest',
             srcDir: 'src',
             filename: 'sw.ts',
-            includeAssets: ['icons/favicon.ico', 'icons/timekeeper.svg', 'icons/apple-touch-icon.png'],
+            includeAssets: ['icons/icon-32x32.png', 'icons/favicon.ico', 'icons/apple-touch-icon.png'],
             manifest: {
                 name: 'Time Keeper',
                 short_name: 'TimeKeeper',

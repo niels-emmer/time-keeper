@@ -43,7 +43,8 @@ All icons live under `packages/frontend/public/icons/`.
 | `icons/maskable-192x192.png` | 192×192 | Android adaptive icon (maskable) |
 | `icons/maskable-512x512.png` | 512×512 | Android adaptive icon, high-res (maskable) |
 | `icons/apple-touch-icon.png` | 180×180 | iOS home screen icon |
-| `icons/favicon.ico` | 32×32 | Browser tab icon |
+| `icons/icon-32x32.png` | 32×32 | Browser tab favicon |
+| `icons/favicon.ico` | 32×32 | Legacy ICO favicon generated from the 32×32 PNG |
 
 Maskable icons have sufficient padding for all common launcher mask shapes (rounded square, circle, etc.).
 
