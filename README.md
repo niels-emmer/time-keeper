@@ -19,17 +19,19 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
   </tr>
 </table>
 
+The screenshot set predates the new Monthly tab and the updated PWA icon. Regenerate `docs/screenshots/` on the next UI documentation pass.
+
 
 ## Features
 
 - **One-tap timer** — tap a category to start, tap Stop to finish; starting a new category auto-stops the previous one
 - **Weekly goal** — configurable hours per week (0–40); shown in the top bar and weekly summary, drives the rounding cap
-- **Monthly budgets** — set per-category hour targets by month; view month-to-date progress in the Weekly tab
+- **Monthly tab** — dedicated monthly planning view with per-category goals, month-to-date progress, projected vs actual comparison, and bonus vs non-bonus breakdown
 - **Bonus eligibility** — mark categories as bonus-eligible or non-eligible for end-of-year bonus calculations
 - **Weekly overview** — time per category per day; click any cell to edit hours inline (totals update live as you type); export as CSV ready to paste into your time registration tool
 - **End-of-day rounding** — round tracked minutes up to the nearest 30 or 60 minutes (configurable), capped at your weekly goal
 - **Light / dark / system theme** — follows your OS preference by default; override per-device in Settings
-- **PWA** — installable on macOS and Android, runs in standalone mode (no browser chrome)
+- **PWA** — installable on macOS and Android, runs in standalone mode (no browser chrome), prompts when a new version is available
 - **macOS status bar app** — native Flutter app lives in the menu bar; icon shows active timer color + `CODE hh:mm`; click to open a popover panel with full Track / Weekly / Settings functionality
 - **Self-hosted** — runs in Docker, no external services or accounts required beyond your own Authentik instance
 

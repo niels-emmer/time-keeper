@@ -23,7 +23,9 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `packages/backend/src/routes/settings.ts` | GET/PUT `/api/settings` — weekly goal hours + rounding increment |
 | `packages/backend/src/services/summaryService.ts` | Builds weekly summary; reads weekly goal + rounding increment from DB |
 | `packages/frontend/src/components/CategoryGrid.tsx` | Primary UX surface — 2-col card grid; pill badge (workday code / initials) + active glow |
-| `packages/frontend/src/components/MonthlyGoalsCard.tsx` | Monthly Goals panel in Weekly tab — per-category budgets, M-T-D tracking, inline editing with dialogs |
+| `packages/frontend/src/pages/Monthly.tsx` | Monthly tab shell — hosts the overview and monthly-goal cards |
+| `packages/frontend/src/components/MonthlyOverviewCard.tsx` | Monthly overview — projected vs actual by category + bonus vs non-bonus hours |
+| `packages/frontend/src/components/MonthlyGoalsCard.tsx` | Monthly Goals card — per-category budgets, M-T-D tracking, inline editing with dialogs |
 | `packages/frontend/src/components/WeeklySummary.tsx` | Weekly tab — stacked bar chart, editable hours-by-category table (click-to-edit cells, live totals), CSV export, round-week |
 | `packages/frontend/src/components/CategoryManager.tsx` | Category CRUD + drag-to-reorder + A-Z sort; bonus flag toggle in edit dialog |
 | `packages/frontend/src/components/WeeklyGoalSetting.tsx` | Settings UI for weekly goal (number input + slider) + rounding increment toggle |
@@ -32,6 +34,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `packages/frontend/src/context/ThemeContext.tsx` | `ThemeProvider` + `useTheme` hook — manages light/dark/system preference and applies `.dark` class |
 | `packages/frontend/src/lib/authContext.ts` | React context carrying `sessionExpired` flag; set by global React Query error handler |
 | `packages/frontend/src/lib/api.ts` | Base fetch wrapper; throws `AuthError` on 401/403 |
+| `packages/frontend/src/hooks/useServiceWorkerUpdate.ts` | Prompts the user when a newer service worker is ready and reloads after takeover |
 | `packages/frontend/src/workers/timer.worker.ts` | Off-thread 1 s tick — keeps elapsed time accurate when tab is hidden |
 | `packages/frontend/src/sw.ts` | Custom service worker (Workbox + persistent timer notification) |
 | `packages/frontend/vite.config.ts` | Vite + VitePWA config (injectManifest strategy); must stay in sync with sw.ts |
@@ -40,6 +43,11 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `packages/shared/src/utils/rounding.test.ts` | Unit tests for the rounding algorithm (Vitest) |
 | `packages/backend/src/routes/settings.test.ts` | Unit tests for the settings route (Vitest) |
 | `packages/frontend/src/lib/__tests__/theme.test.ts` | Unit tests for theme utilities — 18 tests covering get/set/apply/resolve |
+| `packages/frontend/src/components/__tests__/MonthlyGoalsCard.test.tsx` | Frontend tests for month-to-date progress rendering and goal editing |
+| `packages/frontend/src/components/__tests__/MonthlyOverviewCard.test.tsx` | Frontend tests for projected vs actual comparison and bonus breakdown rendering |
+| `packages/frontend/src/hooks/__tests__/useServiceWorkerUpdate.test.tsx` | Frontend tests for the PWA update prompt + reload flow |
+| `packages/backend/src/routes/categories.test.ts` | Backend tests for category bonus validation and persistence |
+| `packages/backend/src/utils/monthlyGoalHelper.test.ts` | Backend tests for monthly-goal insert/update/lookup behavior |
 | `SECURITY.md` | Security posture — **must be kept current** (see task routing below) |
 
 ## Task routing
@@ -54,6 +62,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | Change the theme / add colour tokens | `packages/frontend/src/index.css` (`:root` = light, `.dark` = dark), `src/lib/theme.ts` |
 | Change the weekly goal setting | `packages/backend/src/routes/settings.ts` + `WeeklyGoalSetting.tsx` |
 | Add per-category monthly hour goals | `packages/backend/src/utils/monthlyGoalHelper.ts` + `api.monthlyGoals` + `MonthlyGoalsCard.tsx` |
+| Change monthly projections / bonus charts | `packages/frontend/src/components/MonthlyOverviewCard.tsx` |
 | Change bonus eligibility per category | `packages/frontend/src/components/CategoryManager.tsx` (checkbox in edit dialog) |
 | Debug auth issues | `docs/integration/auth.md`, `packages/backend/src/middleware/auth.ts` |
 | Debug session-expiry UX | `packages/frontend/src/lib/api.ts` (`AuthError`), `src/lib/authContext.ts`, `src/components/SessionExpiredOverlay.tsx` |
@@ -133,10 +142,12 @@ yarn workspace @time-keeper/frontend build
 ```bash
 yarn workspace @time-keeper/shared test        # run unit tests (Vitest)
 yarn workspace @time-keeper/shared test:watch  # watch mode
+yarn workspace @time-keeper/backend test       # backend route/helper tests
+yarn workspace @time-keeper/frontend test      # frontend component/hook tests
 ```
 
 Tests live in `packages/shared/src/utils/rounding.test.ts`. They cover the core rounding algorithm (`computeRounding`): basic ceiling rounding, zero-minute no-ops, the configurable weekly cap, idempotency, and the configurable rounding increment (30 or 60 min). The `computeRounding` function accepts optional `weeklyGoalMinutes` (default 2400) and `roundingIncrementMinutes` (default 60) parameters.
 
-Backend tests live in `packages/backend/src/routes/settings.test.ts` and cover getOrCreate, upsert, and Zod validation for both `weeklyGoalHours` and `roundingIncrementMinutes`.
+Backend tests live in `packages/backend/src/routes/settings.test.ts`, `packages/backend/src/routes/categories.test.ts`, and `packages/backend/src/utils/monthlyGoalHelper.test.ts`. They cover settings validation/persistence, category bonus validation/persistence, and monthly-goal insert/update/lookup behavior.
 
-Frontend tests live in `packages/frontend/src/lib/__tests__/theme.test.ts` and cover all pure theme utilities (`getStoredTheme`, `setStoredTheme`, `getSystemTheme`, `resolveTheme`, `applyTheme`). Vitest config is in `packages/frontend/vitest.config.ts` (jsdom environment, global APIs).
+Frontend tests live in `packages/frontend/src/lib/__tests__/theme.test.ts`, `packages/frontend/src/components/__tests__/MonthlyGoalsCard.test.tsx`, `packages/frontend/src/components/__tests__/MonthlyOverviewCard.test.tsx`, and `packages/frontend/src/hooks/__tests__/useServiceWorkerUpdate.test.tsx`. They cover theme utilities, monthly-goal rendering/editing, monthly overview rendering, and the PWA update prompt flow. Vitest config is in `packages/frontend/vitest.config.ts` (jsdom environment, global APIs).

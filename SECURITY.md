@@ -24,11 +24,12 @@ This is a single-user (or small-team) personal productivity tool, not a public-f
 
 - `GET /api/settings/monthly-goals` — fetch a category's monthly budget
 - `POST /api/settings/set-monthly-goal` — set/update a category's monthly budget
-- Both endpoints require Authentik auth; category ownership is validated
+- Both endpoints require Authentik auth and scope writes/reads to `req.userId`
+- These endpoints do **not** currently verify that `categoryId` belongs to the caller; the main risk is orphan monthly-goal rows inside the caller's own namespace, not cross-user access
 
 ## What has not been done
 
-- Month-to-date (M-T-D) tracking in the UI is currently a placeholder — requires a new `GET /api/entries?fromDate=&toDate=` endpoint or similar
+- Monthly-goal endpoints still accept any numeric `categoryId` for the authenticated user instead of checking category existence/ownership against the `categories` table
 
 ---
 
@@ -93,9 +94,11 @@ See [docs/integration/api-subdomain.md](docs/integration/api-subdomain.md).
 
 ## Dependency audit
 
-Audited with `yarn npm audit` on **2026-04-07**: **no vulnerabilities found**.
+Audited with `yarn npm audit` on **2026-05-06**: **no audit suggestions**.
 
 `vitest` and `jsdom` were added in v0.10.0 as **dev-only** dependencies (not shipped in the production Docker image). They are omitted from the runtime table below.
+
+`recharts` and `react-is` were added for the Monthly overview charts. `@testing-library/react` and `@testing-library/dom` were added as **dev-only** dependencies for frontend component and hook tests.
 
 Runtime dependencies and their risk profiles:
 
@@ -108,6 +111,8 @@ Runtime dependencies and their risk profiles:
 | `express-rate-limit` | `^7` | Simple, auditable rate-limiting middleware |
 | `react` + `vite` | current | Mainstream, heavily used |
 | `@tanstack/react-query` | current | Mainstream, well-maintained |
+| `recharts` | current | Mainstream charting library used for the Monthly overview visualisations |
+| `react-is` | current | Supporting dependency required by `recharts`; small surface area |
 | `@radix-ui/*` / `shadcn/ui` | current | Accessible, widely used UI primitives |
 | `@dnd-kit/*` | current | Pure JS drag-and-drop; no native code |
 
