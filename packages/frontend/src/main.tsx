@@ -5,12 +5,16 @@ import App from './App.tsx';
 import { AuthContext } from './lib/authContext.ts';
 import { AuthError } from './lib/api.ts';
 import { ThemeProvider } from './context/ThemeContext.tsx';
+import { useServiceWorkerUpdate } from './hooks/useServiceWorkerUpdate.ts';
 import './index.css';
 
 function Root() {
   const [sessionExpired, setSessionExpired] = useState(false);
 
   const markSessionExpired = useCallback(() => setSessionExpired(true), []);
+
+  // Listen for PWA updates and prompt user to reload
+  useServiceWorkerUpdate();
 
   const [queryClient] = useState(
     () =>

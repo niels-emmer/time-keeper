@@ -150,12 +150,15 @@ async function stopTracking(): Promise<void> {
 self.addEventListener('message', (event: ExtendableMessageEvent) => {
   const msg = event.data as
     | { type: 'START_TRACKING'; categoryName: string; startTime: string }
-    | { type: 'STOP_TRACKING' };
+    | { type: 'STOP_TRACKING' }
+    | { type: 'SKIP_WAITING' };
 
   if (msg.type === 'START_TRACKING') {
     event.waitUntil(startTracking(msg.categoryName, msg.startTime));
   } else if (msg.type === 'STOP_TRACKING') {
     event.waitUntil(stopTracking());
+  } else if (msg.type === 'SKIP_WAITING') {
+    self.skipWaiting();
   }
 });
 
