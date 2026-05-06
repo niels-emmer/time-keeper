@@ -27,6 +27,8 @@ No port changes needed. Both services communicate via the shared `proxy-net` Doc
 APP_VERSION=$(git describe --tags --abbrev=0) docker compose up -d --build
 ```
 
+If you omit `APP_VERSION`, the backend image falls back to the latest git tag available in the clone, then to `packages/backend/package.json`.
+
 ## Step 2 — Create the NPM proxy host
 
 In Nginx Proxy Manager:

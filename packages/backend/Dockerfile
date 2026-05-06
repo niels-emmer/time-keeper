@@ -3,6 +3,8 @@ FROM node:22-alpine AS builder
 
 WORKDIR /app
 
+ARG APP_VERSION
+
 # Enable Yarn 4
 RUN corepack enable
 
@@ -20,11 +22,14 @@ COPY packages/backend ./packages/backend
 COPY packages/backend/docker-entrypoint.sh ./packages/backend/
 COPY .git ./.git
 
-# Extract version from git tag (or use 'dev' if not available)
-RUN if [ -d .git ]; then \
-      git describe --tags --abbrev=0 2>/dev/null > /version.txt || echo "dev" > /version.txt; \
+# Prefer an explicit build arg, then the latest git tag, then the package version.
+RUN if [ -n "$APP_VERSION" ]; then \
+      printf '%s' "$APP_VERSION" > /version.txt; \
+    elif [ -d .git ]; then \
+      git describe --tags --abbrev=0 2>/dev/null > /version.txt || \
+        node -p "JSON.parse(require('fs').readFileSync('./packages/backend/package.json', 'utf8')).version" > /version.txt; \
     else \
-      echo "dev" > /version.txt; \
+      node -p "JSON.parse(require('fs').readFileSync('./packages/backend/package.json', 'utf8')).version" > /version.txt; \
     fi && \
     cat /version.txt
 

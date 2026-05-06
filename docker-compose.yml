@@ -27,9 +27,9 @@ services:
       context: .
       dockerfile: packages/backend/Dockerfile
       args:
-        # Pass the latest git tag so /api/info can report the running version.
-        # Falls back to 'dev' if no tags exist.
-        APP_VERSION: ${APP_VERSION:-dev}
+        # Optional explicit version override. When omitted, the Docker build
+        # falls back to the latest git tag, then packages/backend/package.json.
+        APP_VERSION: ${APP_VERSION:-}
     restart: unless-stopped
     environment:
       NODE_ENV: production

@@ -39,7 +39,7 @@ Both Dockerfiles use the **repo root** as the build context (`.`). This is requi
 
 | Variable | Set by | Purpose |
 |----------|--------|---------|
-| `APP_VERSION` | Build arg (`--build-arg APP_VERSION=...`) | Git tag baked into the backend image; served by `GET /api/info` and shown in Settings → About. Falls back to `"dev"` if not set. |
+| `APP_VERSION` | Build arg (`--build-arg APP_VERSION=...`) | Optional explicit version override; served by `GET /api/info` and shown in Settings → About. Falls back to the latest git tag in the clone, then `packages/backend/package.json`. |
 | `DEV_USER_ID` | Shell env (dev only) | Email address to use as the user identity in dev mode (bypasses auth) |
 
 Pass `APP_VERSION` at build time:

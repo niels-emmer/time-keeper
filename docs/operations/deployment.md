@@ -76,6 +76,7 @@ APP_VERSION=$(git describe --tags --abbrev=0) docker compose up -d --build
 ```
 
 The `APP_VERSION` variable bakes the latest git tag into the backend image so the Settings → About section shows the correct version. Docker rebuilds only changed layers. The SQLite database is preserved in the `db-data` volume.
+If `APP_VERSION` is omitted, the image now falls back to the latest git tag available in the clone, then to the version in `packages/backend/package.json`.
 
 ## Backup
 
