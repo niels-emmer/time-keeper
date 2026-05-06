@@ -98,7 +98,7 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 ## Deploy command
 
 ```bash
-APP_VERSION=$(git describe --tags --abbrev=0) docker compose up -d --build
+docker compose up -d --build
 ```
 
 ## Screenshot conventions
