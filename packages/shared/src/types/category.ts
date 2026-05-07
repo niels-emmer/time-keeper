@@ -4,7 +4,7 @@ export interface Category {
   name: string;
   color: string;
   workdayCode: string | null;
-  bonus: boolean;
+  billable: boolean;
   sortOrder: number;
   createdAt: string;
   updatedAt: string;
@@ -14,13 +14,13 @@ export interface CreateCategoryDTO {
   name: string;
   color?: string;
   workdayCode?: string;
-  bonus?: boolean;
+  billable?: boolean;
 }
 
 export interface UpdateCategoryDTO {
   name?: string;
   color?: string;
   workdayCode?: string | null;
-  bonus?: boolean;
+  billable?: boolean;
   sortOrder?: number;
 }

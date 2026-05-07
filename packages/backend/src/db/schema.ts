@@ -9,7 +9,7 @@ export const categories = sqliteTable(
     name: text('name').notNull(),
     color: text('color').notNull().default('#6366f1'),
     workdayCode: text('workday_code'),
-    bonus: integer('bonus', { mode: 'boolean' }).notNull().default(false),
+    billable: integer('billable', { mode: 'boolean' }).notNull().default(false),
     sortOrder: integer('sort_order').notNull().default(0),
     createdAt: text('created_at')
       .notNull()

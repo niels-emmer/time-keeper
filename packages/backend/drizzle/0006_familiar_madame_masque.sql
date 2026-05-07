@@ -1,0 +1,1 @@
+ALTER TABLE `categories` RENAME COLUMN "bonus" TO "billable";

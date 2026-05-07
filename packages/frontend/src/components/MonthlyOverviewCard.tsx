@@ -121,7 +121,7 @@ export function MonthlyOverviewCard() {
     return Math.ceil(max * 1.2); // Add 20% padding for readability
   }, [comparisonData]);
 
-  const bonusData = useMemo(() => {
+  const billableData = useMemo(() => {
     const hoursPerCategory = new Map<number, number>();
 
     for (const entry of monthEntries) {
@@ -131,22 +131,22 @@ export function MonthlyOverviewCard() {
       hoursPerCategory.set(entry.categoryId, (hoursPerCategory.get(entry.categoryId) ?? 0) + minutes);
     }
 
-    let bonusHours = 0;
-    let nonBonusHours = 0;
+    let billableHours = 0;
+    let nonBillableHours = 0;
 
     for (const cat of categories) {
       const minutes = hoursPerCategory.get(cat.id) ?? 0;
       const hours = minutes / 60;
-      if (cat.bonus) {
-        bonusHours += hours;
+      if (cat.billable) {
+        billableHours += hours;
       } else {
-        nonBonusHours += hours;
+        nonBillableHours += hours;
       }
     }
 
     return [
-      { name: 'Bonus-eligible', value: Math.round(bonusHours * 10) / 10 },
-      { name: 'Non-bonus', value: Math.round(nonBonusHours * 10) / 10 },
+      { name: 'billable', value: Math.round(billableHours * 10) / 10 },
+      { name: 'non billable', value: Math.round(nonBillableHours * 10) / 10 },
     ];
   }, [categories, monthEntries]);
 
@@ -179,13 +179,13 @@ export function MonthlyOverviewCard() {
           </ResponsiveContainer>
         </div>
 
-        {/* Bonus vs Non-Bonus Bar */}
-        {bonusData.some((item) => item.value > 0) && (
+        {/* Billable vs non billable bar */}
+        {billableData.some((item) => item.value > 0) && (
           <div>
             <h3 className="text-sm font-medium mb-4">Hours by Type</h3>
             <ResponsiveContainer width="100%" height={150}>
               <BarChart
-                data={bonusData}
+                data={billableData}
                 margin={{ top: 20, right: 30, left: 0, bottom: 20 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
@@ -193,10 +193,10 @@ export function MonthlyOverviewCard() {
                 <YAxis />
                 <Tooltip formatter={(value) => `${value}h`} />
                 <Bar dataKey="value" fill="#8884d8" radius={[8, 8, 0, 0]}>
-                  {bonusData.map((entry, index) => (
+                  {billableData.map((entry, index) => (
                     <Cell
                       key={`cell-${index}`}
-                      fill={entry.name === 'Bonus-eligible' ? '#00C49F' : '#FFBB28'}
+                      fill={entry.name === 'billable' ? '#00C49F' : '#FFBB28'}
                     />
                   ))}
                 </Bar>

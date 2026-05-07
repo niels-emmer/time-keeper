@@ -17,8 +17,8 @@ This is a single-user (or small-team) personal productivity tool, not a public-f
 ## Data schema changes (2026-05-06)
 
 - Added `monthly_project_goals` table: tracks per-category hour/minute budgets per month
-- Added `bonus` boolean column to `categories`: marks categories eligible for EOY bonus calculations
-- Both changes are backward-compatible (new table is independent; bonus defaults to `false` on existing categories)
+- Renamed the `categories` classification field from `bonus` to `billable`: marks categories for billable vs non-billable reporting in the monthly overview
+- The monthly-goals addition remains backward-compatible; the category classification rename requires a schema migration to preserve existing values
 
 ## New API endpoints (2026-05-06)
 

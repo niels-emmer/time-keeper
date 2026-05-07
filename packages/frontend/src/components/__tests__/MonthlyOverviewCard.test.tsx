@@ -12,7 +12,7 @@ const { mockCategories, apiMock } = vi.hoisted(() => ({
       name: 'Project Alpha',
       color: '#3366ff',
       workdayCode: 'ALPHA',
-      bonus: true,
+      billable: true,
       sortOrder: 0,
       createdAt: '2026-05-01T00:00:00.000Z',
       updatedAt: '2026-05-01T00:00:00.000Z',
@@ -23,7 +23,7 @@ const { mockCategories, apiMock } = vi.hoisted(() => ({
       name: 'Maintenance',
       color: '#22aa66',
       workdayCode: 'MAINT',
-      bonus: false,
+      billable: false,
       sortOrder: 1,
       createdAt: '2026-05-01T00:00:00.000Z',
       updatedAt: '2026-05-01T00:00:00.000Z',
@@ -34,7 +34,7 @@ const { mockCategories, apiMock } = vi.hoisted(() => ({
       name: 'Hidden Category',
       color: '#ff9933',
       workdayCode: 'HIDE',
-      bonus: false,
+      billable: false,
       sortOrder: 2,
       createdAt: '2026-05-01T00:00:00.000Z',
       updatedAt: '2026-05-01T00:00:00.000Z',
@@ -144,11 +144,11 @@ describe('MonthlyOverviewCard', () => {
     expect(screen.getByText('Actual')).not.toBeNull();
   });
 
-  it('renders the bonus breakdown when actual hours exist', async () => {
+  it('renders the billable breakdown when actual hours exist', async () => {
     renderWithClient(<MonthlyOverviewCard />);
 
     expect(await screen.findByText('Hours by Type')).not.toBeNull();
-    expect(screen.getByText('Bonus-eligible')).not.toBeNull();
-    expect(screen.getByText('Non-bonus')).not.toBeNull();
+    expect(screen.getByText('billable')).not.toBeNull();
+    expect(screen.getByText('non billable')).not.toBeNull();
   });
 });

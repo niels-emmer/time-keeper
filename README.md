@@ -26,8 +26,8 @@ The screenshot set predates the new Monthly tab and the updated PWA icon. Regene
 
 - **One-tap timer** — tap a category to start, tap Stop to finish; starting a new category auto-stops the previous one
 - **Weekly goal** — configurable hours per week (0–40); shown in the top bar and weekly summary, drives the rounding cap
-- **Monthly tab** — dedicated monthly planning view with per-category goals, month-to-date progress, projected vs actual comparison, and bonus vs non-bonus breakdown
-- **Bonus eligibility** — mark categories as bonus-eligible or non-eligible for end-of-year bonus calculations
+- **Monthly tab** — dedicated monthly planning view with per-category goals, month-to-date progress, projected vs actual comparison, and billable vs non billable breakdown
+- **Billable activity** — mark categories as billable or non billable for monthly overview reporting
 - **Weekly overview** — time per category per day; click any cell to edit hours inline (totals update live as you type); export as CSV ready to paste into your time registration tool
 - **End-of-day rounding** — round tracked minutes up to the nearest 30 or 60 minutes (configurable), capped at your weekly goal
 - **Light / dark / system theme** — follows your OS preference by default; override per-device in Settings

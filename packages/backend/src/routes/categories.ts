@@ -11,14 +11,14 @@ const createSchema = z.object({
   name: z.string().min(1).max(100),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   workdayCode: z.string().max(100).optional(),
-  bonus: z.boolean().optional(),
+  billable: z.boolean().optional(),
 });
 
 const updateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   workdayCode: z.string().max(100).nullable().optional(),
-  bonus: z.boolean().optional(),
+  billable: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
 });
 

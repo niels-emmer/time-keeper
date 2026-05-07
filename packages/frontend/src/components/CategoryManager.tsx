@@ -41,9 +41,9 @@ interface FormState {
   name: string;
   color: string;
   workdayCode: string;
-  bonus: boolean;
+  billable: boolean;
 }
-const defaultForm: FormState = { name: '', color: '#6366f1', workdayCode: '', bonus: false };
+const defaultForm: FormState = { name: '', color: '#6366f1', workdayCode: '', billable: false };
 
 // ── Sortable row ─────────────────────────────────────────────────────────────
 interface SortableRowProps {
@@ -92,10 +92,10 @@ function SortableRow({ cat, onEdit, onDelete, deleteDisabled }: SortableRowProps
         )}
       </div>
 
-      {/* Bonus badge */}
-      {cat.bonus && (
+      {/* Billable badge */}
+      {cat.billable && (
         <span className="text-xs font-medium px-1.5 py-0.5 rounded bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 flex-shrink-0">
-          bonus
+          billable
         </span>
       )}
 
@@ -141,7 +141,7 @@ export function CategoryManager() {
   }
 
   function openEdit(cat: Category) {
-    setForm({ name: cat.name, color: cat.color, workdayCode: cat.workdayCode ?? '', bonus: cat.bonus });
+    setForm({ name: cat.name, color: cat.color, workdayCode: cat.workdayCode ?? '', billable: cat.billable });
     setDialog({ open: true, editing: cat });
   }
 
@@ -150,7 +150,7 @@ export function CategoryManager() {
       name: form.name.trim(),
       color: form.color,
       workdayCode: form.workdayCode.trim() || undefined,
-      bonus: form.bonus,
+      billable: form.billable,
     };
     if (dialog.editing) {
       update.mutate({ id: dialog.editing.id, dto });
@@ -275,14 +275,14 @@ export function CategoryManager() {
 
             <div className="flex items-center gap-3">
               <input
-                id="bonus-toggle"
+                id="billable-toggle"
                 type="checkbox"
-                checked={form.bonus}
-                onChange={(e) => setForm((f) => ({ ...f, bonus: e.target.checked }))}
+                checked={form.billable}
+                onChange={(e) => setForm((f) => ({ ...f, billable: e.target.checked }))}
                 className="h-4 w-4 rounded border-input accent-amber-500"
               />
-              <label htmlFor="bonus-toggle" className="text-sm font-medium cursor-pointer">
-                Count toward EOY bonus
+              <label htmlFor="billable-toggle" className="text-sm font-medium cursor-pointer">
+                Billable activity
               </label>
             </div>
 

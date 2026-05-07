@@ -13,7 +13,7 @@ const { mockCategories, apiMock } = vi.hoisted(() => ({
       name: 'Project Alpha',
       color: '#3366ff',
       workdayCode: 'ALPHA',
-      bonus: true,
+      billable: true,
       sortOrder: 0,
       createdAt: '2026-05-01T00:00:00.000Z',
       updatedAt: '2026-05-01T00:00:00.000Z',
