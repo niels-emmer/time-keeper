@@ -1,3 +1,9 @@
+/**
+ * Take dark-theme mobile screenshots of all four tabs (390x844 @ 2x device scale).
+ * 
+ * Usage: npx playwright install chromium && node scripts/take-screenshots.mjs
+ */
+
 import { chromium } from 'playwright';
 import path from 'path';
 import { fileURLToPath } from 'url';
