@@ -1,8 +1,6 @@
-> [!CAUTION]
-> This entire project was built by Claude Code (Sonnet 4.6). Initiated, and then guided by human (me) prompting, a steady stream of “ah, and can you also…” and two evenings of iterative back and forth. Started from an empty folder, it evolved under its own self-authored guidance system (the agent memory living in `docs/`), to a working app with the only human-written content in these opening paragraphs.
->
-> Credit where it is due: impressive speed, clean UI, and a solid overall architecture. It even keeps its documentation up-to-date unprompted, in both the repository and the [Wiki](https://github.com/niels-emmer/time-keeper/wiki). That documentation however, rarely mentions “security” which is not an accident. The code relies on unvetted libraries, has not been pentested, and could theoretically exfiltrate your toothbrush for all I know. See [SECURITY.md](SECURITY.md) for the details.
- 
+> [!INFO]
+> This project was built entirely by AI (Claude Code, GitHub Copilot, GPT-4) from an empty folder, guided by iterative human prompting. It manages its own documentation in `docs/memory/` and keeps the Wiki and code in sync unprompted. For security and dependency details, see [SECURITY.md](SECURITY.md) and the [Wiki](https://github.com/niels-emmer/time-keeper/wiki).
+
 # Time Keeper
 
 A self-hosted personal work-timer PWA. Track time against named categories from any device, view weekly summaries, and copy them into Workday (or any time registration tool) with one click.
@@ -116,4 +114,4 @@ There is no shared data, cross-user reporting, or admin interface — each user 
 
 ## Attribution
 
-Original idea and product direction by the author. All code, architecture, and debugging by [Claude Code](https://claude.ai/claude-code) (Claude Sonnet 4.5 / Opus 4.6, Anthropic).
+Original idea and product direction by the author. Built entirely by AI: [Claude Code](https://claude.ai/claude-code) (Claude Sonnet 4.5 / Opus 4.6, Anthropic), [GitHub Copilot](https://github.com/features/copilot) (Claude Haiku, Anthropic), and [GPT-4](https://openai.com/gpt-4) (OpenAI). Guided by exceptional iterative prompting — the key to coherent, self-documenting AI-driven development.
