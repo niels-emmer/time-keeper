@@ -94,7 +94,7 @@ See [docs/integration/api-subdomain.md](docs/integration/api-subdomain.md).
 
 ## Dependency audit
 
-Audited with `yarn npm audit` on **2026-05-06**: **no audit suggestions**.
+Audited with `yarn npm audit` on **2026-05-07**: **no audit suggestions**.
 
 `vitest` and `jsdom` were added in v0.10.0 as **dev-only** dependencies (not shipped in the production Docker image). They are omitted from the runtime table below.
 
@@ -106,7 +106,7 @@ Runtime dependencies and their risk profiles:
 |---------|------------------|-------|
 | `express` | `^4` | 15+ years old, very widely used, actively maintained |
 | `better-sqlite3` | `^11` | Widely used SQLite binding; includes a native C++ addon compiled at install time — highest-risk category by nature of native code |
-| `drizzle-orm` | `^0.38` | Newer library (2022–); less battle-tested than Prisma but growing adoption |
+| `drizzle-orm` | `^0.45` | Newer library (2022–); less battle-tested than Prisma but growing adoption. Upgraded from 0.38 to fix CVE-2026-39356 (SQL injection via identifier escaping). |
 | `zod` | `^3` | Pure TypeScript; used for all input validation on the backend |
 | `express-rate-limit` | `^7` | Simple, auditable rate-limiting middleware |
 | `react` + `vite` | current | Mainstream, heavily used |
