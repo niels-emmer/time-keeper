@@ -13,13 +13,14 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
 
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/track.png" width="220" alt="Track tab — category grid with active timer"/><br/><sub><b>Track</b> — tap a category to start</sub></td>
-    <td align="center"><img src="docs/screenshots/weekly.png" width="220" alt="Weekly tab — hours per category per day"/><br/><sub><b>Weekly</b> — hours by category × day</sub></td>
-    <td align="center"><img src="docs/screenshots/settings.png" width="220" alt="Settings tab — categories and weekly goal"/><br/><sub><b>Settings</b> — categories &amp; weekly goal</sub></td>
+    <td align="center"><img src="docs/screenshots/track.png" width="380" alt="Track tab — category grid"/><br/><sub><b>Track</b> — tap a category to start</sub></td>
+    <td align="center"><img src="docs/screenshots/weekly.png" width="380" alt="Weekly tab — hours per category per day"/><br/><sub><b>Weekly</b> — hours by category × day</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/monthly.png" width="380" alt="Monthly tab — projected vs actual + billable breakdown"/><br/><sub><b>Monthly</b> — projected vs actual + billable breakdown</sub></td>
+    <td align="center"><img src="docs/screenshots/settings.png" width="380" alt="Settings tab — categories and weekly goal"/><br/><sub><b>Settings</b> — categories &amp; weekly goal</sub></td>
   </tr>
 </table>
-
-The screenshot set predates the new Monthly tab and the updated PWA icon. Regenerate `docs/screenshots/` on the next UI documentation pass.
 
 
 ## Features
