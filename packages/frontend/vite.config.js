@@ -15,8 +15,12 @@ export default defineConfig({
             name: 'version-install-assets',
             transformIndexHtml(html) {
                 return html
+                    .replace('/icons/timekeeper.svg', withAssetVersion('/icons/timekeeper.svg'))
                     .replace('/icons/icon-32x32.png', withAssetVersion('/icons/icon-32x32.png'))
-                    .replace('/icons/apple-touch-icon.png', withAssetVersion('/icons/apple-touch-icon.png'));
+                    .replace('/icons/icon-16x16.png', withAssetVersion('/icons/icon-16x16.png'))
+                    .replace('/icons/favicon.ico', withAssetVersion('/icons/favicon.ico'))
+                    .replace('/icons/apple-touch-icon.png', withAssetVersion('/icons/apple-touch-icon.png'))
+                    .replace('/icons/safari-pinned-tab.svg', withAssetVersion('/icons/safari-pinned-tab.svg'));
             },
         },
         VitePWA({
@@ -25,16 +29,23 @@ export default defineConfig({
             strategies: 'injectManifest',
             srcDir: 'src',
             filename: 'sw.ts',
-            includeAssets: ['icons/icon-32x32.png', 'icons/favicon.ico', 'icons/apple-touch-icon.png'],
+            includeAssets: [
+                'icons/timekeeper.svg',
+                'icons/icon-16x16.png',
+                'icons/icon-32x32.png',
+                'icons/favicon.ico',
+                'icons/apple-touch-icon.png',
+                'icons/safari-pinned-tab.svg',
+            ],
             manifest: {
                 name: 'Time Keeper',
                 short_name: 'TimeKeeper',
                 description: 'Track work time by category for Workday',
-                // Primary brand colour — works across both light and dark themes.
+                // Install surfaces use the new icon brand colours.
                 // The <meta name="theme-color"> tags in index.html handle per-scheme
                 // browser chrome colour while browsing (media query aware).
-                theme_color: '#4f5aea',
-                background_color: '#0B1220',
+                theme_color: '#207D9B',
+                background_color: '#1A202C',
                 display: 'standalone',
                 orientation: 'portrait',
                 start_url: '/',

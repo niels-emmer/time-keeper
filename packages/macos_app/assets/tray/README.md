@@ -4,8 +4,8 @@ Place the following PNG files here before building:
 
 | File | Size | Purpose |
 |------|------|---------|
-| `inactive.png` | 16×16 (+ `inactive@2x.png` at 32×32) | Monochrome **template** icon — shown when connected but no timer running. Use a simple clock/timer glyph as a pure white or black silhouette; macOS will tint it automatically for light/dark mode. |
-| `grey.png` | 16×16 (+ `grey@2x.png` at 32×32) | Same shape as `inactive.png` but at ~40% opacity grey — shown when not connected / not configured. |
+| `inactive.png` | 16×16 (+ `inactive@2x.png` at 32×32) | Monochrome **template** icon — shown when connected but no timer running. Uses the simplified Time Keeper monogram as a pure black silhouette; macOS tints it automatically for light/dark mode. |
+| `grey.png` | 16×16 (+ `grey@2x.png` at 32×32) | Same monogram as `inactive.png` but at ~45% grey — shown when not connected / not configured. |
 
 The colored dot shown when a timer is active is generated at runtime by `IconGenerator.coloredDot()` — no static file needed for that state.
 
@@ -21,4 +21,4 @@ convert inactive@2x.png -fill gray50 -colorize 60 grey@2x.png
 convert inactive.png -fill gray50 -colorize 60 grey.png
 ```
 
-For production, use a proper SVG timer/clock silhouette exported at 16×16 and 32×32.
+For production, keep the tray assets derived from the simplified Time Keeper monogram (`timekeeper-template.svg` / `timekeeper-grey.svg`) and export them at 16×16 and 32×32.

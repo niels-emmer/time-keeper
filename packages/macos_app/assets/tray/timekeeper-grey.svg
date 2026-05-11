@@ -1,12 +1,10 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Time Keeper tray grey">
-  <g opacity="0.45">
-    <circle cx="32" cy="32" r="18" fill="none" stroke="#6B7280" stroke-width="5.5"/>
-    <circle cx="32" cy="14.5" r="2.4" fill="#6B7280"/>
-    <circle cx="49.5" cy="32" r="2.4" fill="#6B7280"/>
-    <circle cx="32" cy="49.5" r="2.4" fill="#6B7280"/>
-    <circle cx="14.5" cy="32" r="2.4" fill="#6B7280"/>
-    <line x1="32" y1="32" x2="22.5" y2="20" stroke="#6B7280" stroke-width="5" stroke-linecap="round"/>
-    <line x1="32" y1="32" x2="41.5" y2="26" stroke="#6B7280" stroke-width="5.75" stroke-linecap="round"/>
-    <circle cx="32" cy="32" r="4.2" fill="#6B7280"/>
+  <g stroke="#6B7280" stroke-opacity="0.45" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none">
+    <path d="M22 14H42"/>
+    <path d="M32 14V32"/>
+    <path d="M32 32L46 48"/>
+    <path d="M32 32L20 44"/>
+    <path d="M32 32H18"/>
+    <path d="M42 14L32 32L22 14"/>
   </g>
 </svg>

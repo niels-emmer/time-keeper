@@ -71,8 +71,8 @@ async function showNotification(categoryName: string, startTime: string): Promis
   await self.registration.showNotification('Time Keeper – timer running', {
     tag: NOTIFICATION_TAG,
     body: `${categoryName}  ·  ${timeStr}`,
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-192x192.png',
     silent: true,
     requireInteraction: true,
     data: { url: '/', categoryName, startTime },
