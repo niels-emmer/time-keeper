@@ -5,6 +5,8 @@ import App from './App.tsx';
 import { AuthContext } from './lib/authContext.ts';
 import { AuthError } from './lib/api.ts';
 import { ThemeProvider } from './context/ThemeContext.tsx';
+import { AppStatusContext } from './lib/appStatusContext.tsx';
+import { useOnlineStatus } from './hooks/useOnlineStatus.ts';
 import { useServiceWorkerUpdate } from './hooks/useServiceWorkerUpdate.ts';
 import './index.css';
 
@@ -13,8 +15,8 @@ function Root() {
 
   const markSessionExpired = useCallback(() => setSessionExpired(true), []);
 
-  // Listen for PWA updates and prompt user to reload
-  useServiceWorkerUpdate();
+  const { updateAvailable, applyingUpdate, applyUpdate, dismissUpdate } = useServiceWorkerUpdate();
+  const { isOnline, recentlyReconnected, lastConnectionChangeAt } = useOnlineStatus();
 
   const [queryClient] = useState(
     () =>
@@ -51,12 +53,30 @@ function Root() {
     });
   }, [queryClient, markSessionExpired]);
 
+  React.useEffect(() => {
+    if (!isOnline) return;
+    if (!recentlyReconnected) return;
+    queryClient.invalidateQueries();
+  }, [isOnline, recentlyReconnected, queryClient]);
+
   return (
     <ThemeProvider>
       <AuthContext.Provider value={{ sessionExpired, markSessionExpired }}>
-        <QueryClientProvider client={queryClient}>
-          <App />
-        </QueryClientProvider>
+        <AppStatusContext.Provider
+          value={{
+            isOnline,
+            recentlyReconnected,
+            lastConnectionChangeAt,
+            updateAvailable,
+            applyingUpdate,
+            applyUpdate,
+            dismissUpdate,
+          }}
+        >
+          <QueryClientProvider client={queryClient}>
+            <App />
+          </QueryClientProvider>
+        </AppStatusContext.Provider>
       </AuthContext.Provider>
     </ThemeProvider>
   );

@@ -1,204 +1,115 @@
-import { useState, useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { useCategories } from '@/hooks/useCategories';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
-import { toISOWeek } from '@time-keeper/shared';
-import type { TimeEntry } from '@time-keeper/shared';
+import { formatHoursFromMinutes, getMonthlyStatusMeta } from '@/lib/monthly';
+import type { MonthlySummary } from '@time-keeper/shared';
 
-// Get current month in YYYY-MM format
-function getCurrentMonth(): string {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  return `${year}-${month}`;
-}
-
-export function MonthlyGoalsCard() {
-  const { data: categories = [] } = useCategories();
-  const monthYear = useMemo(() => getCurrentMonth(), []);
-
+export function MonthlyGoalsCard({ summary }: { summary: MonthlySummary }) {
   const [editingGoal, setEditingGoal] = useState<{
     categoryId: number;
     categoryName: string;
-    currentGoalHours: number;
     currentGoalMinutes: number;
   } | null>(null);
-
   const [editForm, setEditForm] = useState({ hours: 0, minutes: 0 });
 
   const qc = useQueryClient();
   const updateGoal = useMutation({
     mutationFn: ({ categoryId, hours, minutes }: { categoryId: number; hours: number; minutes: number }) =>
-      api.monthlyGoals.set({ categoryId, monthYear, availableHours: hours, availableMinutes: minutes }),
+      api.monthlyGoals.set({
+        categoryId,
+        monthYear: summary.monthYear,
+        availableHours: hours,
+        availableMinutes: minutes,
+      }),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['monthlyGoals', monthYear] });
+      qc.invalidateQueries({ queryKey: ['summary', 'monthly', summary.monthYear] });
       setEditingGoal(null);
     },
   });
 
-  // Fetch entries for the current month
-  // Get all weeks that overlap with this month and fetch them
-  const { data: monthEntries = [] } = useQuery({
-    queryKey: ['monthEntries', monthYear],
-    queryFn: async () => {
-      const now = new Date();
-      const currentYear = now.getFullYear();
-      const currentMonth = now.getMonth();
-      const monthStart = new Date(Date.UTC(currentYear, currentMonth, 1));
-      const monthEnd = new Date(Date.UTC(currentYear, currentMonth + 1, 0));
-
-      const allEntries: TimeEntry[] = [];
-      const currentDate = new Date(monthStart);
-
-      // Fetch week-by-week for all weeks that overlap with the month
-      const fetchedWeeks = new Set<string>();
-      while (currentDate <= monthEnd) {
-        const weekStr = toISOWeek(currentDate);
-        
-        // Only fetch each week once
-        if (!fetchedWeeks.has(weekStr)) {
-          fetchedWeeks.add(weekStr);
-          try {
-            const weekEntries = await api.entries.listByWeek(weekStr);
-            // Only include entries that are actually in the target month
-            const monthEntries = weekEntries.filter((entry) => {
-              const entryDate = new Date(entry.startTime);
-              return (
-                entryDate.getUTCFullYear() === currentYear &&
-                entryDate.getUTCMonth() === currentMonth
-              );
-            });
-            allEntries.push(...monthEntries);
-          } catch (err) {
-            // Skip if week doesn't exist or other error
-            console.warn(`Failed to fetch week ${weekStr}:`, err);
-          }
-        }
-
-        // Move to next week
-        currentDate.setUTCDate(currentDate.getUTCDate() + 7);
-      }
-
-      return allEntries;
-    },
-  });
-
-  // Calculate month-to-date minutes per category
-  const mtdByCategory = useMemo(() => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth();
-    const currentDay = now.getDate();
-
-    const result = new Map<number, number>();
-
-    for (const entry of monthEntries) {
-      if (!entry.endTime) continue; // Skip running timers
-      const entryDate = new Date(entry.startTime);
-      if (
-        entryDate.getUTCFullYear() === currentYear &&
-        entryDate.getUTCMonth() === currentMonth &&
-        entryDate.getUTCDate() <= currentDay
-      ) {
-        const duration = new Date(entry.endTime).getTime() - entryDate.getTime();
-        const minutes = Math.floor(duration / 60000);
-        result.set(entry.categoryId, (result.get(entry.categoryId) ?? 0) + minutes);
-      }
-    }
-
-    return result;
-  }, [monthEntries]);
-
-  // Fetch monthly goals for all categories in a single request
-  const { data: allGoals = [] } = useQuery({
-    queryKey: ['monthlyGoals', monthYear],
-    queryFn: async () => {
-      // Fetch all goals for the month
-      const goals = await Promise.all(
-        categories.map((cat) =>
-          api.monthlyGoals.get(cat.id, monthYear).then((res) => ({
-            categoryId: cat.id,
-            goal: res.goal,
-          }))
-        )
-      );
-      return goals;
-    },
-    enabled: categories.length > 0,
-  });
-
-  const goalsByCategory = useMemo(() => {
-    const result = new Map<number, { hours: number; minutes: number }>();
-    for (const item of allGoals) {
-      if (item.goal) {
-        result.set(item.categoryId, { hours: item.goal.availableHours, minutes: item.goal.availableMinutes });
-      }
-    }
-    return result;
-  }, [allGoals]);
+  const goalRows = useMemo(
+    () => summary.categories.filter((category) => category.goalMinutes > 0 || category.actualMinutes > 0),
+    [summary.categories]
+  );
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">Monthly Goals — {monthYear}</CardTitle>
+        <CardTitle className="text-base">Monthly Goals — {summary.monthLabel}</CardTitle>
       </CardHeader>
       <CardContent>
-        {categories.length === 0 ? (
+        {goalRows.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No categories yet. Create categories to set monthly goals.
+            No categories with goals or hours yet. Create categories or track time to start planning this month.
           </p>
         ) : (
           <div className="space-y-3">
-            {categories.map((cat) => {
-              const mtdMinutes = mtdByCategory.get(cat.id) ?? 0;
-              const mtdHours = mtdMinutes / 60;
-              const goal = goalsByCategory.get(cat.id);
-              const goalHours = goal?.hours ?? 0;
-              const progressPercent = goalHours > 0 ? (mtdHours / goalHours) * 100 : 0;
+            {goalRows.map((category) => {
+              const progressPercent = category.goalMinutes > 0
+                ? Math.min((category.actualMinutes / category.goalMinutes) * 100, 100)
+                : 0;
+              const statusMeta = getMonthlyStatusMeta(category.status);
 
               return (
                 <button
-                  key={cat.id}
+                  key={category.categoryId}
                   onClick={() => {
-                    setEditingGoal({ categoryId: cat.id, categoryName: cat.name, currentGoalHours: goalHours, currentGoalMinutes: goal?.minutes ?? 0 });
-                    setEditForm({ hours: goalHours, minutes: goal?.minutes ?? 0 });
+                    setEditingGoal({
+                      categoryId: category.categoryId,
+                      categoryName: category.name,
+                      currentGoalMinutes: category.goalMinutes,
+                    });
+                    setEditForm({
+                      hours: Math.floor(category.goalMinutes / 60),
+                      minutes: category.goalMinutes % 60,
+                    });
                   }}
-                  className="w-full text-left group"
+                  className="group w-full text-left"
                 >
-                  <div className="flex items-center justify-between gap-3 rounded-lg border p-3 hover:bg-muted/50 transition-colors">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="h-3 w-3 rounded-full flex-shrink-0"
-                          style={{ backgroundColor: cat.color }}
-                        />
-                        <span className="font-medium text-sm">{cat.name}</span>
-                      </div>
-                      {goal && (
-                        <div className="mt-2 h-1.5 w-full bg-muted rounded-full overflow-hidden">
+                  <div className="rounded-lg border p-3 transition-colors hover:bg-muted/50">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="h-3 w-3 rounded-full" style={{ backgroundColor: category.color }} />
+                          <span className="text-sm font-medium">{category.name}</span>
+                          {category.workdayCode && (
+                            <span className="text-xs text-muted-foreground">{category.workdayCode}</span>
+                          )}
+                          <span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusMeta.className}`}>
+                            {statusMeta.label}
+                          </span>
+                        </div>
+
+                        <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
                           <div
                             className="h-full bg-blue-500 transition-all"
-                            style={{ width: `${Math.min(progressPercent, 100)}%` }}
+                            style={{ width: `${progressPercent}%` }}
                           />
                         </div>
-                      )}
-                    </div>
 
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-sm font-medium">
-                        {mtdHours.toFixed(1)}h {goal && `/ ${goalHours}h`}
-                      </p>
-                      {goal && (
+                        <div className="mt-3 grid gap-1 text-xs text-muted-foreground sm:grid-cols-3">
+                          <p>Actual: {formatHoursFromMinutes(category.actualMinutes)}</p>
+                          <p>Goal: {formatHoursFromMinutes(category.goalMinutes)}</p>
+                          <p>
+                            {category.remainingMinutes > 0
+                              ? `Need ${formatHoursFromMinutes(category.requiredDailyMinutes)} / day`
+                              : 'Goal reached'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-medium">{formatHoursFromMinutes(category.actualMinutes)}</p>
                         <p className="text-xs text-muted-foreground">
-                          {progressPercent > 100
-                            ? `+${(progressPercent - 100).toFixed(0)}%`
-                            : `${progressPercent.toFixed(0)}%`}
+                          {category.goalMinutes > 0
+                            ? `Projected ${formatHoursFromMinutes(category.projectedMinutes)}`
+                            : 'No target set'}
                         </p>
-                      )}
+                      </div>
                     </div>
                   </div>
                 </button>
@@ -208,7 +119,6 @@ export function MonthlyGoalsCard() {
         )}
       </CardContent>
 
-      {/* Edit dialog */}
       <Dialog open={editingGoal !== null} onOpenChange={(open) => !open && setEditingGoal(null)}>
         <DialogContent>
           <DialogHeader>
@@ -223,7 +133,7 @@ export function MonthlyGoalsCard() {
                 min="0"
                 max="744"
                 value={editForm.hours}
-                onChange={(e) => setEditForm((f) => ({ ...f, hours: Number(e.target.value) }))}
+                onChange={(event) => setEditForm((current) => ({ ...current, hours: Number(event.target.value) }))}
                 placeholder="e.g. 160"
               />
             </div>
@@ -235,7 +145,7 @@ export function MonthlyGoalsCard() {
                 min="0"
                 max="59"
                 value={editForm.minutes}
-                onChange={(e) => setEditForm((f) => ({ ...f, minutes: Number(e.target.value) }))}
+                onChange={(event) => setEditForm((current) => ({ ...current, minutes: Number(event.target.value) }))}
                 placeholder="0–59"
               />
             </div>

@@ -31,19 +31,29 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `packages/backend/src/middleware/auth.ts` | Auth boundary — validates Bearer tokens, trusts `X-authentik-email` only with a matching `X-Internal-Token` in production |
 | `packages/backend/src/routes/settings.ts` | GET/PUT `/api/settings` — weekly goal hours + rounding increment |
 | `packages/backend/src/services/summaryService.ts` | Builds weekly summary; reads weekly goal + rounding increment from DB |
-| `packages/frontend/src/components/CategoryGrid.tsx` | Primary UX surface — 2-col card grid; pill badge (workday code / initials) + active glow |
-| `packages/frontend/src/pages/Monthly.tsx` | Monthly tab shell — hosts the overview and monthly-goal cards |
-| `packages/frontend/src/components/MonthlyOverviewCard.tsx` | Monthly overview — projected vs actual by category + billable vs non-billable hours |
-| `packages/frontend/src/components/MonthlyGoalsCard.tsx` | Monthly Goals card — per-category budgets, M-T-D tracking, inline editing with dialogs |
-| `packages/frontend/src/components/WeeklySummary.tsx` | Weekly tab — stacked bar chart, editable hours-by-category table (click-to-edit cells, live totals), CSV export, round-week |
+| `packages/frontend/src/pages/Home.tsx` | Track tab shell — search input, sort mode toggle, pinned/recent sections, and timer/category coordination |
+| `packages/frontend/src/components/CategoryGrid.tsx` | Primary Track UX surface — category cards with active state, pin toggles, and quick-start affordances |
+| `packages/frontend/src/lib/track.ts` | Track screen utilities — local sort/pin preferences, filtering, and recent/manual/alphabetical ordering |
+| `packages/frontend/src/hooks/useRecentCategories.ts` | Derives recent category ordering from the current + previous ISO week entry data |
+| `packages/frontend/src/pages/Monthly.tsx` | Monthly tab shell — month navigation plus the monthly overview, focus, and goal cards |
+| `packages/frontend/src/components/MonthlyOverviewCard.tsx` | Monthly overview — headline metrics, projected vs actual by category, and billable vs non-billable hours |
+| `packages/frontend/src/components/MonthlyFocusCard.tsx` | Monthly focus panel — surfaces the categories that need attention most |
+| `packages/frontend/src/components/MonthlyGoalsCard.tsx` | Monthly Goals card — per-category budgets, status chips, pace guidance, and inline goal editing |
+| `packages/frontend/src/hooks/useMonthlySummary.ts` | Fetches the canonical monthly summary payload used by the Monthly tab |
+| `packages/frontend/src/lib/monthly.ts` | Monthly helpers — month navigation, hours formatting, focus ranking, and status metadata |
+| `packages/frontend/src/components/WeeklySummary.tsx` | Weekly tab — review panel, export-format picker + preview, editable hours-by-category table, day-log entry points, copy/download handoff formats, and round-week |
+| `packages/frontend/src/components/DailyLogDialog.tsx` | Day-level entry history UI — inspect actual entries, navigate dates, edit/delete completed entries, and backfill missed work |
+| `packages/frontend/src/lib/weeklyExport.ts` | Weekly export utilities — format selection persistence plus CSV/plain-text/compact output builders |
 | `packages/frontend/src/components/CategoryManager.tsx` | Category CRUD + drag-to-reorder + A-Z sort; billable flag toggle in edit dialog |
 | `packages/frontend/src/components/WeeklyGoalSetting.tsx` | Settings UI for weekly goal (number input + slider) + rounding increment toggle |
 | `packages/frontend/src/components/SessionExpiredOverlay.tsx` | Full-screen overlay shown on 401/403; prompts user to log in again |
 | `packages/frontend/src/lib/theme.ts` | Pure theme utilities — `getStoredTheme`, `setStoredTheme`, `applyTheme`, `resolveTheme` |
 | `packages/frontend/src/context/ThemeContext.tsx` | `ThemeProvider` + `useTheme` hook — manages light/dark/system preference and applies `.dark` class |
 | `packages/frontend/src/lib/authContext.ts` | React context carrying `sessionExpired` flag; set by global React Query error handler |
+| `packages/frontend/src/lib/appStatusContext.tsx` | App-wide online/update state shared between the layout banners and Settings → About |
 | `packages/frontend/src/lib/api.ts` | Base fetch wrapper; throws `AuthError` on 401/403 |
-| `packages/frontend/src/hooks/useServiceWorkerUpdate.ts` | Prompts the user when a newer service worker is ready and reloads after takeover |
+| `packages/frontend/src/hooks/useOnlineStatus.ts` | Tracks online/offline transitions and recent reconnect state for in-app status banners |
+| `packages/frontend/src/hooks/useServiceWorkerUpdate.ts` | Detects newer service workers, exposes update-ready state, and applies updates on demand |
 | `packages/frontend/src/workers/timer.worker.ts` | Off-thread 1 s tick — keeps elapsed time accurate when tab is hidden |
 | `packages/frontend/src/sw.ts` | Custom service worker (Workbox + persistent timer notification) |
 | `packages/frontend/vite.config.ts` | Vite + VitePWA config (injectManifest strategy); must stay in sync with sw.ts |
@@ -52,10 +62,17 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `packages/shared/src/utils/rounding.test.ts` | Unit tests for the rounding algorithm (Vitest) |
 | `packages/backend/src/routes/settings.test.ts` | Unit tests for the settings route (Vitest) |
 | `packages/frontend/src/lib/__tests__/theme.test.ts` | Unit tests for theme utilities — 18 tests covering get/set/apply/resolve |
-| `packages/frontend/src/components/__tests__/MonthlyGoalsCard.test.tsx` | Frontend tests for month-to-date progress rendering and goal editing |
-| `packages/frontend/src/components/__tests__/MonthlyOverviewCard.test.tsx` | Frontend tests for projected vs actual comparison and billable breakdown rendering |
-| `packages/frontend/src/hooks/__tests__/useServiceWorkerUpdate.test.tsx` | Frontend tests for the PWA update prompt + reload flow |
+| `packages/frontend/src/lib/__tests__/track.test.ts` | Unit tests for Track helpers — filtering, recency, pin toggling, and sort modes |
+| `packages/frontend/src/components/__tests__/CategoryGrid.test.tsx` | Frontend tests for Track cards — active state, pin toggles, and timer starts |
+| `packages/frontend/src/components/__tests__/MonthlyGoalsCard.test.tsx` | Frontend tests for monthly goal status/pacing and goal editing |
+| `packages/frontend/src/components/__tests__/MonthlyOverviewCard.test.tsx` | Frontend tests for monthly headline metrics and chart rendering |
+| `packages/frontend/src/components/__tests__/MonthlyFocusCard.test.tsx` | Frontend tests for the monthly focus/attention panel |
+| `packages/frontend/src/components/__tests__/DailyLogDialog.test.tsx` | Frontend tests for the day-log entry history UI and manual-entry creation flow |
+| `packages/frontend/src/components/__tests__/WeeklySummary.test.tsx` | Frontend tests for weekly export preview, format switching, and copy workflow |
+| `packages/frontend/src/hooks/__tests__/useServiceWorkerUpdate.test.tsx` | Frontend tests for PWA update-ready detection and reload flow |
+| `packages/frontend/src/lib/__tests__/weeklyExport.test.ts` | Unit tests for weekly export builders and last-used export format persistence |
 | `packages/backend/src/routes/categories.test.ts` | Backend tests for category billable validation and persistence |
+| `packages/backend/src/routes/entries.test.ts` | Backend tests for manual-entry validation and entry persistence guardrails |
 | `packages/backend/src/utils/monthlyGoalHelper.test.ts` | Backend tests for monthly-goal insert/update/lookup behavior |
 | `SECURITY.md` | Security posture — **must be kept current** (see task routing below) |
 
@@ -103,9 +120,11 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `POST /api/timer/start` | Yes | Start timer |
 | `POST /api/timer/stop` | Yes | Stop timer |
 | `GET /api/entries` | Yes | Time entries by date/week |
+| `POST /api/entries` | Yes | Create a completed manual/backfilled time entry |
 | `PATCH /api/entries/:id` | Yes | Update a time entry |
 | `DELETE /api/entries/:id` | Yes | Delete a time entry |
 | `GET /api/summary/weekly` | Yes | Weekly summary (goalMinutes comes from user_settings) |
+| `GET /api/summary/monthly` | Yes | Canonical monthly summary with per-category goals, pace, projections, and billable split |
 | `POST /api/summary/round` | Yes | Apply end-of-day rounding for a single date (cap = user's weekly goal) |
 | `POST /api/summary/round-week` | Yes | Apply rounding to all 7 days of an ISO week; idempotent, skips already-rounded entries |
 | `PATCH /api/summary/adjust-cell` | Yes | Set total minutes for a (date, categoryId) cell; creates/adjusts/deletes underlying time entries |

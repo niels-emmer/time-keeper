@@ -1,14 +1,10 @@
 import React from 'react';
-import { renderHook, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { act, renderHook, waitFor } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useServiceWorkerUpdate } from '../useServiceWorkerUpdate';
 
 describe('useServiceWorkerUpdate', () => {
   const originalLocation = window.location;
-
-  beforeEach(() => {
-    vi.stubGlobal('confirm', vi.fn(() => true));
-  });
 
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -18,36 +14,31 @@ describe('useServiceWorkerUpdate', () => {
     });
   });
 
-  it('prompts for an already waiting service worker and requests skip waiting', async () => {
-    const waitingPostMessage = vi.fn();
-    const addEventListener = vi.fn();
-    const removeEventListener = vi.fn();
-
+  it('flags an already waiting service worker as an available update', async () => {
     Object.defineProperty(navigator, 'serviceWorker', {
       configurable: true,
       value: {
         controller: { postMessage: vi.fn() },
         getRegistrations: vi.fn().mockResolvedValue([
           {
-            waiting: { postMessage: waitingPostMessage },
+            waiting: { postMessage: vi.fn() },
             addEventListener: vi.fn(),
           },
         ]),
-        addEventListener,
-        removeEventListener,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
       },
     });
 
-    renderHook(() => useServiceWorkerUpdate());
+    const { result } = renderHook(() => useServiceWorkerUpdate());
 
     await waitFor(() => {
-      expect(waitingPostMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
-      expect(confirm).toHaveBeenCalled();
+      expect(result.current.updateAvailable).toBe(true);
     });
   });
 
-  it('reloads once the new service worker takes control after confirmation', async () => {
-    const controllerPostMessage = vi.fn();
+  it('requests skip waiting and reloads once the new worker takes control', async () => {
+    const waitingPostMessage = vi.fn();
     const listeners = new Map<string, EventListener>();
     const reload = vi.fn();
 
@@ -59,26 +50,34 @@ describe('useServiceWorkerUpdate', () => {
     Object.defineProperty(navigator, 'serviceWorker', {
       configurable: true,
       value: {
-        controller: { postMessage: controllerPostMessage },
-        getRegistrations: vi.fn().mockResolvedValue([]),
+        controller: { postMessage: vi.fn() },
+        getRegistrations: vi.fn().mockResolvedValue([
+          {
+            waiting: { postMessage: waitingPostMessage },
+            addEventListener: vi.fn(),
+          },
+        ]),
         addEventListener: vi.fn((type: string, handler: EventListener) => listeners.set(type, handler)),
         removeEventListener: vi.fn(),
       },
     });
 
-    renderHook(() => useServiceWorkerUpdate());
-
-    const messageHandler = listeners.get('message');
-    expect(messageHandler).toBeDefined();
-
-    messageHandler?.({ data: { type: 'installed' } } as MessageEvent);
+    const { result } = renderHook(() => useServiceWorkerUpdate());
 
     await waitFor(() => {
-      expect(controllerPostMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+      expect(result.current.updateAvailable).toBe(true);
     });
 
+    act(() => {
+      result.current.applyUpdate();
+    });
+
+    expect(waitingPostMessage).toHaveBeenCalledWith({ type: 'SKIP_WAITING' });
+
     const controllerChangeHandler = listeners.get('controllerchange');
-    controllerChangeHandler?.(new Event('controllerchange'));
+    act(() => {
+      controllerChangeHandler?.(new Event('controllerchange'));
+    });
 
     expect(reload).toHaveBeenCalled();
   });

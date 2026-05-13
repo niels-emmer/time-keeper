@@ -12,8 +12,9 @@ export interface TimeEntry {
 
 export interface CreateEntryDTO {
   categoryId: number;
-  startTime?: string;
-  notes?: string;
+  startTime: string;
+  endTime: string;
+  notes?: string | null;
 }
 
 export interface UpdateEntryDTO {

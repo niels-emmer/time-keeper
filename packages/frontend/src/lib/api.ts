@@ -2,8 +2,11 @@ import type {
   Category,
   CreateCategoryDTO,
   UpdateCategoryDTO,
+  CreateEntryDTO,
+  UpdateEntryDTO,
   TimeEntry,
   WeeklySummary,
+  MonthlySummary,
   RoundingResult,
 } from '@time-keeper/shared';
 
@@ -70,7 +73,9 @@ export const api = {
   entries: {
     listByDate: (date: string) => request<TimeEntry[]>(`/entries?date=${date}`),
     listByWeek: (week: string) => request<TimeEntry[]>(`/entries?week=${week}`),
-    update: (id: number, dto: Partial<TimeEntry>) =>
+    create: (dto: CreateEntryDTO) =>
+      request<TimeEntry>('/entries', { method: 'POST', body: JSON.stringify(dto) }),
+    update: (id: number, dto: UpdateEntryDTO) =>
       request<TimeEntry>(`/entries/${id}`, { method: 'PATCH', body: JSON.stringify(dto) }),
     delete: (id: number) =>
       request<void>(`/entries/${id}`, { method: 'DELETE' }),
@@ -79,6 +84,8 @@ export const api = {
   summary: {
     weekly: (week?: string) =>
       request<WeeklySummary>(`/summary/weekly${week ? `?week=${week}` : ''}`),
+    monthly: (month: string) =>
+      request<MonthlySummary>(`/summary/monthly?month=${encodeURIComponent(month)}`),
     round: (date: string) =>
       request<RoundingResult>('/summary/round', { method: 'POST', body: JSON.stringify({ date }) }),
     roundWeek: (week: string) =>

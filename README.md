@@ -23,14 +23,14 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
 
 ## Features
 
-- **One-tap timer** — tap a category to start, tap Stop to finish; starting a new category auto-stops the previous one
+- **One-tap timer** — tap a category to start, tap Stop to finish; starting a new category auto-stops the previous one, and the Track screen now supports search, pinned categories, and recent-category sections for faster switching
 - **Weekly goal** — configurable hours per week (0–40); shown in the top bar and weekly summary, drives the rounding cap
-- **Monthly tab** — dedicated monthly planning view with per-category goals, month-to-date progress, projected vs actual comparison, and billable vs non-billable breakdown
+- **Monthly tab** — dedicated monthly planning view with month navigation, per-category goals, status chips, projected vs actual comparison, pace guidance, and billable vs non-billable breakdown
 - **Billable activity** — mark categories as billable or non-billable for monthly overview reporting
-- **Weekly overview** — time per category per day; click any cell to edit hours inline (totals update live as you type); export as CSV ready to paste into your time registration tool
+- **Weekly overview** — time per category per day; click any cell to edit hours inline (totals update live as you type), open day logs to inspect/edit/delete the actual entries, backfill missed work, review the week, and copy or download CSV/plain-text/compact handoff formats
 - **End-of-day rounding** — round tracked minutes up to the nearest 30 or 60 minutes (configurable), capped at your weekly goal
 - **Light / dark / system theme** — follows your OS preference by default; override per-device in Settings
-- **PWA** — installable on macOS and Android, runs in standalone mode (no browser chrome), prompts when a new version is available
+- **PWA** — installable on macOS and Android, runs in standalone mode (no browser chrome), shows an in-app update banner when a new version is ready, and surfaces connectivity status/reconnect feedback
 - **macOS status bar app** — native Flutter app lives in the menu bar; icon shows active timer color + `CODE hh:mm`; click to open a popover panel with full Track / Weekly / Settings functionality
 - **Self-hosted** — runs in Docker, no external services or accounts required beyond your own Authentik instance
 - **Personal access tokens** — browser-created tokens for the native app, shown once, hashed at rest, and expiring after one year

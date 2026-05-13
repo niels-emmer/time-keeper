@@ -125,6 +125,7 @@ export function ActiveTimer({ entry, categoryName, categoryColor }: Props) {
           <div>
             <p className="text-sm text-muted-foreground">Tracking</p>
             <p className="font-semibold">{categoryName}</p>
+            <p className="text-xs text-muted-foreground">Tap another category below to switch instantly.</p>
           </div>
         </div>
         <div className="flex items-center gap-4">
