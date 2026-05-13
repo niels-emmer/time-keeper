@@ -10,7 +10,11 @@ Time Keeper is a personal self-hosted tool, built and maintained by its author w
 
 ## For AI coding agents
 
-Read **[AGENTS.md](AGENTS.md)** — it is the authoritative entry point for agentic work in this repository and supersedes any generic instructions.
+Read **[AGENTS.md](AGENTS.md)** first — it is the authoritative routing index for agentic work in this repository and supersedes any generic instructions.
+
+Project-local Pi governance lives in `AGENTS.md` and the repo-local Pi surfaces it catalogs: `.pi/APPEND_SYSTEM.md`, `.pi-rules`, `.pi-context`, `CONTEXT.md`, `.pi/settings.json`, `.pi/extensions/`, `.pi/skills/`, `.pi/agents/`, and `.pi/prompts/session-init.md`.
+
+Your Pi runtime may also expose builtin or user-level agents from outside this repository; treat those as environment-specific unless this repo documents them explicitly.
 
 ## Development setup
 
@@ -29,7 +33,7 @@ DEV_USER_ID=you@example.com yarn workspace @time-keeper/backend dev
 yarn workspace @time-keeper/frontend dev
 ```
 
-Open http://localhost:5173.
+Then open http://localhost:5173.
 
 ## Running tests
 

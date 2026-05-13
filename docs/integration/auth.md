@@ -25,7 +25,7 @@ Authentik's embedded outpost sets these headers on authenticated requests (as fo
 | `X-authentik-username` | Username | Passed through, not used |
 | `X-authentik-uid` | OIDC `sub` (UUID) | Passed through, not used |
 
-The backend auth middleware (`packages/backend/src/middleware/auth.ts`) reads `X-authentik-email`. All database queries filter by this value.
+The backend auth middleware (`packages/backend/src/middleware/auth.ts`) reads `X-authentik-email`. In production it only trusts that header when the frontend nginx also sends a matching `X-Internal-Token` derived from `INTERNAL_PROXY_SECRET`. All database queries filter by the resulting user ID.
 
 ## Using a different identity provider
 
@@ -133,10 +133,11 @@ All data is stored under this value. No Authentik setup needed locally.
 ## Troubleshooting
 
 **401 from the backend after successful Authentik login**
-The `X-authentik-email` header isn't reaching the backend. Check in order:
-1. The NPM Advanced config sets `proxy_set_header X-authentik-email $authentik_email`
-2. The frontend nginx forwards it: `proxy_set_header X-authentik-email $http_x_authentik_email` in `packages/frontend/nginx.conf`
-3. The outpost is healthy: Authentik Admin → Outposts → verify status
+The browser auth headers are not reaching the backend as a trusted proxied request. Check in order:
+1. `INTERNAL_PROXY_SECRET` is set in `.env` and matches in both frontend and backend containers
+2. The NPM Advanced config sets `proxy_set_header X-authentik-email $authentik_email`
+3. The frontend nginx forwards both headers: `proxy_set_header X-authentik-email $http_x_authentik_email` and `proxy_set_header X-Internal-Token "${INTERNAL_PROXY_SECRET}"` in `packages/frontend/nginx.conf`
+4. The outpost is healthy: Authentik Admin → Outposts → verify status
 
 **Redirect loop after login**
 The Proxy Provider's **External host** must exactly match the domain NPM is serving, including `https://`. Check the Proxy Provider settings in Authentik.

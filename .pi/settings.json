@@ -1,0 +1,9 @@
+{
+  "packages": [
+    "npm:pi-subagents",
+    "npm:context-mode",
+    "npm:pi-web-access",
+    "npm:@plannotator/pi-extension",
+    "npm:@juicesharp/rpiv-ask-user-question"
+  ]
+}

@@ -13,7 +13,7 @@ import {
 } from '@/components/ui/dialog';
 import { api } from '@/lib/api';
 
-type TokenRow = { id: number; label: string; createdAt: string; lastUsedAt: string | null };
+type TokenRow = { id: number; label: string; createdAt: string; lastUsedAt: string | null; expiresAt: string };
 
 function formatDate(iso: string | null): string {
   if (!iso) return 'Never';
@@ -90,7 +90,8 @@ export function ApiTokenManager() {
         <CardContent>
           <p className="mb-4 text-sm text-muted-foreground">
             Tokens allow the macOS app to access the API without going through the browser login
-            flow. Each token is shown only once — copy it immediately after creation.
+            flow. Each token is shown only once, expires after one year, and should be copied
+            immediately after creation.
           </p>
 
           {isLoading ? (
@@ -104,6 +105,7 @@ export function ApiTokenManager() {
                   <th className="pb-2 font-medium">Label</th>
                   <th className="pb-2 font-medium">Created</th>
                   <th className="pb-2 font-medium">Last used</th>
+                  <th className="pb-2 font-medium">Expires</th>
                   <th className="pb-2" />
                 </tr>
               </thead>
@@ -113,6 +115,7 @@ export function ApiTokenManager() {
                     <td className="py-2 pr-4 font-medium">{t.label}</td>
                     <td className="py-2 pr-4 text-muted-foreground">{formatDate(t.createdAt)}</td>
                     <td className="py-2 pr-4 text-muted-foreground">{formatDate(t.lastUsedAt)}</td>
+                    <td className="py-2 pr-4 text-muted-foreground">{formatDate(t.expiresAt)}</td>
                     <td className="py-2 text-right">
                       <Button
                         size="sm"

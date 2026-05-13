@@ -9,8 +9,9 @@
 
 # Dependencies
 node_modules
+.pi/npm/
 
-# Build output
+# Build artifacts
 dist
 build
 
@@ -18,7 +19,7 @@ build
 .env
 *.env.local
 
-# SQLite (dev)
+# SQLite data
 *.db
 *.db-journal
 *.db-wal

@@ -68,6 +68,7 @@ export const apiTokens = sqliteTable(
       .notNull()
       .default(sql`(datetime('now'))`),
     lastUsedAt: text('last_used_at'), // null until first use
+    expiresAt: text('expires_at').notNull(),
   },
   (t) => [uniqueIndex('idx_api_tokens_hash').on(t.tokenHash)]
 );

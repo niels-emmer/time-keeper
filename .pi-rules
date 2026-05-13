@@ -1,0 +1,13 @@
+# Time Keeper Workspace Rules
+
+1. Start every session with `docs/memory/INDEX.md`.
+2. Read `docs/memory/invariants.md` before architectural changes.
+3. Read `docs/memory/decisions.md` before proposing or implementing alternatives.
+4. Preserve the core invariants: Authentik-owned browser auth, one active timer per user, UTC timestamps, SQLite as the only stateful resource, and rounding capped by the user's weekly goal.
+5. Keep changes small, evidence-based, and aligned with the documented architecture.
+6. For non-trivial tasks, prefer an explicit Research -> Plan -> Build -> Verify flow rather than jumping straight to mutation.
+7. Update tests and documentation in the same task when behavior or workflow changes.
+8. Update `SECURITY.md` when dependencies, API surface, auth flow, or storage change.
+9. Update `CONTRIBUTING.md` when tooling, setup, or contribution workflow changes.
+10. Update `README.md` when visible behavior or setup instructions change.
+11. Ask before destructive actions or when requirements are materially ambiguous.

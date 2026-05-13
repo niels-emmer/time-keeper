@@ -27,7 +27,7 @@ openssl rand -hex 32
 # → paste the output as INTERNAL_PROXY_SECRET in .env
 ```
 
-This secret prevents header injection attacks on the `api.*` subdomain (see [docs/integration/api-subdomain.md](../integration/api-subdomain.md)).
+This secret prevents header injection attacks on the `api.*` subdomain (see [docs/integration/api-subdomain.md](../integration/api-subdomain.md)). In production the backend now fails closed without it and will refuse to trust browser-auth headers if it is missing or mismatched.
 
 ## Step 3: Start the containers
 

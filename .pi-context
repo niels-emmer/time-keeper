@@ -1,0 +1,39 @@
+# Time Keeper — Pi Context
+
+## Mission
+Time Keeper is a self-hosted personal work-timer PWA for tracking time by category, reviewing weekly summaries, and producing Workday-friendly totals.
+
+## Stack
+- Frontend: React + Vite + Tailwind + shadcn/ui
+- Backend: Node.js + Express + Drizzle ORM
+- Database: SQLite
+- Auth: Authentik embedded outpost via NPM forward auth
+- Package manager: Yarn 4 workspaces
+
+## Primary source of truth
+- `AGENTS.md` — session bootstrap and standing documentation requirements
+- `docs/memory/INDEX.md` — project map and task routing
+- `docs/memory/invariants.md` — hard architectural rules
+- `docs/memory/decisions.md` — ADR log
+- `SECURITY.md` — security posture and dependency audit status
+
+## Critical code paths
+- `packages/backend/src/db/schema.ts`
+- `packages/backend/src/middleware/auth.ts`
+- `packages/shared/src/utils/rounding.ts`
+- `packages/backend/src/services/summaryService.ts`
+- `packages/frontend/src/components/WeeklySummary.tsx`
+- `packages/frontend/src/components/CategoryManager.tsx`
+- `packages/frontend/src/components/WeeklyGoalSetting.tsx`
+
+## Verification commands
+- `yarn workspace @time-keeper/shared test`
+- `yarn workspace @time-keeper/backend test`
+- `yarn workspace @time-keeper/frontend test`
+- `yarn workspace @time-keeper/backend build`
+- `yarn workspace @time-keeper/frontend build`
+
+## Documentation sync triggers
+- Dependencies/API/auth/storage changes -> `SECURITY.md`
+- Dev workflow/tooling/process changes -> `CONTRIBUTING.md`
+- Visible feature or setup changes -> `README.md`

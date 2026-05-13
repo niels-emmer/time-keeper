@@ -25,14 +25,15 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
 
 - **One-tap timer** — tap a category to start, tap Stop to finish; starting a new category auto-stops the previous one
 - **Weekly goal** — configurable hours per week (0–40); shown in the top bar and weekly summary, drives the rounding cap
-- **Monthly tab** — dedicated monthly planning view with per-category goals, month-to-date progress, projected vs actual comparison, and billable vs non billable breakdown
-- **Billable activity** — mark categories as billable or non billable for monthly overview reporting
+- **Monthly tab** — dedicated monthly planning view with per-category goals, month-to-date progress, projected vs actual comparison, and billable vs non-billable breakdown
+- **Billable activity** — mark categories as billable or non-billable for monthly overview reporting
 - **Weekly overview** — time per category per day; click any cell to edit hours inline (totals update live as you type); export as CSV ready to paste into your time registration tool
 - **End-of-day rounding** — round tracked minutes up to the nearest 30 or 60 minutes (configurable), capped at your weekly goal
 - **Light / dark / system theme** — follows your OS preference by default; override per-device in Settings
 - **PWA** — installable on macOS and Android, runs in standalone mode (no browser chrome), prompts when a new version is available
 - **macOS status bar app** — native Flutter app lives in the menu bar; icon shows active timer color + `CODE hh:mm`; click to open a popover panel with full Track / Weekly / Settings functionality
 - **Self-hosted** — runs in Docker, no external services or accounts required beyond your own Authentik instance
+- **Personal access tokens** — browser-created tokens for the native app, shown once, hashed at rest, and expiring after one year
 
 ## Tech stack
 
@@ -48,7 +49,7 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
 
 **To deploy (production):**
 - [Docker Engine 24+](https://docs.docker.com/engine/install/) with [Docker Compose v2](https://docs.docker.com/compose/install/)
-- An [Authentik](https://goauthentik.io) instance (or another identity provider — see [auth integration guide](docs/integration/auth.md))
+- An [Authentik](https://goauthentik.io) instance (see the [auth integration guide](docs/integration/auth.md))
 - [Nginx Proxy Manager](https://nginxproxymanager.com) (or another reverse proxy with forward auth support)
 - A domain name with SSL
 
@@ -81,26 +82,27 @@ See [docs/operations/deployment.md](docs/operations/deployment.md) for the full 
 
 The short version:
 1. Clone the repo on your VPS
-2. `docker compose up -d --build`
-3. Create a **Proxy Provider** in Authentik (forward auth mode, external host = your domain)
-4. Add it to your existing proxy outpost
-5. Add a proxy host in NPM pointing to `192.168.x.x:38521` (your server's LAN IP) with the standard Authentik forward auth Advanced config
+2. Generate `INTERNAL_PROXY_SECRET` with `openssl rand -hex 32` and store it in `.env`
+3. `docker compose up -d --build`
+4. Create a **Proxy Provider** in Authentik (forward auth mode, external host = your domain)
+5. Add it to your existing proxy outpost
+6. Add a proxy host in NPM pointing to `192.168.x.x:38521` (your server's LAN IP) with the standard Authentik forward auth Advanced config
 
 ## Documentation
 
 | Path | Contents |
 |------|----------|
 | [Wiki](https://github.com/niels-emmer/time-keeper/wiki) | Full user and operator documentation |
-| [AGENTS.md](AGENTS.md) | Entry point for AI coding agents |
-| [docs/memory/INDEX.md](docs/memory/INDEX.md) | Architecture overview and session guide |
-| [docs/integration/auth.md](docs/integration/auth.md) | Authentik + NPM wiring |
-| [docs/integration/docker.md](docs/integration/docker.md) | Docker services and volumes |
-| [docs/integration/pwa.md](docs/integration/pwa.md) | Installing on macOS and Android |
-| [docs/integration/api-subdomain.md](docs/integration/api-subdomain.md) | API subdomain setup for the native app |
-| [packages/macos_app/README.md](packages/macos_app/README.md) | macOS status bar app — build &amp; setup |
-| [docs/operations/deployment.md](docs/operations/deployment.md) | Production deployment guide |
-| [docs/operations/runbooks.md](docs/operations/runbooks.md) | Common break/fix procedures |
+| [AGENTS.md](AGENTS.md) | Entry point, bootstrap order, and the canonical catalog for repo-local Pi surfaces |
+| [.pi/APPEND_SYSTEM.md](.pi/APPEND_SYSTEM.md), [.pi-rules](.pi-rules), [.pi-context](.pi-context), [CONTEXT.md](CONTEXT.md) | Repo-local operating contract, workspace rules, and bootstrap context |
+| [.pi/settings.json](.pi/settings.json), [.pi/extensions/](.pi/extensions/), [.pi/skills/](.pi/skills/), [.pi/agents/](.pi/agents/), [.pi/prompts/session-init.md](.pi/prompts/session-init.md) | Repo-local Pi packages, extensions, skills, agents, and prompts |
+| [docs/memory/INDEX.md](docs/memory/INDEX.md) | Architecture overview, routing, and deeper links |
+| [docs/integration/](docs/integration) | Auth, Docker, PWA, and native-app integration docs |
+| [docs/operations/](docs/operations) | Local development, deployment, and runbooks |
+| [packages/macos_app/README.md](packages/macos_app/README.md) | macOS status bar app build and setup |
 | [SECURITY.md](SECURITY.md) | Security posture, risks, and dependency audit |
+
+Repo-local Pi surfaces above are defined by this repository. Your runtime may also expose additional builtin or user-level agents, but those are environment-specific and are not part of Time Keeper's repo contract unless documented here or in `AGENTS.md`.
 
 ## Customising categories
 

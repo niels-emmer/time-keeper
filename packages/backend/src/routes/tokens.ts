@@ -4,6 +4,7 @@ import { eq, and } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/client.js';
 import { apiTokens } from '../db/schema.js';
+import { createTokenExpiryTimestamp } from '../lib/apiTokenExpiry.js';
 import { requireHeaderAuth } from '../middleware/auth.js';
 
 export const tokensRouter = Router();
@@ -24,6 +25,7 @@ tokensRouter.get('/', (req, res) => {
       label: apiTokens.label,
       createdAt: apiTokens.createdAt,
       lastUsedAt: apiTokens.lastUsedAt,
+      expiresAt: apiTokens.expiresAt,
     })
     .from(apiTokens)
     .where(eq(apiTokens.userId, req.userId))
@@ -36,6 +38,7 @@ tokensRouter.get('/', (req, res) => {
  * Create a new token.
  * The raw token is returned ONCE in the response and is never stored.
  * Only the SHA-256 hash is stored in the database.
+ * Tokens expire one year after creation.
  */
 tokensRouter.post('/', (req, res) => {
   const parsed = createSchema.safeParse(req.body);
@@ -46,6 +49,7 @@ tokensRouter.post('/', (req, res) => {
 
   const rawToken = randomBytes(32).toString('base64url'); // 256-bit, URL-safe, ~43 chars
   const tokenHash = createHash('sha256').update(rawToken).digest('hex');
+  const expiresAt = createTokenExpiryTimestamp();
 
   const [row] = db
     .insert(apiTokens)
@@ -53,11 +57,13 @@ tokensRouter.post('/', (req, res) => {
       userId: req.userId,
       tokenHash,
       label: parsed.data.label,
+      expiresAt,
     })
     .returning({
       id: apiTokens.id,
       label: apiTokens.label,
       createdAt: apiTokens.createdAt,
+      expiresAt: apiTokens.expiresAt,
     })
     .all();
 

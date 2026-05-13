@@ -7,7 +7,7 @@
 | `frontend` | Built from `packages/frontend/Dockerfile` | 80 | `0.0.0.0:38521` | Serves React SPA, proxies `/api/*` to backend |
 | `backend` | Built from `packages/backend/Dockerfile` | 3001 | — (internal only) | Express API + SQLite |
 
-Auth is not a Docker service — it is handled by Authentik's embedded outpost running inside your existing Authentik stack, integrated via NPM forward auth.
+Auth is not a Docker service — it is handled by Authentik's embedded outpost running inside your existing Authentik stack, integrated via NPM forward auth. In production, set `INTERNAL_PROXY_SECRET` in `.env` before starting the stack or the backend will refuse to trust browser-auth headers.
 
 ## Network layout
 
@@ -40,6 +40,7 @@ Both Dockerfiles use the **repo root** as the build context (`.`). This is requi
 | Variable | Set by | Purpose |
 |----------|--------|---------|
 | `APP_VERSION` | Build arg (`--build-arg APP_VERSION=...`) | Optional explicit version override; served by `GET /api/info` and shown in Settings → About. Falls back to the latest git tag in the clone, then `packages/backend/package.json`. |
+| `INTERNAL_PROXY_SECRET` | `.env` / deployment secret | Shared secret between frontend nginx and backend. Required in production so the backend only trusts `X-authentik-email` when the proxied request also carries a matching `X-Internal-Token`. |
 | `DEV_USER_ID` | Shell env (dev only) | Email address to use as the user identity in dev mode (bypasses auth) |
 
 Pass `APP_VERSION` at build time:

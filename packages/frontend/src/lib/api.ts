@@ -102,9 +102,9 @@ export const api = {
 
   tokens: {
     list: () =>
-      request<{ id: number; label: string; createdAt: string; lastUsedAt: string | null }[]>('/tokens'),
+      request<{ id: number; label: string; createdAt: string; lastUsedAt: string | null; expiresAt: string }[]>('/tokens'),
     create: (label: string) =>
-      request<{ id: number; label: string; createdAt: string; token: string }>('/tokens', {
+      request<{ id: number; label: string; createdAt: string; expiresAt: string; token: string }>('/tokens', {
         method: 'POST',
         body: JSON.stringify({ label }),
       }),

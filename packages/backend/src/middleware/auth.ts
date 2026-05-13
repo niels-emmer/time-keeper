@@ -3,6 +3,7 @@ import type { Request, Response, NextFunction } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { apiTokens } from '../db/schema.js';
+import { isTokenExpired } from '../lib/apiTokenExpiry.js';
 
 declare global {
   namespace Express {
@@ -32,6 +33,19 @@ declare global {
  *
  * Returns 401 if none of the above yield a user in production.
  */
+export function isTrustedProxyRequest(req: Request): boolean {
+  if (process.env.NODE_ENV !== 'production') {
+    return true;
+  }
+
+  const proxySecret = process.env.INTERNAL_PROXY_SECRET;
+  if (!proxySecret) {
+    return false;
+  }
+
+  return req.headers['x-internal-token'] === proxySecret;
+}
+
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   // --- Path 1: Bearer token ---
   const authHeader = req.headers['authorization'];
@@ -46,6 +60,11 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
         .get();
 
       if (row) {
+        if (isTokenExpired(row.expiresAt)) {
+          res.status(401).json({ error: 'Unauthorized' });
+          return;
+        }
+
         req.userId = row.userId;
         req.authMethod = 'token';
         // Update last_used_at asynchronously — don't block the request
@@ -77,17 +96,10 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   // headers, an external caller still cannot forge X-authentik-email to bypass
   // token auth. The secret is set via the INTERNAL_PROXY_SECRET env var.
   //
-  // In development (NODE_ENV !== 'production') or when INTERNAL_PROXY_SECRET
-  // is not set, the check is skipped so local dev still works without the secret.
-  const proxySecret = process.env.INTERNAL_PROXY_SECRET;
-  const internalToken = req.headers['x-internal-token'] as string | undefined;
-  const proxyTrusted =
-    !proxySecret ||                         // secret not configured → skip check (dev / not yet set up)
-    process.env.NODE_ENV !== 'production' || // dev mode
-    internalToken === proxySecret;           // secret matches
-
+  // In production, the header path is fail-closed: if INTERNAL_PROXY_SECRET
+  // is missing or mismatched, X-authentik-email is ignored.
   const headerUser = req.headers['x-authentik-email'] as string | undefined;
-  if (headerUser && proxyTrusted) {
+  if (headerUser && isTrustedProxyRequest(req)) {
     req.userId = headerUser;
     req.authMethod = 'header';
     next();

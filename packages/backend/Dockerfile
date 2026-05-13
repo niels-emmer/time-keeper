@@ -58,7 +58,11 @@ COPY --from=builder /app/packages/backend/dist ./packages/backend/dist
 COPY --from=builder /app/packages/backend/drizzle ./packages/backend/drizzle
 COPY --from=builder /version.txt /app/VERSION
 COPY --from=builder /app/packages/backend/docker-entrypoint.sh /app/docker-entrypoint.sh
-RUN chmod +x /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh \
+ && mkdir -p /data \
+ && chown -R node:node /app /data
+
+USER node
 
 EXPOSE 3001
 

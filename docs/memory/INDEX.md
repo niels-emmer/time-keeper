@@ -4,7 +4,7 @@
 
 ## What this project is
 
-A personal work-timer PWA. The user tracks time in categories (aligned to Workday) from macOS and Android. At end of week, they copy a time summary into Workday's time registration.
+A personal work-timer PWA for tracking time in categories from macOS and Android, then copying an end-of-week summary into Workday.
 
 - One active timer at a time per user
 - Configurable weekly goal (default 40 h) stored per user in `user_settings`
@@ -17,9 +17,18 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 
 | File | Why it matters |
 |------|---------------|
+| `AGENTS.md` | Routing index, canonical bootstrap order, and local Pi catalog for AI coding agents |
+| `.pi/APPEND_SYSTEM.md` | Always-on Pi operating contract for this repository |
+| `.pi-context` / `.pi-rules` / `CONTEXT.md` | Concise agent bootstrap context + durable workspace rules |
+| `.pi/settings.json` | Declared Pi package/tooling expectations for local runs |
+| `.pi/extensions/workflow-gate.ts` | Runtime workflow enforcement for explicit Research -> Plan -> Build -> Verify and `/rpbv-*` commands |
+| `.pi/skills/` | Project-local focused guidance for governance, workflow hygiene, validation, and subagent routing |
+| `.pi/agents/repo-governor.md` | Project-local governance helper agent |
+| `.pi/agents/local-builder.md` | Project-local Ollama-backed builder for bounded, low-context tasks |
+| `.pi/agents/local-reviewer.md` | Project-local Ollama-backed reviewer for bounded, low-context reviews |
 | `packages/backend/src/db/schema.ts` | All data types flow from here (`categories`, `time_entries`, `user_settings`, `monthly_project_goals`) |
 | `packages/shared/src/utils/rounding.ts` | Core business logic — the rounding algorithm |
-| `packages/backend/src/middleware/auth.ts` | Auth boundary — reads `X-authentik-email` header |
+| `packages/backend/src/middleware/auth.ts` | Auth boundary — validates Bearer tokens, trusts `X-authentik-email` only with a matching `X-Internal-Token` in production |
 | `packages/backend/src/routes/settings.ts` | GET/PUT `/api/settings` — weekly goal hours + rounding increment |
 | `packages/backend/src/services/summaryService.ts` | Builds weekly summary; reads weekly goal + rounding increment from DB |
 | `packages/frontend/src/components/CategoryGrid.tsx` | Primary UX surface — 2-col card grid; pill badge (workday code / initials) + active glow |
@@ -100,8 +109,8 @@ A personal work-timer PWA. The user tracks time in categories (aligned to Workda
 | `POST /api/summary/round` | Yes | Apply end-of-day rounding for a single date (cap = user's weekly goal) |
 | `POST /api/summary/round-week` | Yes | Apply rounding to all 7 days of an ISO week; idempotent, skips already-rounded entries |
 | `PATCH /api/summary/adjust-cell` | Yes | Set total minutes for a (date, categoryId) cell; creates/adjusts/deletes underlying time entries |
-| `GET /api/tokens` | Yes (header-only) | List personal access tokens for the current user |
-| `POST /api/tokens` | Yes (header-only) | Create a token; returns raw token once; label required |
+| `GET /api/tokens` | Yes (header-only) | List personal access tokens for the current user, including last-used and expiry metadata |
+| `POST /api/tokens` | Yes (header-only) | Create a token; returns raw token once; label required; token expires after one year |
 | `DELETE /api/tokens/:id` | Yes (header-only) | Revoke a token |
 
 ## Deploy command
@@ -112,12 +121,12 @@ docker compose up -d --build
 
 ## Screenshot conventions
 
-`docs/screenshots/` contains three real PNG screenshots (track.png, weekly.png, settings.png) captured at 390×844px using Chrome DevTools device emulation (390×844 iPhone viewport) with html2canvas. To regenerate:
+`docs/screenshots/` contains four PNG screenshots (`track.png`, `weekly.png`, `monthly.png`, `settings.png`) captured at 390×844px using Chrome DevTools device emulation with html2canvas. To regenerate:
 
 1. Start dev servers: `DEV_USER_ID=dev@example.com yarn workspace @time-keeper/backend dev` + `yarn workspace @time-keeper/frontend dev`
 2. Seed sample data via the API (categories + an active timer)
-3. Open Chrome, enable DevTools device emulation at 390×844, undock DevTools to a separate window
-4. For each page (`/`, `/weekly`, `/settings`): inject html2canvas from CDN, capture `document.body`, POST base64 PNG to a temporary `/api/dev/screenshot` endpoint on the backend (add CORS header for localhost:5173), save to `docs/screenshots/{name}.png`
+3. Open Chrome, enable 390×844 device emulation, and undock DevTools to a separate window
+4. For each page (`/`, `/weekly`, `/monthly`, `/settings`): inject html2canvas from CDN, capture `document.body`, POST the base64 PNG to a temporary `/api/dev/screenshot` endpoint on the backend (with a CORS header for localhost:5173), and save it to `docs/screenshots/{name}.png`
 5. Update `README.md` if filenames change
 
 ## Read next
@@ -146,8 +155,10 @@ yarn workspace @time-keeper/backend test       # backend route/helper tests
 yarn workspace @time-keeper/frontend test      # frontend component/hook tests
 ```
 
-Tests live in `packages/shared/src/utils/rounding.test.ts`. They cover the core rounding algorithm (`computeRounding`): basic ceiling rounding, zero-minute no-ops, the configurable weekly cap, idempotency, and the configurable rounding increment (30 or 60 min). The `computeRounding` function accepts optional `weeklyGoalMinutes` (default 2400) and `roundingIncrementMinutes` (default 60) parameters.
+Key test files:
 
-Backend tests live in `packages/backend/src/routes/settings.test.ts`, `packages/backend/src/routes/categories.test.ts`, and `packages/backend/src/utils/monthlyGoalHelper.test.ts`. They cover settings validation/persistence, category billable validation/persistence, and monthly-goal insert/update/lookup behavior.
+- `packages/shared/src/utils/rounding.test.ts` — covers `computeRounding`, including ceiling rounding, zero-minute no-ops, the weekly cap, idempotency, and 30/60 minute increments.
+- `packages/backend/src/routes/settings.test.ts`, `packages/backend/src/routes/categories.test.ts`, `packages/backend/src/utils/monthlyGoalHelper.test.ts` — cover settings validation and persistence, category billable validation and persistence, and monthly-goal insert/update/lookup behavior.
+- `packages/frontend/src/lib/__tests__/theme.test.ts`, `packages/frontend/src/components/__tests__/MonthlyGoalsCard.test.tsx`, `packages/frontend/src/components/__tests__/MonthlyOverviewCard.test.tsx`, `packages/frontend/src/hooks/__tests__/useServiceWorkerUpdate.test.tsx` — cover theme utilities, monthly-goal rendering and editing, monthly overview rendering, and the PWA update prompt flow.
 
-Frontend tests live in `packages/frontend/src/lib/__tests__/theme.test.ts`, `packages/frontend/src/components/__tests__/MonthlyGoalsCard.test.tsx`, `packages/frontend/src/components/__tests__/MonthlyOverviewCard.test.tsx`, and `packages/frontend/src/hooks/__tests__/useServiceWorkerUpdate.test.tsx`. They cover theme utilities, monthly-goal rendering/editing, monthly overview rendering, and the PWA update prompt flow. Vitest config is in `packages/frontend/vitest.config.ts` (jsdom environment, global APIs).
+Vitest config for the frontend lives in `packages/frontend/vitest.config.ts` (jsdom environment, global APIs).

@@ -1,6 +1,7 @@
 import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { authMiddleware } from './middleware/auth.js';
+import { protectBrowserMutations } from './middleware/browserMutationProtection.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { categoriesRouter } from './routes/categories.js';
 import { timerRouter } from './routes/timer.js';
@@ -12,6 +13,8 @@ import { tokensRouter } from './routes/tokens.js';
 
 export function createApp() {
   const app = express();
+
+  app.disable('x-powered-by');
 
   // Trust the reverse proxy chain (nginx → NPM → Authentik outpost)
   // Required for express-rate-limit to correctly read X-Forwarded-For
@@ -35,6 +38,7 @@ export function createApp() {
 
   // All other API routes require auth
   app.use('/api', authMiddleware);
+  app.use('/api', protectBrowserMutations);
   app.use('/api/categories', categoriesRouter);
   app.use('/api/timer', timerRouter);
   app.use('/api/entries', entriesRouter);
