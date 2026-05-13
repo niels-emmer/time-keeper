@@ -101,7 +101,7 @@ See [docs/integration/api-subdomain.md](docs/integration/api-subdomain.md).
 
 Audited with `yarn npm audit` on **2026-05-13**: **no audit suggestions**.
 
-The frontend dependency graph was also refreshed on 2026-05-13: app/runtime deps now include `@tanstack/react-query` 5.100.x and `react-router-dom` 7.15.x, the frontend build/test toolchain was refreshed (`vite` 6.4.2, `vite-plugin-pwa` 1.3.0, `vitest` 4.1.6), and the root `resolutions` now pin patched transitive versions for packages such as `@babel/plugin-transform-modules-systemjs`, `fast-uri`, `ip-address`, `postcss`, `rollup`, and `serialize-javascript`.
+The frontend dependency graph was also refreshed on 2026-05-13: app/runtime deps now include `@tanstack/react-query` 5.100.x and `react-router-dom` 7.15.x, the frontend build/test toolchain was refreshed (`vite` 6.4.2, `vite-plugin-pwa` 1.3.0, `vitest` 4.1.6), backend tooling now uses `drizzle-kit` 0.31.10, and the root `resolutions` pin patched transitive versions for packages such as `@babel/plugin-transform-modules-systemjs`, `esbuild`, `fast-uri`, `ip-address`, `postcss`, `rollup`, and `serialize-javascript`.
 
 `vitest`, `jsdom`, `vite-plugin-pwa`, `postcss`, and `tailwindcss` are build/test-only dependencies (not shipped in the production Docker image). They are omitted from the runtime table below.
 
