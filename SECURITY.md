@@ -101,7 +101,9 @@ See [docs/integration/api-subdomain.md](docs/integration/api-subdomain.md).
 
 Audited with `yarn npm audit` on **2026-05-13**: **no audit suggestions**.
 
-`vitest` and `jsdom` were added in v0.10.0 as **dev-only** dependencies (not shipped in the production Docker image). They are omitted from the runtime table below.
+The frontend build/test toolchain was also refreshed on 2026-05-13 (`vite` 6.4.2, `vite-plugin-pwa` 1.3.0, `vitest` 4.1.6), and the root `resolutions` now pin patched transitive versions for packages such as `@babel/plugin-transform-modules-systemjs`, `fast-uri`, `ip-address`, `postcss`, `rollup`, and `serialize-javascript`.
+
+`vitest`, `jsdom`, `vite-plugin-pwa`, `postcss`, and `tailwindcss` are build/test-only dependencies (not shipped in the production Docker image). They are omitted from the runtime table below.
 
 `recharts` and `react-is` were added for the Monthly overview charts. `@testing-library/react` and `@testing-library/dom` were added as **dev-only** dependencies for frontend component and hook tests.
 
