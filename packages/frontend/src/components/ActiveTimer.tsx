@@ -19,31 +19,58 @@ interface Props {
   categoryColor: string;
 }
 
+function computeElapsedSeconds(startTime: string): number {
+  const startMs = new Date(startTime).getTime();
+  if (Number.isNaN(startMs)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+}
+
 export function ActiveTimer({ entry, categoryName, categoryColor }: Props) {
   const stop = useStopTimer();
   const qc = useQueryClient();
-  const [elapsed, setElapsed] = useState(0);
+  const [elapsed, setElapsed] = useState(() => computeElapsedSeconds(entry.startTime));
   const workerRef = useRef<Worker | null>(null);
 
-  // ── Web Worker: keeps tick accurate even when tab is hidden ──────────────
+  // ── Elapsed time: main-thread fallback plus worker when available ─────────
   useEffect(() => {
-    const worker = new Worker(new URL('../workers/timer.worker.ts', import.meta.url), {
-      type: 'module',
-    });
+    setElapsed(computeElapsedSeconds(entry.startTime));
 
-    worker.onmessage = (event: MessageEvent<{ type: 'tick'; elapsed: number }>) => {
-      if (event.data.type === 'tick') {
-        setElapsed(event.data.elapsed);
-      }
-    };
+    const fallbackIntervalId = window.setInterval(() => {
+      setElapsed(computeElapsedSeconds(entry.startTime));
+    }, 1000);
 
-    worker.postMessage({ type: 'start', startTime: entry.startTime });
-    workerRef.current = worker;
+    try {
+      const worker = new Worker(new URL('../workers/timer.worker.ts', import.meta.url), {
+        type: 'module',
+      });
+
+      worker.onmessage = (event: MessageEvent<{ type: 'tick'; elapsed: number }>) => {
+        if (event.data.type === 'tick') {
+          setElapsed(event.data.elapsed);
+        }
+      };
+
+      worker.onerror = () => {
+        worker.terminate();
+        workerRef.current = null;
+      };
+
+      worker.postMessage({ type: 'start', startTime: entry.startTime });
+      workerRef.current = worker;
+    } catch {
+      workerRef.current = null;
+    }
 
     return () => {
-      worker.postMessage({ type: 'stop' });
-      worker.terminate();
-      workerRef.current = null;
+      window.clearInterval(fallbackIntervalId);
+      if (workerRef.current) {
+        workerRef.current.postMessage({ type: 'stop' });
+        workerRef.current.terminate();
+        workerRef.current = null;
+      }
     };
   }, [entry.startTime]);
 
