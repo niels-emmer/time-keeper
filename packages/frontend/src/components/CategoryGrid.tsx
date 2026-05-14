@@ -65,46 +65,47 @@ export function CategoryGrid({
               }}
               aria-pressed={isActive}
             >
-              <span
-                className="rounded-full px-2 py-0.5 text-xs font-semibold"
-                style={{
-                  backgroundColor: `${category.color}22`,
-                  color: category.color,
-                  border: `1px solid ${category.color}55`,
-                }}
-              >
-                {getCategoryBadge(category)}
-              </span>
+              <div className="w-full space-y-2.5">
+                <span
+                  className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                  style={{
+                    backgroundColor: `${category.color}22`,
+                    color: category.color,
+                    border: `1px solid ${category.color}55`,
+                  }}
+                >
+                  {getCategoryBadge(category)}
+                </span>
 
-              <div className="w-full space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="line-clamp-2 text-sm font-semibold leading-tight">{category.name}</span>
+                <span className="block min-w-0 line-clamp-2 text-sm font-semibold leading-tight">{category.name}</span>
+              </div>
+
+              <div className="flex min-h-[1.5rem] w-full items-end justify-between gap-2 text-xs">
+                {isActive ? (
+                  <span
+                    className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-medium"
+                    style={{
+                      backgroundColor: `${category.color}20`,
+                      color: category.color,
+                    }}
+                  >
+                    <span
+                      className="inline-block h-2 w-2 animate-pulse rounded-full"
+                      style={{ backgroundColor: category.color }}
+                    />
+                    Now tracking
+                  </span>
+                ) : (
+                  <span />
+                )}
+
+                <div className="flex flex-wrap justify-end gap-1.5">
                   {isPinned && (
                     <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
                       pinned
                     </span>
                   )}
-                </div>
-
-                <div className="flex items-center justify-between gap-2 text-xs">
-                  {isActive ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-medium"
-                      style={{
-                        backgroundColor: `${category.color}20`,
-                        color: category.color,
-                      }}
-                    >
-                      <span
-                        className="inline-block h-2 w-2 animate-pulse rounded-full"
-                        style={{ backgroundColor: category.color }}
-                      />
-                      Now tracking
-                    </span>
-                  ) : (
-                    <span className="text-muted-foreground">Tap to start</span>
-                  )}
-
-                  {!isActive && category.billable && (
+                  {category.billable && (
                     <span className="rounded-full bg-amber-100 px-1.5 py-0.5 font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
                       billable
                     </span>

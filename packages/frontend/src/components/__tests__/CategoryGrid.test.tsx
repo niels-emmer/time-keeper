@@ -56,7 +56,7 @@ describe('CategoryGrid', () => {
     startTimerMock.mutate.mockClear();
   });
 
-  it('shows active and pinned states', () => {
+  it('shows active state and bottom-row tags without the old helper text', () => {
     render(
       <CategoryGrid
         categories={categories}
@@ -68,6 +68,8 @@ describe('CategoryGrid', () => {
 
     expect(screen.getByText('Now tracking')).not.toBeNull();
     expect(screen.getByText('pinned')).not.toBeNull();
+    expect(screen.getByText('billable')).not.toBeNull();
+    expect(screen.queryByText('Tap to start')).toBeNull();
   });
 
   it('starts a timer when a category card is pressed', () => {
