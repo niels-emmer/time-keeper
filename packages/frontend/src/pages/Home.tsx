@@ -142,9 +142,7 @@ export function Home() {
                 </div>
               )}
             </div>
-            <p className="text-sm text-muted-foreground">
-              Search, pin, or use recent categories to start the right timer faster.
-            </p>
+            {/* Description removed as per new UI spec */}
           </div>
 
           <div className="relative">
@@ -168,19 +166,7 @@ export function Home() {
             )}
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {SORT_MODES.map((option) => (
-              <Button
-                key={option.value}
-                type="button"
-                size="sm"
-                variant={sortMode === option.value ? 'default' : 'outline'}
-                onClick={() => setSortMode(option.value)}
-              >
-                {option.label}
-              </Button>
-            ))}
-          </div>
+          {/* Sorting buttons removed; recents first, then more, manual sorting only within categories */}
 
           {activeCategory && (
             <div className="rounded-xl border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">

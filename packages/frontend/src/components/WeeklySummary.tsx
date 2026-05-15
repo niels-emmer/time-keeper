@@ -200,6 +200,7 @@ export function WeeklySummary() {
 
   return (
     <div className="space-y-4">
+      {/* Navigation and week summary */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" size="icon" onClick={() => setWeek(getWeekOffset(week, -1))}>
           <ChevronLeft className="h-4 w-4" />
@@ -215,154 +216,7 @@ export function WeeklySummary() {
         </Button>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Review this week before you submit</CardTitle>
-        </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          <div className="rounded-xl border bg-muted/20 p-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total tracked</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{totalHours.toFixed(1)}h</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {totalHours >= goalHours
-                ? `Goal met${exceededHours > 0 ? ` (+${exceededHours.toFixed(1)}h)` : ''}`
-                : `${remainingHours.toFixed(1)}h remaining to hit goal`}
-            </p>
-          </div>
-          <div className="rounded-xl border bg-muted/20 p-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Categories used</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{activeCategoryCount}</p>
-            <p className="mt-1 text-sm text-muted-foreground">Distinct categories with hours this week.</p>
-          </div>
-          <div className="rounded-xl border bg-muted/20 p-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Busiest day</p>
-            <p className="mt-1 text-2xl font-semibold">{DAYS[busiestDayIndex]}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {computedDayMinutes[busiestDayIndex] > 0
-                ? `${(computedDayMinutes[busiestDayIndex] / 60).toFixed(1)}h logged`
-                : 'No time logged yet'}
-            </p>
-          </div>
-          <div className="rounded-xl border bg-muted/20 p-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Submit flow</p>
-            <p className="mt-1 text-base font-semibold">Review → choose format → copy/export</p>
-            <p className="mt-1 text-sm text-muted-foreground">Use the preview below to confirm what you will paste.</p>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-3">
-          <CardTitle className="text-base">Choose your handoff format</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-wrap gap-2">
-            {getWeeklyExportFormats().map((option) => (
-              <Button
-                key={option.value}
-                type="button"
-                size="sm"
-                variant={exportFormat === option.value ? 'default' : 'outline'}
-                onClick={() => setExportFormat(option.value)}
-              >
-                {option.label}
-              </Button>
-            ))}
-          </div>
-
-          <div className="rounded-xl border bg-muted/20 p-3">
-            <p className="text-sm font-medium">{exportArtifact.label}</p>
-            <p className="mt-1 text-sm text-muted-foreground">{exportArtifact.description}</p>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <h3 className="text-sm font-medium">Preview</h3>
-              <span className="text-xs text-muted-foreground">{exportArtifact.filename}</span>
-            </div>
-            <textarea
-              readOnly
-              value={exportArtifact.content}
-              className="min-h-[220px] w-full rounded-xl border bg-background p-3 font-mono text-xs leading-5 text-foreground"
-              aria-label="Weekly export preview"
-            />
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            <Button type="button" onClick={handleCopy} className="min-w-[10rem]">
-              {copyState === 'copied' ? (
-                <>
-                  <Check className="mr-2 h-4 w-4" />
-                  Copied
-                </>
-              ) : (
-                <>
-                  <Copy className="mr-2 h-4 w-4" />
-                  Copy {getWeeklyExportFormats().find((option) => option.value === exportFormat)?.label}
-                </>
-              )}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => downloadExport(exportArtifact.content, exportArtifact.filename, exportArtifact.mimeType)}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Download {exportFormat === 'csv' ? 'CSV' : 'text'}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => roundWeek.mutate(week)}
-              disabled={roundWeek.isPending}
-            >
-              {roundWeek.isPending ? 'Rounding…' : 'Round week'}
-            </Button>
-            {copyState === 'error' && (
-              <p className="self-center text-sm text-destructive">
-                Copy failed. You can still download the preview text.
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardContent className="space-y-3 p-4">
-          <div className="flex h-4 w-full overflow-hidden rounded-full bg-muted">
-            {summary.totalMinutes === 0 ? null : barSegments.map((segment, index) => (
-              <div
-                key={segment.categoryId}
-                title={`${segment.name}: ${(segment.minutes / 60).toFixed(1)}h`}
-                style={{
-                  width: `${(segment.minutes / summary.totalMinutes) * 100}%`,
-                  backgroundColor: segment.color,
-                  borderRadius:
-                    index === 0 && index === barSegments.length - 1
-                      ? '9999px'
-                      : index === 0
-                      ? '9999px 0 0 9999px'
-                      : index === barSegments.length - 1
-                      ? '0 9999px 9999px 0'
-                      : '0',
-                }}
-              />
-            ))}
-          </div>
-          <div className="flex flex-wrap gap-x-4 gap-y-1">
-            {barSegments.map((segment) => (
-              <div key={segment.categoryId} className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span
-                  className="inline-block h-2 w-2 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: segment.color }}
-                />
-                <span>{segment.name}</span>
-                <span className="tabular-nums">{(segment.minutes / 60).toFixed(1)}h</span>
-              </div>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
+      {/* Weekly totals and day logs card moved to top */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Weekly totals and day logs</CardTitle>
@@ -472,6 +326,155 @@ export function WeeklySummary() {
               </tr>
             </tbody>
           </table>
+        </CardContent>
+      </Card>
+
+      {/* Review this week card, now includes bar chart between Busiest day and Submit flow */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Review this week before you submit</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-xl border bg-muted/20 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total tracked</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">{totalHours.toFixed(1)}h</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {totalHours >= goalHours
+                ? `Goal met${exceededHours > 0 ? ` (+${exceededHours.toFixed(1)}h)` : ''}`
+                : `${remainingHours.toFixed(1)}h remaining to hit goal`}
+            </p>
+          </div>
+          <div className="rounded-xl border bg-muted/20 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Categories used</p>
+            <p className="mt-1 text-2xl font-semibold tabular-nums">{activeCategoryCount}</p>
+            <p className="mt-1 text-sm text-muted-foreground">Distinct categories with hours this week.</p>
+          </div>
+          <div className="rounded-xl border bg-muted/20 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Busiest day</p>
+            <p className="mt-1 text-2xl font-semibold">{DAYS[busiestDayIndex]}</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {computedDayMinutes[busiestDayIndex] > 0
+                ? `${(computedDayMinutes[busiestDayIndex] / 60).toFixed(1)}h logged`
+                : 'No time logged yet'}
+            </p>
+          </div>
+          {/* Insert bar chart here */}
+          <div className="col-span-full xl:col-span-1 flex flex-col gap-2">
+            <div className="flex h-4 w-full overflow-hidden rounded-full bg-muted">
+              {summary.totalMinutes === 0 ? null : barSegments.map((segment, index) => (
+                <div
+                  key={segment.categoryId}
+                  title={`${segment.name}: ${(segment.minutes / 60).toFixed(1)}h`}
+                  style={{
+                    width: `${(segment.minutes / summary.totalMinutes) * 100}%`,
+                    backgroundColor: segment.color,
+                    borderRadius:
+                      index === 0 && index === barSegments.length - 1
+                        ? '9999px'
+                        : index === 0
+                        ? '9999px 0 0 9999px'
+                        : index === barSegments.length - 1
+                        ? '0 9999px 9999px 0'
+                        : '0',
+                  }}
+                />
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-x-4 gap-y-1">
+              {barSegments.map((segment) => (
+                <div key={segment.categoryId} className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <span
+                    className="inline-block h-2 w-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: segment.color }}
+                  />
+                  <span>{segment.name}</span>
+                  <span className="tabular-nums">{(segment.minutes / 60).toFixed(1)}h</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* End bar chart insert */}
+          <div className="rounded-xl border bg-muted/20 p-3 xl:col-span-1">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Submit flow</p>
+            <p className="mt-1 text-base font-semibold">Review → choose format → copy/export</p>
+            <p className="mt-1 text-sm text-muted-foreground">Use the preview below to confirm what you will paste.</p>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Handoff format and preview card remains below */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Choose your handoff format</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-wrap gap-2">
+            {getWeeklyExportFormats().map((option) => (
+              <Button
+                key={option.value}
+                type="button"
+                size="sm"
+                variant={exportFormat === option.value ? 'default' : 'outline'}
+                onClick={() => setExportFormat(option.value)}
+              >
+                {option.label}
+              </Button>
+            ))}
+          </div>
+
+          <div className="rounded-xl border bg-muted/20 p-3">
+            <p className="text-sm font-medium">{exportArtifact.label}</p>
+            <p className="mt-1 text-sm text-muted-foreground">{exportArtifact.description}</p>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-3">
+              <h3 className="text-sm font-medium">Preview</h3>
+              <span className="text-xs text-muted-foreground">{exportArtifact.filename}</span>
+            </div>
+            <textarea
+              readOnly
+              value={exportArtifact.content}
+              className="min-h-[220px] w-full rounded-xl border bg-background p-3 font-mono text-xs leading-5 text-foreground"
+              aria-label="Weekly export preview"
+            />
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" onClick={handleCopy} className="min-w-[10rem]">
+              {copyState === 'copied' ? (
+                <>
+                  <Check className="mr-2 h-4 w-4" />
+                  Copied
+                </>
+              ) : (
+                <>
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy {getWeeklyExportFormats().find((option) => option.value === exportFormat)?.label}
+                </>
+              )}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => downloadExport(exportArtifact.content, exportArtifact.filename, exportArtifact.mimeType)}
+            >
+              <Download className="mr-2 h-4 w-4" />
+              Download {exportFormat === 'csv' ? 'CSV' : 'text'}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => roundWeek.mutate(week)}
+              disabled={roundWeek.isPending}
+            >
+              {roundWeek.isPending ? 'Rounding…' : 'Round week'}
+            </Button>
+            {copyState === 'error' && (
+              <p className="self-center text-sm text-destructive">
+                Copy failed. You can still download the preview text.
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
 

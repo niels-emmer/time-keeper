@@ -77,38 +77,37 @@ export function CategoryGrid({
                   {getCategoryBadge(category)}
                 </span>
 
-                <span className="block min-w-0 line-clamp-2 text-sm font-semibold leading-tight">{category.name}</span>
+                {/* Always reserve 2 lines for name for consistent card height */}
+                <span className="block min-w-0 line-clamp-2 text-sm font-semibold leading-tight min-h-[2.5em]">{category.name}</span>
               </div>
 
-              <div className="flex min-h-[1.5rem] w-full items-end justify-between gap-2 text-xs">
-                {isActive ? (
-                  <span
-                    className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 font-medium"
-                    style={{
-                      backgroundColor: `${category.color}20`,
-                      color: category.color,
-                    }}
-                  >
-                    <span
-                      className="inline-block h-2 w-2 animate-pulse rounded-full"
-                      style={{ backgroundColor: category.color }}
-                    />
-                    Now tracking
-                  </span>
-                ) : (
-                  <span />
-                )}
-
-                <div className="flex flex-wrap justify-end gap-1.5">
-                  {isPinned && (
-                    <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">
-                      pinned
-                    </span>
-                  )}
+              {/* Bottom line: billable left, pinned icon right */}
+              <div className="flex min-h-[1.5rem] w-full items-end justify-between gap-2 text-xs mt-auto">
+                <div className="flex items-center gap-1.5">
                   {category.billable && (
                     <span className="rounded-full bg-amber-100 px-1.5 py-0.5 font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
                       billable
                     </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 ml-auto">
+                  {onTogglePinned && (
+                    <button
+                      type="button"
+                      className="rounded-full border bg-background/90 p-1.5 text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onTogglePinned(category.id);
+                      }}
+                      aria-label={isPinned ? `Unpin ${category.name}` : `Pin ${category.name}`}
+                      aria-pressed={isPinned}
+                      title={isPinned ? 'Unpin category' : 'Pin category'}
+                    >
+                      <Pin
+                        className={`h-3.5 w-3.5 ${isPinned ? 'fill-current text-foreground' : ''}`}
+                        style={isPinned ? { color: category.color } : undefined}
+                      />
+                    </button>
                   )}
                 </div>
               </div>
