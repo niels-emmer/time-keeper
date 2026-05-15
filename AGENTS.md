@@ -38,12 +38,14 @@ Treat these repo-defined files as the local governance layer:
 
 ## Runtime availability note
 
-This repository currently defines three project-local subagents:
+This repository currently defines three project-local subagents on disk:
 - `repo-governor` — governance, memory, and documentation-alignment helper
 - `local-builder` — local Ollama-backed builder for bounded code, doc, and test work
 - `local-reviewer` — local Ollama-backed reviewer for bounded diffs, plans, docs, and small implementations
 
-Use them as follows:
+Whether they are invokable depends on the active runtime exposing repo-local agents by name.
+
+When available, use them as follows:
 - Prefer `local-builder` for small edits, focused refactors, targeted tests, and doc updates.
 - Prefer `local-reviewer` for a cheap first-pass review of a small diff, plan, prompt, doc, or bounded implementation.
 - Prefer `repo-governor` for governance, memory, and documentation alignment.

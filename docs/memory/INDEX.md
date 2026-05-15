@@ -31,9 +31,9 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `packages/backend/src/middleware/auth.ts` | Auth boundary — validates Bearer tokens, trusts `X-authentik-email` only with a matching `X-Internal-Token` in production |
 | `packages/backend/src/routes/settings.ts` | GET/PUT `/api/settings` — weekly goal hours + rounding increment |
 | `packages/backend/src/services/summaryService.ts` | Builds weekly summary; reads weekly goal + rounding increment from DB |
-| `packages/frontend/src/pages/Home.tsx` | Track tab shell — search input, sort mode toggle, pinned/recent sections, and timer/category coordination |
+| `packages/frontend/src/pages/Home.tsx` | Track tab shell — search input, recent/manual sections, pin state, and timer/category coordination |
 | `packages/frontend/src/components/CategoryGrid.tsx` | Primary Track UX surface — category cards with active state, pin toggles, and quick-start affordances |
-| `packages/frontend/src/lib/track.ts` | Track screen utilities — local sort/pin preferences, filtering, and recent/manual/alphabetical ordering |
+| `packages/frontend/src/lib/track.ts` | Track screen utilities — local pin preferences, filtering, and ordering helpers for recent/manual category presentation |
 | `packages/frontend/src/hooks/useRecentCategories.ts` | Derives recent category ordering from the current + previous ISO week entry data |
 | `packages/frontend/src/pages/Monthly.tsx` | Monthly tab shell — month navigation plus the monthly overview, focus, and goal cards |
 | `packages/frontend/src/components/MonthlyOverviewCard.tsx` | Monthly overview — headline metrics, projected vs actual by category, and billable vs non-billable hours |

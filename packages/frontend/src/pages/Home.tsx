@@ -5,18 +5,14 @@ import { useCategories } from '@/hooks/useCategories';
 import { useRecentCategoryIds } from '@/hooks/useRecentCategories';
 import { ActiveTimer } from '@/components/ActiveTimer';
 import { CategoryGrid } from '@/components/CategoryGrid';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
   filterTrackCategories,
   getStoredPinnedCategoryIds,
-  getStoredTrackSortMode,
   setStoredPinnedCategoryIds,
-  setStoredTrackSortMode,
   sortTrackCategories,
   togglePinnedCategoryId,
-  type TrackSortMode,
 } from '@/lib/track';
 import type { Category } from '@time-keeper/shared';
 
@@ -40,12 +36,6 @@ function Section({
   );
 }
 
-const SORT_MODES: Array<{ value: TrackSortMode; label: string }> = [
-  { value: 'manual', label: 'Manual' },
-  { value: 'recent', label: 'Recent' },
-  { value: 'alphabetical', label: 'A–Z' },
-];
-
 export function Home() {
   const { data: timerStatus } = useTimer();
   const { data: categories = [] } = useCategories();
@@ -57,12 +47,7 @@ export function Home() {
   const { data: recentCategoryIds = [] } = useRecentCategoryIds(activeEntry);
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [sortMode, setSortMode] = useState<TrackSortMode>(() => getStoredTrackSortMode());
   const [pinnedCategoryIds, setPinnedCategoryIds] = useState<number[]>(() => getStoredPinnedCategoryIds());
-
-  useEffect(() => {
-    setStoredTrackSortMode(sortMode);
-  }, [sortMode]);
 
   useEffect(() => {
     setStoredPinnedCategoryIds(pinnedCategoryIds);
@@ -81,18 +66,18 @@ export function Home() {
   );
 
   const searchResults = useMemo(
-    () => sortTrackCategories(filteredCategories, sortMode, recentCategoryIds, pinnedCategoryIds),
-    [filteredCategories, sortMode, recentCategoryIds, pinnedCategoryIds]
+    () => sortTrackCategories(filteredCategories, 'manual', recentCategoryIds, pinnedCategoryIds),
+    [filteredCategories, recentCategoryIds, pinnedCategoryIds]
   );
 
   const pinnedCategories = useMemo(
     () => sortTrackCategories(
       categories.filter((category) => pinnedSet.has(category.id)),
-      sortMode,
+      'manual',
       recentCategoryIds,
       pinnedCategoryIds
     ),
-    [categories, pinnedSet, sortMode, recentCategoryIds, pinnedCategoryIds]
+    [categories, pinnedSet, recentCategoryIds, pinnedCategoryIds]
   );
 
   const recentCategories = useMemo(
@@ -106,11 +91,11 @@ export function Home() {
   const remainingCategories = useMemo(
     () => sortTrackCategories(
       categories.filter((category) => !pinnedSet.has(category.id) && !recentSet.has(category.id)),
-      sortMode,
+      'manual',
       recentCategoryIds,
       []
     ),
-    [categories, pinnedSet, recentSet, sortMode, recentCategoryIds]
+    [categories, pinnedSet, recentSet, recentCategoryIds]
   );
 
   const hasSearch = searchQuery.trim().length > 0;
@@ -179,7 +164,7 @@ export function Home() {
       {hasSearch ? (
         <Section
           title={`Results (${searchResults.length})`}
-          description="Search results are still sorted using your selected Track mode, with pinned categories first."
+          description="Search results follow your saved manual category order, with pinned categories first."
         >
           <CategoryGrid
             categories={searchResults}
@@ -192,20 +177,6 @@ export function Home() {
         </Section>
       ) : (
         <>
-          {pinnedCategories.length > 0 && (
-            <Section
-              title={`Pinned (${pinnedCategories.length})`}
-              description="Your quickest access categories. Tap the pin icon again to remove one from this section."
-            >
-              <CategoryGrid
-                categories={pinnedCategories}
-                activeEntry={activeEntry}
-                pinnedCategoryIds={pinnedCategoryIds}
-                onTogglePinned={(categoryId) => setPinnedCategoryIds((current) => togglePinnedCategoryId(current, categoryId))}
-              />
-            </Section>
-          )}
-
           {recentCategories.length > 0 && (
             <Section
               title="Recent"
@@ -222,16 +193,10 @@ export function Home() {
 
           <Section
             title={hasOrganizedSections ? 'More categories' : 'All categories'}
-            description={
-              sortMode === 'manual'
-                ? 'This list follows your saved Settings order.'
-                : sortMode === 'recent'
-                ? 'Remaining categories keep your less-used items available without burying recent work.'
-                : 'Remaining categories are sorted alphabetically for quick scanning.'
-            }
+            description="This list follows your saved Settings order. Pin any category to keep it surfaced while its position stays manually managed in Settings."
           >
             <CategoryGrid
-              categories={hasOrganizedSections ? remainingCategories : searchResults}
+              categories={hasOrganizedSections ? [...pinnedCategories, ...remainingCategories] : searchResults}
               activeEntry={activeEntry}
               pinnedCategoryIds={pinnedCategoryIds}
               onTogglePinned={(categoryId) => setPinnedCategoryIds((current) => togglePinnedCategoryId(current, categoryId))}
