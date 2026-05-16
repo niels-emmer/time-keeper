@@ -1,26 +1,64 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
+import { extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-const appVersion = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8'));
-const assetVersion = appVersion.version;
-function withAssetVersion(assetPath) {
-    return `${assetPath}?v=${assetVersion}`;
+const publicDir = fileURLToPath(new URL('./public', import.meta.url));
+const installAssetPaths = [
+    'icons/timekeeper.svg',
+    'icons/icon-16x16.png',
+    'icons/icon-32x32.png',
+    'icons/icon-192x192.png',
+    'icons/icon-512x512.png',
+    'icons/maskable-192x192.png',
+    'icons/maskable-512x512.png',
+    'icons/favicon.ico',
+    'icons/apple-touch-icon.png',
+    'icons/safari-pinned-tab.svg',
+];
+function withFingerprint(assetPath) {
+    const absolutePath = resolve(publicDir, assetPath);
+    const extension = extname(assetPath);
+    const basename = assetPath.slice(0, -extension.length);
+    const hash = createHash('sha256')
+        .update(readFileSync(absolutePath))
+        .digest('hex')
+        .slice(0, 8);
+    return `${basename}.${hash}${extension}`;
 }
+const fingerprintedAssets = Object.fromEntries(installAssetPaths.map((assetPath) => [assetPath, withFingerprint(assetPath)]));
+function installAssetUrl(assetPath) {
+    return `/${fingerprintedAssets[assetPath]}`;
+}
+const installAssetHtmlReplacements = [
+    '/icons/timekeeper.svg',
+    '/icons/icon-32x32.png',
+    '/icons/icon-16x16.png',
+    '/icons/favicon.ico',
+    '/icons/apple-touch-icon.png',
+    '/icons/safari-pinned-tab.svg',
+];
 export default defineConfig({
+    define: {
+        __INSTALL_NOTIFICATION_ICON_URL__: JSON.stringify(installAssetUrl('icons/icon-192x192.png')),
+    },
     plugins: [
         react(),
         {
-            name: 'version-install-assets',
+            name: 'fingerprint-install-assets',
+            buildStart() {
+                for (const [assetPath, fileName] of Object.entries(fingerprintedAssets)) {
+                    this.emitFile({
+                        type: 'asset',
+                        fileName,
+                        source: readFileSync(resolve(publicDir, assetPath)),
+                    });
+                }
+            },
             transformIndexHtml(html) {
-                return html
-                    .replace('/icons/timekeeper.svg', withAssetVersion('/icons/timekeeper.svg'))
-                    .replace('/icons/icon-32x32.png', withAssetVersion('/icons/icon-32x32.png'))
-                    .replace('/icons/icon-16x16.png', withAssetVersion('/icons/icon-16x16.png'))
-                    .replace('/icons/favicon.ico', withAssetVersion('/icons/favicon.ico'))
-                    .replace('/icons/apple-touch-icon.png', withAssetVersion('/icons/apple-touch-icon.png'))
-                    .replace('/icons/safari-pinned-tab.svg', withAssetVersion('/icons/safari-pinned-tab.svg'));
+                return installAssetHtmlReplacements.reduce((output, assetPath) => output.replace(assetPath, installAssetUrl(assetPath.slice(1))), html);
             },
         },
         VitePWA({
@@ -51,10 +89,10 @@ export default defineConfig({
                 start_url: '/',
                 scope: '/',
                 icons: [
-                    { src: withAssetVersion('icons/icon-192x192.png'), sizes: '192x192', type: 'image/png' },
-                    { src: withAssetVersion('icons/icon-512x512.png'), sizes: '512x512', type: 'image/png' },
-                    { src: withAssetVersion('icons/maskable-192x192.png'), sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-                    { src: withAssetVersion('icons/maskable-512x512.png'), sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+                    { src: installAssetUrl('icons/icon-192x192.png'), sizes: '192x192', type: 'image/png' },
+                    { src: installAssetUrl('icons/icon-512x512.png'), sizes: '512x512', type: 'image/png' },
+                    { src: installAssetUrl('icons/maskable-192x192.png'), sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+                    { src: installAssetUrl('icons/maskable-512x512.png'), sizes: '512x512', type: 'image/png', purpose: 'maskable' },
                 ],
             },
             injectManifest: {

@@ -25,6 +25,7 @@ import { registerRoute } from 'workbox-routing';
 import { NetworkFirst, NetworkOnly } from 'workbox-strategies';
 
 declare const self: ServiceWorkerGlobalScope;
+declare const __INSTALL_NOTIFICATION_ICON_URL__: string;
 
 // ── Workbox setup ──────────────────────────────────────────────────────────
 
@@ -71,8 +72,8 @@ async function showNotification(categoryName: string, startTime: string): Promis
   await self.registration.showNotification('Time Keeper – timer running', {
     tag: NOTIFICATION_TAG,
     body: `${categoryName}  ·  ${timeStr}`,
-    icon: '/icons/icon-192x192.png',
-    badge: '/icons/icon-192x192.png',
+    icon: __INSTALL_NOTIFICATION_ICON_URL__,
+    badge: __INSTALL_NOTIFICATION_ICON_URL__,
     silent: true,
     requireInteraction: true,
     data: { url: '/', categoryName, startTime },
