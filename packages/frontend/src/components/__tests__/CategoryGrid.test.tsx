@@ -56,44 +56,35 @@ describe('CategoryGrid', () => {
     startTimerMock.mutate.mockClear();
   });
 
-  it('shows active state and bottom-row tags without the old helper text', () => {
+  it('shows active state and highlights the active category', () => {
     render(
       <CategoryGrid
         categories={categories}
         activeEntry={activeEntry}
-        pinnedCategoryIds={[2]}
-        onTogglePinned={() => undefined}
       />
     );
 
-    expect(screen.getByText('Now tracking')).not.toBeNull();
-    expect(screen.getByText('pinned')).not.toBeNull();
-    expect(screen.getByText('billable')).not.toBeNull();
+    // Check that the active category card (Project Alpha) is rendered
+    const activeCard = screen.getByText('Project Alpha').closest('button');
+    expect(activeCard).not.toBeNull();
+    
+    // Check that old helper text is not shown
     expect(screen.queryByText('Tap to start')).toBeNull();
+    expect(screen.queryByText('Tap another category')).toBeNull();
   });
 
   it('starts a timer when a category card is pressed', () => {
-    render(<CategoryGrid categories={categories} pinnedCategoryIds={[]} onTogglePinned={() => undefined} />);
+    render(<CategoryGrid categories={categories} />);
 
     fireEvent.click(screen.getByText('Project Alpha').closest('button')!);
 
     expect(startTimerMock.mutate).toHaveBeenCalledWith(1);
   });
 
-  it('toggles pin state without starting the timer', () => {
-    const onTogglePinned = vi.fn();
+  it('renders category names and codes in category cards', () => {
+    render(<CategoryGrid categories={categories} />);
 
-    render(
-      <CategoryGrid
-        categories={categories}
-        pinnedCategoryIds={[]}
-        onTogglePinned={onTogglePinned}
-      />
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: /pin internal ops/i }));
-
-    expect(onTogglePinned).toHaveBeenCalledWith(2);
-    expect(startTimerMock.mutate).not.toHaveBeenCalledWith(2);
+    expect(screen.getByText('Project Alpha')).not.toBeNull();
+    expect(screen.getByText('Internal Ops')).not.toBeNull();
   });
 });
