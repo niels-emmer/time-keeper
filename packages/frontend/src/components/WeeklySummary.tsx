@@ -326,7 +326,7 @@ export function WeeklySummary() {
               </tr>
             </tbody>
           </table>
-          <div className="flex gap-2">
+          <div className="flex gap-2 border-t p-3">
             <Button
               variant="secondary"
               onClick={() => roundWeek.mutate(week)}
