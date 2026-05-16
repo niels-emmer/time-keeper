@@ -44,12 +44,18 @@ function WeeklyProgress() {
 
   const totalMinutes = completedMinutes + activeElapsedMinutes;
   const goalHours = summary ? summary.goalMinutes / 60 : 40;
+  const isActive = timerData?.active;
 
   if (!summary) return null;
 
+  const timeStr = formatHHMM(totalMinutes);
+  const [hours, minutes] = timeStr.split(':');
+
   return (
-    <span className="font-mono text-sm tabular-nums text-muted-foreground">
-      {formatHHMM(totalMinutes)}
+    <span className={cn("font-mono text-sm tabular-nums", isActive && "font-bold text-foreground")}>
+      {hours}
+      <span className={isActive ? "animate-blink" : "text-muted-foreground"}>{':'}</span>
+      {minutes}
       <span className="text-muted-foreground/50"> / {goalHours}</span>
     </span>
   );
