@@ -22,11 +22,11 @@ void main() async {
   // After the user dismisses it (or after 5s) we resize + hide and
   // the app lives entirely in the menu bar.
   const splashOptions = WindowOptions(
-    size: Size(320, 340),
-    minimumSize: Size(280, 300),
+    size: Size(320, 540),
+    minimumSize: Size(280, 340),
     center: true,
     title: 'Time Keeper',
-    titleBarStyle: TitleBarStyle.hidden,
+    titleBarStyle: TitleBarStyle.normal,
     alwaysOnTop: true,
     skipTaskbar: true,
   );

@@ -78,7 +78,7 @@ class _TopTabBar extends StatelessWidget {
     return Container(
       color: cs.surface,
       child: SizedBox(
-        height: 36,
+        height: 44,
         child: Row(
           children: [
             _TabItem(
@@ -122,38 +122,26 @@ class _TabItem extends StatelessWidget {
     return Expanded(
       child: InkWell(
         onTap: onTap,
-        splashColor: Colors.transparent,
+        splashColor: cs.primary.withValues(alpha: 0.1),
         highlightColor: Colors.transparent,
         child: Center(
-          child: Stack(
-            alignment: Alignment.bottomCenter,
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(bottom: 2),
-                child: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: textColor,
-                    fontWeight:
-                        selected ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                ),
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: selected 
+                  ? cs.primary.withValues(alpha: 0.1) 
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                color: textColor,
+                fontWeight: selected ? FontWeight.w600 : FontWeight.w500,
               ),
-              if (selected)
-                Positioned(
-                  bottom: 0,
-                  left: 8,
-                  right: 8,
-                  child: Container(
-                    height: 2,
-                    decoration: BoxDecoration(
-                      color: cs.primary,
-                      borderRadius: BorderRadius.circular(1),
-                    ),
-                  ),
-                ),
-            ],
+            ),
           ),
         ),
       ),

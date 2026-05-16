@@ -48,7 +48,8 @@ class _WeeklyTabState extends State<WeeklyTab> {
       final week = _isoWeek(_referenceDate);
       _summary = await api.getWeeklySummary(week);
     } catch (e) {
-      _error = e.toString();
+      _error = 'Failed to load: ${e.toString()}';
+      debugPrint('Weekly tab error: $e');
     } finally {
       if (mounted) setState(() { _loading = false; });
     }
@@ -141,9 +142,11 @@ class _WeeklyTabState extends State<WeeklyTab> {
               ),
             ),
           )
-        else if (_summary == null || categories.isEmpty)
-          Expanded(child: Center(child: Text('No data', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant))))
-        else ...[
+        else if (categories.isEmpty)
+          Expanded(child: Center(child: Text('No categories yet.\nCreate some in the web app.', textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13))))
+        else if (_summary == null)
+          Expanded(child: Center(child: Text('No entries this week', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13))))
+        else ..[
           Expanded(child: _SummaryTable(summary: _summary!, categories: categories)),
           const Divider(height: 1),
           Padding(
@@ -264,13 +267,13 @@ class _Cell extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 2),
       child: Text(
         text,
         textAlign: TextAlign.center,
         style: TextStyle(
-          fontSize: 11,
-          fontWeight: (header || bold) ? FontWeight.w600 : FontWeight.normal,
+          fontSize: 12,
+          fontWeight: (header || bold) ? FontWeight.w700 : FontWeight.w500,
           color: header ? cs.onSurfaceVariant : cs.onSurface,
           fontFeatures: const [FontFeature.tabularFigures()],
         ),
@@ -287,15 +290,28 @@ class _CatCell extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = Color(int.parse('FF${cat.color.replaceAll('#', '')}', radix: 16));
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         children: [
-          Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-          const SizedBox(width: 4),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(
+              color: color,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: color.withValues(alpha: 0.3),
+                  blurRadius: 2,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 6),
           Expanded(
             child: Text(
               cat.name,
-              style: const TextStyle(fontSize: 11),
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),

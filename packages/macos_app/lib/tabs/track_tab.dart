@@ -149,12 +149,19 @@ class _TkCategoryCard extends StatelessWidget {
         duration: const Duration(milliseconds: 150),
         decoration: BoxDecoration(
           color: isActive
-              ? color.withValues(alpha: 0.12)
+              ? color.withValues(alpha: 0.15)
               : cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.08),
+              blurRadius: 4,
+              offset: const Offset(0, 2),
+            ),
+          ],
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(10),
           child: Row(
             children: [
               // Left color bar
