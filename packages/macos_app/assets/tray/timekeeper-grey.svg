@@ -1,10 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Time Keeper tray grey">
-  <g stroke="#6B7280" stroke-opacity="0.45" stroke-width="7" stroke-linecap="round" stroke-linejoin="round" fill="none">
-    <path d="M22 14H42"/>
-    <path d="M32 14V32"/>
-    <path d="M32 32L46 48"/>
-    <path d="M32 32L20 44"/>
-    <path d="M32 32H18"/>
-    <path d="M42 14L32 32L22 14"/>
-  </g>
+  <!-- Clock face -->
+  <circle cx="32" cy="32" r="27" fill="none" stroke="#6B7280" stroke-opacity="0.45" stroke-width="5"/>
+  <!-- Hour hand pointing to ~9 o'clock -->
+  <line x1="32" y1="32" x2="13" y2="32" stroke="#6B7280" stroke-opacity="0.45" stroke-width="5" stroke-linecap="round"/>
+  <!-- Minute hand pointing to ~1 o'clock -->
+  <line x1="32" y1="32" x2="47" y2="17" stroke="#6B7280" stroke-opacity="0.45" stroke-width="5" stroke-linecap="round"/>
+  <!-- Second/sweep indicator pointing down -->
+  <line x1="32" y1="32" x2="32" y2="52" stroke="#6B7280" stroke-opacity="0.45" stroke-width="3" stroke-linecap="round"/>
+  <!-- Center cap -->
+  <circle cx="32" cy="32" r="3" fill="#6B7280" fill-opacity="0.45"/>
 </svg>

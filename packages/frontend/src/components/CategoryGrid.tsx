@@ -55,7 +55,7 @@ export function CategoryGrid({
             <button
               onClick={() => start.mutate(category.id)}
               disabled={start.isPending}
-              className="relative flex min-h-[6.5rem] w-full flex-col items-start justify-between overflow-hidden rounded-2xl border-2 p-4 pr-12 text-left transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+              className="relative flex min-h-[6.5rem] w-full flex-col items-start justify-between overflow-hidden rounded-2xl border-2 p-4 text-left transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
               style={{
                 borderColor: isActive ? category.color : 'hsl(var(--border))',
                 backgroundColor: isActive ? `${category.color}16` : 'hsl(var(--card))',
@@ -82,7 +82,7 @@ export function CategoryGrid({
               </div>
 
               {/* Bottom line: billable left, pinned icon right */}
-              <div className="flex min-h-[1.5rem] w-full items-end justify-between gap-2 text-xs mt-auto">
+              <div className="mt-auto flex min-h-[2rem] w-full items-center justify-between gap-2 text-xs">
                 <div className="flex items-center gap-1.5">
                   {category.billable && (
                     <span className="rounded-full bg-amber-100 px-1.5 py-0.5 font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
@@ -94,7 +94,7 @@ export function CategoryGrid({
                   {onTogglePinned && (
                     <button
                       type="button"
-                      className="rounded-full border bg-background/90 p-1.5 text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+                      className="flex h-7 w-7 items-center justify-center rounded-full border bg-background/90 text-muted-foreground shadow-sm transition-colors hover:text-foreground"
                       onClick={(event) => {
                         event.stopPropagation();
                         onTogglePinned(category.id);
@@ -112,25 +112,6 @@ export function CategoryGrid({
                 </div>
               </div>
             </button>
-
-            {onTogglePinned && (
-              <button
-                type="button"
-                className="absolute right-3 top-3 rounded-full border bg-background/90 p-1.5 text-muted-foreground shadow-sm transition-colors hover:text-foreground"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onTogglePinned(category.id);
-                }}
-                aria-label={isPinned ? `Unpin ${category.name}` : `Pin ${category.name}`}
-                aria-pressed={isPinned}
-                title={isPinned ? 'Unpin category' : 'Pin category'}
-              >
-                <Pin
-                  className={`h-3.5 w-3.5 ${isPinned ? 'fill-current text-foreground' : ''}`}
-                  style={isPinned ? { color: category.color } : undefined}
-                />
-              </button>
-            )}
           </div>
         );
       })}
