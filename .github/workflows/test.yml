@@ -1,0 +1,35 @@
+name: Tests
+
+on:
+  push:
+    branches: [main, v2]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable Corepack / Yarn 4
+        run: corepack enable
+
+      - name: Install deps
+        run: yarn install --immutable
+
+      - name: Run shared package tests
+        run: yarn workspace @time-keeper/shared test
+
+      - name: Run backend tests
+        run: yarn workspace @time-keeper/backend test
+        continue-on-error: true   # backend tests optional until more coverage added
+
+      - name: Run frontend tests
+        run: yarn workspace @time-keeper/frontend test
+        continue-on-error: true   # frontend tests optional until more coverage added
+
+      - name: Build backend
+        run: yarn workspace @time-keeper/backend build
+
+      - name: Build frontend
+        run: yarn workspace @time-keeper/frontend build
