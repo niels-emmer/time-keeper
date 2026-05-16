@@ -83,10 +83,11 @@ See [docs/operations/deployment.md](docs/operations/deployment.md) for the full 
 The short version:
 1. Clone the repo on your VPS
 2. Generate `INTERNAL_PROXY_SECRET` with `openssl rand -hex 32` and store it in `.env`
-3. `docker compose up -d --build`
-4. Create a **Proxy Provider** in Authentik (forward auth mode, external host = your domain)
-5. Add it to your existing proxy outpost
-6. Add a proxy host in NPM pointing to `192.168.x.x:38521` (your server's LAN IP) with the standard Authentik forward auth Advanced config
+3. Run `APP_VERSION=$(git describe --tags --abbrev=0) docker compose up -d --build` for the first deploy
+4. Use `./refresh-vps.sh` for later pull-and-rebuild updates
+5. Create a **Proxy Provider** in Authentik (forward auth mode, external host = your domain)
+6. Add it to your existing proxy outpost
+7. Add a proxy host in NPM pointing to `192.168.x.x:38521` (your server's LAN IP) with the standard Authentik forward auth Advanced config
 
 ## Documentation
 
