@@ -20,6 +20,8 @@ Your Pi runtime may also expose builtin or user-level agents from outside this r
 
 See [docs/operations/local-dev.md](docs/operations/local-dev.md) for the full local development guide.
 
+For production/VPS refreshes, use the root helper script `./refresh-vps.sh` described in [docs/operations/deployment.md](docs/operations/deployment.md); it wraps `git pull`, sets `APP_VERSION` from the latest git tag, and rebuilds the frontend and backend containers.
+
 Quick start:
 
 ```bash

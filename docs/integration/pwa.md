@@ -63,7 +63,15 @@ The PWA manifest `theme_color` is set to `#4f5aea` (the primary brand colour), w
 
 The app uses `registerType: 'autoUpdate'`. When a new version is deployed:
 1. The service worker detects the update on next app open or background sync.
-2. It downloads and activates the new version automatically.
-3. The next navigation within the app shows the new version.
+2. The installed app now shows an in-app **New version available** banner instead of a blocking browser `confirm()`.
+3. Choosing **Reload now** posts `SKIP_WAITING` to the waiting worker and reloads once the new worker takes control.
+4. Choosing **Later** dismisses the banner until the next update detection cycle.
 
-No manual cache clearing is needed by the user. See [RB-004 in runbooks.md](../operations/runbooks.md) for force-clearing if needed.
+## Connectivity status
+
+The layout now surfaces app-level connectivity state:
+- **Offline** banner when the browser loses network connectivity
+- **Back online** banner after reconnect, while the app refreshes timer, entry, weekly, and monthly data
+- Settings → About also shows the current connection state and whether an update is ready to reload
+
+No manual cache clearing is needed by the user in normal operation. See [RB-004 in runbooks.md](../operations/runbooks.md) for force-clearing if needed.

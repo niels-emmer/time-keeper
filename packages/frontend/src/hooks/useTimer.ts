@@ -16,6 +16,8 @@ export function useStartTimer() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['timer'] });
       qc.invalidateQueries({ queryKey: ['summary'] });
+      qc.invalidateQueries({ queryKey: ['entries'] });
+      qc.invalidateQueries({ queryKey: ['categories', 'recent'] });
     },
   });
 }
@@ -28,6 +30,7 @@ export function useStopTimer() {
       qc.invalidateQueries({ queryKey: ['timer'] });
       qc.invalidateQueries({ queryKey: ['summary'] });
       qc.invalidateQueries({ queryKey: ['entries'] });
+      qc.invalidateQueries({ queryKey: ['categories', 'recent'] });
     },
   });
 }

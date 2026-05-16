@@ -72,20 +72,11 @@ export function ApiTokenManager() {
   return (
     <>
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardHeader className="pb-2">
           <CardTitle className="flex items-center gap-2 text-base">
             <KeyRound className="h-4 w-4" />
             Personal Access Tokens
           </CardTitle>
-          <Button
-            size="sm"
-            variant="outline"
-            className="gap-1"
-            onClick={() => setCreateOpen(true)}
-          >
-            <Plus className="h-4 w-4" />
-            New token
-          </Button>
         </CardHeader>
         <CardContent>
           <p className="mb-4 text-sm text-muted-foreground">
@@ -93,6 +84,16 @@ export function ApiTokenManager() {
             flow. Each token is shown only once, expires after one year, and should be copied
             immediately after creation.
           </p>
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="mb-4 gap-1"
+            onClick={() => setCreateOpen(true)}
+          >
+            <Plus className="h-4 w-4" />
+            New token
+          </Button>
 
           {isLoading ? (
             <p className="text-sm text-muted-foreground">Loading…</p>

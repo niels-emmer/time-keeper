@@ -21,6 +21,37 @@ export interface WeeklySummary {
   days: DaySummary[];
 }
 
+export type MonthlyCategoryStatus = 'no-goal' | 'on-pace' | 'behind' | 'over-target';
+
+export interface MonthlyCategorySummary {
+  categoryId: number;
+  name: string;
+  color: string;
+  workdayCode: string | null;
+  billable: boolean;
+  actualMinutes: number;
+  goalMinutes: number;
+  expectedMinutesByNow: number;
+  remainingMinutes: number;
+  projectedMinutes: number;
+  requiredDailyMinutes: number;
+  status: MonthlyCategoryStatus;
+}
+
+export interface MonthlySummary {
+  monthYear: string; // YYYY-MM
+  monthLabel: string;
+  isCurrentMonth: boolean;
+  daysElapsed: number;
+  daysInMonth: number;
+  remainingDays: number;
+  totalActualMinutes: number;
+  totalGoalMinutes: number;
+  billableMinutes: number;
+  nonBillableMinutes: number;
+  categories: MonthlyCategorySummary[];
+}
+
 export interface RoundingResult {
   date: string;
   roundingApplied: boolean;

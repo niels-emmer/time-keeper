@@ -56,14 +56,14 @@ Then refresh the app.
 
 **Cause:** The service worker is serving a cached version.
 
-**Fix (user side):** The service worker uses `registerType: 'autoUpdate'`. The update should apply on the next page navigation after the service worker detects it (typically within a few minutes of opening the app).
+**Fix (user side):** The service worker uses `registerType: 'autoUpdate'`. When a new build is ready, the app now shows a **New version available** banner. Tap **Reload now** to activate the waiting worker and refresh into the new version.
 
 **Fix (force):**
 - Android Chrome: Open app → three-dot menu → "Clear data" → re-install
 - macOS Chrome: Navigate to `chrome://serviceworker-internals`, find the app's worker, click "Unregister", then reload
 - macOS Safari: **Cmd+Shift+R** for a hard refresh; or Develop menu → Empty Caches, then reload. Enable the Develop menu via Settings → Advanced → "Show features for web developers"
 
-**Fix (developer — prevent this):** Ensure the `vite build` output has content-hashed filenames (default behavior). If filenames are not changing, the service worker won't detect updates.
+**Fix (developer — prevent this):** Ensure the `vite build` output has content-hashed filenames (default behavior). If filenames are not changing, the service worker won't detect updates. Also confirm the update banner still appears and that `Reload now` triggers `SKIP_WAITING` followed by a page reload.
 
 ---
 

@@ -22,12 +22,17 @@ This is a single-user (or small-team) personal productivity tool, not a public-f
 - Renamed the `categories` classification field from `bonus` to `billable`: marks categories for billable vs non-billable reporting in the monthly overview
 - The monthly-goals addition remains backward-compatible; the category classification rename required a schema migration to preserve existing values
 
-## New API endpoints (2026-05-06)
+## New API endpoints (2026-05-13)
 
 - `GET /api/settings/monthly-goals` — fetch a category's monthly budget
 - `POST /api/settings/set-monthly-goal` — set/update a category's monthly budget
-- Both endpoints require Authentik auth and scope writes/reads to `req.userId`
-- These endpoints do **not** currently verify that `categoryId` belongs to the caller; the main risk is orphan monthly-goal rows inside the caller's own namespace, not cross-user access
+- `GET /api/summary/monthly` — read-only monthly analytics payload for the Monthly tab (goals, pace, projections, billable split)
+- `POST /api/entries` — create a completed manual/backfilled time entry from the day log UI
+- `PATCH /api/entries/:id` now validates any reassigned `categoryId` against the caller's own categories and rejects invalid time ranges (`endTime <= startTime`)
+- All of the above endpoints require Authentik auth and scope writes/reads to `req.userId`
+- The monthly-goal endpoints still do **not** currently verify that `categoryId` belongs to the caller; the main risk is orphan monthly-goal rows inside the caller's own namespace, not cross-user access
+- The monthly summary endpoint is read-only and derives all data from rows already scoped to `req.userId`
+- The manual-entry endpoint validates category ownership and requires a completed time range, so it cannot be used to forge a second running timer
 
 ## What has not been done
 
@@ -44,6 +49,7 @@ This is a single-user (or small-team) personal productivity tool, not a public-f
 | Bearer token stolen from device | Low | Stored in macOS Keychain (not plaintext); revoke immediately from web app Settings; expiry limits long-term exposure |
 | Token used to create more tokens | None | Token management endpoints require Authentik header auth — Bearer tokens receive 403 |
 | Unauthorised modification of another user's time entries via adjust-cell | None | `PATCH /api/summary/adjust-cell` validates category ownership before any write; all DB operations are scoped to `req.userId` |
+| Unauthorised creation or reassignment of manual entries | None | `POST /api/entries` requires Authentik auth, validates the target category belongs to `req.userId`, and only creates completed entries; `PATCH /api/entries/:id` validates category ownership before reassignment and rejects invalid time ranges |
 | SQL injection | Low | All queries use Drizzle ORM with parameterised statements; no raw SQL with user input |
 | XSS | Low | React escapes output by default; no `dangerouslySetInnerHTML` is used |
 | Supply chain attack on a dependency | Very low | Standard npm ecosystem risk; see dependency audit below |

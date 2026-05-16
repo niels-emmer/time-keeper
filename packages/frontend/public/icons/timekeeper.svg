@@ -1,24 +1,31 @@
-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Time Keeper icon">
-  <rect width="512" height="512" rx="120" fill="#207D9B" class="bg-color"/>
-
-  <g transform="translate(256 256)" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="0" cy="0" r="180" fill="none"/>
-    <path d="M-80 -100H80"/>
-    <path d="M0 -100V0"/>
-    <path d="M0 0L80 100"/>
-    <path d="M0 0L-60 80"/>
-    <path d="M0 0H-80"/>
-    <path d="M80 -100L0 0L-80 -100"/>
-  </g>
-
-  <g transform="translate(256 256)" fill="#FFFFFF">
-    <circle cx="0" cy="60" r="10"/>
-    <circle cx="0" cy="90" r="10"/>
-  </g>
-
-  <style>
-    @media (prefers-color-scheme: dark) {
-      .bg-color { fill: #1A202C; }
-    }
-  </style>
+<svg width="512" height="512" viewBox="0 0 6400 6400" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Time Keeper icon">
+<g clip-path="url(#clip0)">
+<path d="M4900 836.395L5394.97 341.421C5473.08 263.316 5599.71 263.316 5677.82 341.421L6102.03 765.633C6180.14 843.738 6180.14 970.371 6102.03 1048.48L5607.06 1543.45L4900 836.395Z" fill="url(#paint0)"/>
+<path d="M0 3200C0 1432.69 1432.69 0 3200 0C4967.31 0 6400 1432.69 6400 3200V6200C6400 6310.46 6310.46 6400 6200 6400H3200H200C89.5431 6400 0 6310.46 0 6200V3200Z" fill="url(#paint1)"/>
+<path d="M3200 5800C4635.94 5800 5800 4635.94 5800 3200C5800 1764.06 4635.94 600 3200 600C1764.06 600 600 1764.06 600 3200C600 4635.94 1764.06 5800 3200 5800Z" fill="url(#paint2)"/>
+<path d="M3200 5750C4608.33 5750 5750 4608.33 5750 3200C5750 1791.67 4608.33 650 3200 650C1791.67 650 650 1791.67 650 3200C650 4608.33 1791.67 5750 3200 5750Z" stroke="white" stroke-opacity="0.25" stroke-width="100"/>
+<path d="M3050 3500H3350V5250C3350 5332.84 3282.84 5400 3200 5400C3117.16 5400 3050 5332.84 3050 5250V3500Z" fill="#D83600"/>
+<path d="M3397.21 3062.58L3192.91 3463.53L1678.2 2691.75C1579.79 2641.6 1540.65 2521.17 1590.8 2422.75L1613.5 2378.2C1663.65 2279.78 1784.08 2240.65 1882.5 2290.8L3397.21 3062.58Z" fill="#44484C"/>
+<path d="M3005.4 3121.87L3288.24 3404.71L4674.15 2018.8C4752.26 1940.69 4752.26 1814.06 4674.15 1735.96C4596.05 1657.85 4469.41 1657.85 4391.31 1735.96L3005.4 3121.87Z" fill="#44484C"/>
+<path d="M3200 3600C3420.91 3600 3600 3420.91 3600 3200C3600 2979.09 3420.91 2800 3200 2800C2979.09 2800 2800 2979.09 2800 3200C2800 3420.91 2979.09 3600 3200 3600Z" fill="#1E2021"/>
+</g>
+<defs>
+<linearGradient id="paint0" x1="5218.2" y1="518.197" x2="5925.25" y2="1225.25" gradientUnits="userSpaceOnUse">
+<stop stop-color="#515151"/>
+<stop offset="0.151042" stop-color="#4D4D4D"/>
+<stop offset="0.791667" stop-color="#4D4D4D"/>
+<stop offset="1" stop-color="#525252"/>
+</linearGradient>
+<linearGradient id="paint1" x1="1400" y1="600" x2="6400" y2="6300" gradientUnits="userSpaceOnUse">
+<stop stop-color="#899097"/>
+<stop offset="1" stop-color="#63717B"/>
+</linearGradient>
+<linearGradient id="paint2" x1="1700" y1="1200" x2="4850" y2="5200" gradientUnits="userSpaceOnUse">
+<stop stop-color="white"/>
+<stop offset="1" stop-color="#C7CCD0"/>
+</linearGradient>
+<clipPath id="clip0">
+<rect width="6400" height="6400" fill="white"/>
+</clipPath>
+</defs>
 </svg>

@@ -1,61 +1,118 @@
+import { Pin } from 'lucide-react';
 import { useStartTimer } from '@/hooks/useTimer';
 import type { Category, TimeEntry } from '@time-keeper/shared';
 
 interface Props {
   categories: Category[];
   activeEntry?: TimeEntry;
+  pinnedCategoryIds?: number[];
+  onTogglePinned?: (categoryId: number) => void;
+  emptyTitle?: string;
+  emptyDescription?: string;
 }
 
-export function CategoryGrid({ categories, activeEntry }: Props) {
+function getCategoryBadge(category: Category) {
+  if (category.workdayCode) return category.workdayCode;
+  if (category.name.includes(' ')) {
+    return category.name
+      .split(' ')
+      .map((word) => word[0])
+      .join('')
+      .slice(0, 3)
+      .toUpperCase();
+  }
+  return category.name.slice(0, 2).toUpperCase();
+}
+
+export function CategoryGrid({
+  categories,
+  activeEntry,
+  pinnedCategoryIds = [],
+  onTogglePinned,
+  emptyTitle = 'No categories yet.',
+  emptyDescription = 'Add categories in Settings to start tracking time.',
+}: Props) {
   const start = useStartTimer();
+  const pinnedSet = new Set(pinnedCategoryIds);
 
   if (categories.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center text-muted-foreground">
-        <p className="text-lg">No categories yet.</p>
-        <p className="text-sm mt-1">Add categories in Settings to start tracking time.</p>
+      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-12 text-center text-muted-foreground">
+        <p className="text-lg">{emptyTitle}</p>
+        <p className="mt-1 text-sm">{emptyDescription}</p>
       </div>
     );
   }
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-      {categories.map((cat) => {
-        const isActive = activeEntry?.categoryId === cat.id;
+      {categories.map((category) => {
+        const isActive = activeEntry?.categoryId === category.id;
+        const isPinned = pinnedSet.has(category.id);
+
         return (
-          <button
-            key={cat.id}
-            onClick={() => start.mutate(cat.id)}
-            disabled={start.isPending}
-            className="relative flex min-h-[5.5rem] flex-col items-start justify-end rounded-xl border-2 p-4 text-left transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-            style={{
-              borderColor: isActive ? cat.color : 'hsl(var(--border))',
-              backgroundColor: isActive ? `${cat.color}18` : 'hsl(var(--card))',
-              boxShadow: isActive ? `0 0 0 1px ${cat.color}40, 0 4px 16px ${cat.color}25` : 'none',
-            }}
-          >
-            {/* Pill badge — colour-tinted, shows workday code or first 3 chars of name */}
-            <span
-              className="absolute left-3 top-3 rounded-full px-2 py-0.5 text-xs font-semibold"
+          <div key={category.id} className="relative">
+            <button
+              onClick={() => start.mutate(category.id)}
+              disabled={start.isPending}
+              className="relative flex min-h-[6.5rem] w-full flex-col items-start justify-between overflow-hidden rounded-2xl border-2 p-4 text-left transition-all active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
               style={{
-                backgroundColor: `${cat.color}28`,
-                color: cat.color,
-                border: `1px solid ${cat.color}60`,
+                borderColor: isActive ? category.color : 'hsl(var(--border))',
+                backgroundColor: isActive ? `${category.color}16` : 'hsl(var(--card))',
+                boxShadow: isActive
+                  ? `0 0 0 1px ${category.color}35, 0 10px 30px ${category.color}20`
+                  : '0 4px 16px rgba(15, 23, 42, 0.04)',
               }}
+              aria-pressed={isActive}
             >
-              {cat.workdayCode ?? (cat.name.includes(' ')
-                ? cat.name.split(' ').map((w: string) => w[0]).join('').toUpperCase()
-                : cat.name.slice(0, 2).toUpperCase())}
-            </span>
-            {/* Active blinking dot — top-right */}
-            {isActive && (
-              <span
-                className="absolute right-3 top-3 inline-block h-2 w-2 animate-pulse rounded-full"
-                style={{ backgroundColor: cat.color }}
-              />
-            )}
-            <span className="text-sm font-semibold leading-tight">{cat.name}</span>
-          </button>
+              <div className="w-full space-y-2.5">
+                <span
+                  className="inline-flex rounded-full px-2 py-0.5 text-xs font-semibold"
+                  style={{
+                    backgroundColor: `${category.color}22`,
+                    color: category.color,
+                    border: `1px solid ${category.color}55`,
+                  }}
+                >
+                  {getCategoryBadge(category)}
+                </span>
+
+                {/* Always reserve 2 lines for name for consistent card height */}
+                <span className="block min-w-0 line-clamp-2 text-sm font-semibold leading-tight min-h-[2.5em]">{category.name}</span>
+              </div>
+
+              {/* Bottom line: billable left, pinned icon right */}
+              <div className="mt-auto flex min-h-[2rem] w-full items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-1.5">
+                  {category.billable && (
+                    <span className="rounded-full bg-amber-100 px-1.5 py-0.5 font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+                      billable
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-1.5 ml-auto">
+                  {onTogglePinned && (
+                    <button
+                      type="button"
+                      className="flex h-7 w-7 items-center justify-center rounded-full border bg-background/90 text-muted-foreground shadow-sm transition-colors hover:text-foreground"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        onTogglePinned(category.id);
+                      }}
+                      aria-label={isPinned ? `Unpin ${category.name}` : `Pin ${category.name}`}
+                      aria-pressed={isPinned}
+                      title={isPinned ? 'Unpin category' : 'Pin category'}
+                    >
+                      <Pin
+                        className={`h-3.5 w-3.5 ${isPinned ? 'fill-current text-foreground' : ''}`}
+                        style={isPinned ? { color: category.color } : undefined}
+                      />
+                    </button>
+                  )}
+                </div>
+              </div>
+            </button>
+          </div>
         );
       })}
     </div>

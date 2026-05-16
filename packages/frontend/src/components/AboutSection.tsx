@@ -1,8 +1,14 @@
 import { ExternalLink } from 'lucide-react';
 import { useInfo } from '@/hooks/useInfo';
+import { useAppStatus } from '@/lib/appStatusContext';
 
 export function AboutSection() {
   const { data, isLoading } = useInfo();
+  const { isOnline, updateAvailable, applyingUpdate, applyUpdate, lastConnectionChangeAt } = useAppStatus();
+
+  const lastChangeLabel = lastConnectionChangeAt
+    ? new Date(lastConnectionChangeAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+    : '—';
 
   return (
     <div className="space-y-4">
@@ -23,6 +29,34 @@ export function AboutSection() {
           <span className="font-mono font-medium">
             {isLoading ? '…' : (data?.version ?? '—')}
           </span>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-muted-foreground">Connection</span>
+          <span className="font-medium">{isOnline ? 'Online' : 'Offline'}</span>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-muted-foreground">App update</span>
+          <div className="flex items-center gap-2">
+            <span className="font-medium">
+              {updateAvailable ? (applyingUpdate ? 'Reloading…' : 'Ready to reload') : 'Up to date'}
+            </span>
+            {updateAvailable && (
+              <button
+                type="button"
+                onClick={applyUpdate}
+                className="text-xs font-medium text-primary hover:underline"
+              >
+                Reload now
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-muted-foreground">Last network change</span>
+          <span className="font-medium text-right">{lastChangeLabel}</span>
         </div>
 
         {/* GitHub link */}

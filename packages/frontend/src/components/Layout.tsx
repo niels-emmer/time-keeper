@@ -1,8 +1,9 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { Timer, BarChart2, Calendar, Settings } from 'lucide-react';
+import { Timer, BarChart2, Calendar, RefreshCw, Settings, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWeeklySummary } from '@/hooks/useSummary';
 import { useTimer } from '@/hooks/useTimer';
+import { useAppStatus } from '@/lib/appStatusContext';
 
 const navItems = [
   { to: '/', icon: Timer, label: 'Track' },
@@ -13,41 +14,12 @@ const navItems = [
 
 function TimekeeperLogo({ className }: { className?: string }) {
   return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 64 64"
-      aria-hidden="true"
+    <img
+      src="/icons/timekeeper.svg"
+      alt="Time Keeper"
       className={className}
-    >
-      <defs>
-        <linearGradient id="tk-bg" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#0F1E35" />
-          <stop offset="100%" stopColor="#0A1628" />
-        </linearGradient>
-        <linearGradient id="tk-ring" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#00D4FF" />
-          <stop offset="100%" stopColor="#0099CC" />
-        </linearGradient>
-      </defs>
-      {/* Rounded square background */}
-      <rect x="2" y="2" width="60" height="60" rx="16" fill="url(#tk-bg)" />
-      {/* Subtle inner highlight */}
-      <rect x="2" y="2" width="60" height="60" rx="16" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="1" />
-      {/* Clock ring */}
-      <circle cx="32" cy="32" r="17" fill="none" stroke="url(#tk-ring)" strokeWidth="3.5" />
-      {/* Hour markers */}
-      <circle cx="32" cy="17" r="1.5" fill="#00D4FF" opacity="0.7" />
-      <circle cx="47" cy="32" r="1.5" fill="#00D4FF" opacity="0.7" />
-      <circle cx="32" cy="47" r="1.5" fill="#00D4FF" opacity="0.7" />
-      <circle cx="17" cy="32" r="1.5" fill="#00D4FF" opacity="0.7" />
-      {/* Minute hand — ~10 o'clock */}
-      <line x1="32" y1="32" x2="22.5" y2="19.5" stroke="#E8F4FF" strokeWidth="2.5" strokeLinecap="round" />
-      {/* Hour hand — ~2 o'clock */}
-      <line x1="32" y1="32" x2="40" y2="25" stroke="#FFAA00" strokeWidth="3" strokeLinecap="round" />
-      {/* Center pivot */}
-      <circle cx="32" cy="32" r="3" fill="#FFAA00" />
-      <circle cx="32" cy="32" r="1.5" fill="#FFD966" />
-    </svg>
+      aria-hidden="true"
+    />
   );
 }
 
@@ -72,18 +44,26 @@ function WeeklyProgress() {
 
   const totalMinutes = completedMinutes + activeElapsedMinutes;
   const goalHours = summary ? summary.goalMinutes / 60 : 40;
+  const isActive = timerData?.active;
 
   if (!summary) return null;
 
+  const timeStr = formatHHMM(totalMinutes);
+  const [hours, minutes] = timeStr.split(':');
+
   return (
-    <span className="font-mono text-sm tabular-nums text-muted-foreground">
-      {formatHHMM(totalMinutes)}
+    <span className={cn("font-mono text-sm tabular-nums", isActive && "font-bold text-foreground")}>
+      {hours}
+      <span className={isActive ? "animate-blink" : "text-muted-foreground"}>{':'}</span>
+      {minutes}
       <span className="text-muted-foreground/50"> / {goalHours}</span>
     </span>
   );
 }
 
 export function Layout() {
+  const { isOnline, recentlyReconnected, updateAvailable, applyingUpdate, applyUpdate, dismissUpdate } = useAppStatus();
+
   return (
     <div className="flex min-h-screen flex-col">
       {/* Top bar */}
@@ -96,6 +76,57 @@ export function Layout() {
           </div>
         </div>
       </header>
+
+      {(!isOnline || recentlyReconnected || updateAvailable) && (
+        <div className="space-y-2 border-b bg-card px-4 py-3">
+          {!isOnline && (
+            <div className="flex items-start gap-3 rounded-xl border border-amber-400/40 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
+              <WifiOff className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-medium">You are offline.</p>
+                <p className="text-xs opacity-80">The timer and summaries need connectivity for fresh data. Reconnect to resume syncing.</p>
+              </div>
+            </div>
+          )}
+
+          {isOnline && recentlyReconnected && (
+            <div className="flex items-start gap-3 rounded-xl border border-emerald-400/40 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-700/40 dark:bg-emerald-950/30 dark:text-emerald-100">
+              <RefreshCw className="mt-0.5 h-4 w-4 shrink-0" />
+              <div>
+                <p className="font-medium">Back online.</p>
+                <p className="text-xs opacity-80">Refreshing timer, weekly, monthly, and entry data now.</p>
+              </div>
+            </div>
+          )}
+
+          {updateAvailable && (
+            <div className="flex flex-col gap-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-medium">New version available.</p>
+                <p className="text-xs text-muted-foreground">Reload when ready to switch to the latest cached app shell.</p>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  className="inline-flex h-9 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+                  onClick={dismissUpdate}
+                  disabled={applyingUpdate}
+                >
+                  Later
+                </button>
+                <button
+                  type="button"
+                  className="inline-flex h-9 items-center justify-center rounded-md bg-primary px-3 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+                  onClick={applyUpdate}
+                  disabled={applyingUpdate}
+                >
+                  {applyingUpdate ? 'Reloading…' : 'Reload now'}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Page content */}
       <main className="flex-1 overflow-y-auto px-4 py-6">

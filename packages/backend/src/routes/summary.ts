@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { eq, and, gte, lte, isNotNull, asc } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { timeEntries, categories } from '../db/schema.js';
-import { getWeeklySummary, getWeekDateRange } from '../services/summaryService.js';
+import { getWeeklySummary, getMonthlySummary, getWeekDateRange } from '../services/summaryService.js';
 import { applyRounding } from '../services/roundingService.js';
 import { toISOWeek } from '@time-keeper/shared';
 import { createError } from '../middleware/errorHandler.js';
@@ -15,6 +15,20 @@ summaryRouter.get('/weekly', (req, res, next) => {
     const week =
       (req.query.week as string | undefined) ?? toISOWeek(new Date());
     const summary = getWeeklySummary(req.userId, week);
+    res.json(summary);
+  } catch (err) {
+    next(err);
+  }
+});
+
+summaryRouter.get('/monthly', (req, res, next) => {
+  try {
+    const month = z
+      .object({ month: z.string().regex(/^\d{4}-\d{2}$/).optional() })
+      .parse(req.query)
+      .month ?? new Date().toISOString().slice(0, 7);
+
+    const summary = getMonthlySummary(req.userId, month);
     res.json(summary);
   } catch (err) {
     next(err);
