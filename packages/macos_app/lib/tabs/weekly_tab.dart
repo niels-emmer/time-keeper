@@ -146,7 +146,7 @@ class _WeeklyTabState extends State<WeeklyTab> {
           Expanded(child: Center(child: Text('No categories yet.\nCreate some in the web app.', textAlign: TextAlign.center, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13))))
         else if (_summary == null)
           Expanded(child: Center(child: Text('No entries this week', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 13))))
-        if (_summary != null) ...[
+        else ...[
           Expanded(child: _SummaryTable(summary: _summary!, categories: categories)),
           const Divider(height: 1),
           Padding(
