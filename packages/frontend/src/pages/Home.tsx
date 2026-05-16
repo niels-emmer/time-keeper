@@ -121,11 +121,6 @@ export function Home() {
                   {categories.length} categories · {pinnedCategoryIds.length} pinned
                 </p>
               </div>
-              {activeCategory && (
-                <div className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
-                  Tracking {activeCategory.name}
-                </div>
-              )}
             </div>
             {/* Description removed as per new UI spec */}
           </div>
@@ -153,11 +148,7 @@ export function Home() {
 
           {/* Sorting buttons removed; recents first, then more, manual sorting only within categories */}
 
-          {activeCategory && (
-            <div className="rounded-xl border bg-muted/40 px-3 py-2 text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">Currently tracking:</span> {activeCategory.name}. Tap another category below to switch instantly.
-            </div>
-          )}
+
         </CardContent>
       </Card>
 
