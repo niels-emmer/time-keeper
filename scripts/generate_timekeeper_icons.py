@@ -32,6 +32,30 @@ def svg_to_pil(svg_path: Path, size: int) -> Image.Image:
     return Image.open(io.BytesIO(png_data)).convert("RGBA")
 
 
+def add_padding(image: Image.Image, output_size: int, inner_padding: int) -> Image.Image:
+    """Add padding around an image by placing it in a canvas.
+    
+    The image is resized to fit with the specified padding on all sides.
+    
+    Args:
+        image: The source image
+        output_size: The final canvas size (e.g., 180 for a 180x180 output)
+        inner_padding: Padding in pixels to leave on each side (e.g., 20 for 20px padding)
+    
+    Returns:
+        Image of size output_size × output_size with the input image centered with padding
+    """
+    # Create transparent canvas
+    canvas = Image.new("RGBA", (output_size, output_size), (0, 0, 0, 0))
+    # Calculate the size of the image after accounting for padding
+    inner_size = output_size - (inner_padding * 2)
+    # Resize the image to fit with padding
+    resized = image.resize((inner_size, inner_size), Image.Resampling.LANCZOS)
+    # Paste in center
+    canvas.paste(resized, (inner_padding, inner_padding), resized)
+    return canvas
+
+
 def save_png(path: Path, image: Image.Image) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     image.save(path, format="PNG")
@@ -61,7 +85,8 @@ def main() -> None:
     save_png(frontend_icons / "icon-64x64.png", rendered[64])
     save_png(frontend_icons / "icon-128x128.png", rendered[128])
     save_png(frontend_icons / "icon-180x180.png", rendered[180])
-    save_png(frontend_icons / "apple-touch-icon.png", rendered[180])
+    # apple-touch-icon needs padding for macOS dock (rounded corners): 20px padding leaves room for the dock's visual treatment
+    save_png(frontend_icons / "apple-touch-icon.png", add_padding(rendered[180], 180, 20))
     save_png(frontend_icons / "icon-192x192.png", rendered[192])
     save_png(frontend_public / "icon-192.png", rendered[192])
     save_png(frontend_icons / "icon-256x256.png", rendered[256])

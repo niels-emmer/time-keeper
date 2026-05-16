@@ -99,7 +99,7 @@ export function Home() {
   );
 
   const hasSearch = searchQuery.trim().length > 0;
-  const hasOrganizedSections = !hasSearch && (pinnedCategories.length > 0 || recentCategories.length > 0);
+  const hasOrganizedSections = !hasSearch && pinnedCategories.length > 0;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -177,6 +177,20 @@ export function Home() {
         </Section>
       ) : (
         <>
+          {pinnedCategories.length > 0 && (
+            <Section
+              title="Pinned"
+              description="Categories you've pinned are always surfaced here, in your saved manual order."
+            >
+              <CategoryGrid
+                categories={pinnedCategories}
+                activeEntry={activeEntry}
+                pinnedCategoryIds={pinnedCategoryIds}
+                onTogglePinned={(categoryId) => setPinnedCategoryIds((current) => togglePinnedCategoryId(current, categoryId))}
+              />
+            </Section>
+          )}
+
           {recentCategories.length > 0 && (
             <Section
               title="Recent"
@@ -196,7 +210,7 @@ export function Home() {
             description="This list follows your saved Settings order. Pin any category to keep it surfaced while its position stays manually managed in Settings."
           >
             <CategoryGrid
-              categories={hasOrganizedSections ? [...pinnedCategories, ...remainingCategories] : searchResults}
+              categories={remainingCategories}
               activeEntry={activeEntry}
               pinnedCategoryIds={pinnedCategoryIds}
               onTogglePinned={(categoryId) => setPinnedCategoryIds((current) => togglePinnedCategoryId(current, categoryId))}

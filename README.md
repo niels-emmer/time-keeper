@@ -1,5 +1,4 @@
-> [!INFO]
-> This project was built entirely by AI (Claude Code, GitHub Copilot, GPT-4) from an empty folder, guided by iterative human prompting. It manages its own documentation in `docs/memory/` and keeps the Wiki and code in sync unprompted. For security and dependency details, see [SECURITY.md](SECURITY.md) and the [Wiki](https://github.com/niels-emmer/time-keeper/wiki).
+> This project was built entirely by AI (Pi, Claude Code, GPT-5.4) from an empty folder, guided by iterative human prompting. It manages its own documentation in `docs/memory/` and keeps the Wiki and code in sync unprompted. For security and dependency details, see [SECURITY.md](SECURITY.md) and the [Wiki](https://github.com/niels-emmer/time-keeper/wiki).
 
 # Time Keeper
 

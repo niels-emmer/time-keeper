@@ -326,40 +326,60 @@ export function WeeklySummary() {
               </tr>
             </tbody>
           </table>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              onClick={() => roundWeek.mutate(week)}
+              disabled={roundWeek.isPending}
+            >
+              {roundWeek.isPending ? 'Rounding…' : 'Round week'}
+            </Button>
+          </div>
         </CardContent>
       </Card>
 
-      {/* Review this week card, now includes bar chart between Busiest day and Submit flow */}
+      {/* Review this week card - reordered with Submit flow first, graph at bottom full-width */}
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">Review this week before you submit</CardTitle>
         </CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <CardContent className="space-y-3">
+          {/* Submit flow box first */}
           <div className="rounded-xl border bg-muted/20 p-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total tracked</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{totalHours.toFixed(1)}h</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {totalHours >= goalHours
-                ? `Goal met${exceededHours > 0 ? ` (+${exceededHours.toFixed(1)}h)` : ''}`
-                : `${remainingHours.toFixed(1)}h remaining to hit goal`}
-            </p>
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Submit flow</p>
+            <p className="mt-1 text-base font-semibold">Review → choose format → copy/export</p>
+            <p className="mt-1 text-sm text-muted-foreground">Use the preview below to confirm what you will paste.</p>
           </div>
-          <div className="rounded-xl border bg-muted/20 p-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Categories used</p>
-            <p className="mt-1 text-2xl font-semibold tabular-nums">{activeCategoryCount}</p>
-            <p className="mt-1 text-sm text-muted-foreground">Distinct categories with hours this week.</p>
+
+          {/* Summary stats grid */}
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border bg-muted/20 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Total tracked</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">{totalHours.toFixed(1)}h</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {totalHours >= goalHours
+                  ? `Goal met${exceededHours > 0 ? ` (+${exceededHours.toFixed(1)}h)` : ''}`
+                  : `${remainingHours.toFixed(1)}h remaining to hit goal`}
+              </p>
+            </div>
+            <div className="rounded-xl border bg-muted/20 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Categories used</p>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">{activeCategoryCount}</p>
+              <p className="mt-1 text-sm text-muted-foreground">Distinct categories with hours this week.</p>
+            </div>
+            <div className="rounded-xl border bg-muted/20 p-3">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Busiest day</p>
+              <p className="mt-1 text-2xl font-semibold">{DAYS[busiestDayIndex]}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {computedDayMinutes[busiestDayIndex] > 0
+                  ? `${(computedDayMinutes[busiestDayIndex] / 60).toFixed(1)}h logged`
+                  : 'No time logged yet'}
+              </p>
+            </div>
           </div>
-          <div className="rounded-xl border bg-muted/20 p-3">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Busiest day</p>
-            <p className="mt-1 text-2xl font-semibold">{DAYS[busiestDayIndex]}</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {computedDayMinutes[busiestDayIndex] > 0
-                ? `${(computedDayMinutes[busiestDayIndex] / 60).toFixed(1)}h logged`
-                : 'No time logged yet'}
-            </p>
-          </div>
-          {/* Insert bar chart here */}
-          <div className="col-span-full xl:col-span-1 flex flex-col gap-2">
+
+          {/* Bar chart at bottom, full width */}
+          <div className="flex flex-col gap-2">
             <div className="flex h-4 w-full overflow-hidden rounded-full bg-muted">
               {summary.totalMinutes === 0 ? null : barSegments.map((segment, index) => (
                 <div
@@ -392,12 +412,6 @@ export function WeeklySummary() {
                 </div>
               ))}
             </div>
-          </div>
-          {/* End bar chart insert */}
-          <div className="rounded-xl border bg-muted/20 p-3 xl:col-span-1">
-            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Submit flow</p>
-            <p className="mt-1 text-base font-semibold">Review → choose format → copy/export</p>
-            <p className="mt-1 text-sm text-muted-foreground">Use the preview below to confirm what you will paste.</p>
           </div>
         </CardContent>
       </Card>
@@ -461,13 +475,6 @@ export function WeeklySummary() {
             >
               <Download className="mr-2 h-4 w-4" />
               Download {exportFormat === 'csv' ? 'CSV' : 'text'}
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => roundWeek.mutate(week)}
-              disabled={roundWeek.isPending}
-            >
-              {roundWeek.isPending ? 'Rounding…' : 'Round week'}
             </Button>
             {copyState === 'error' && (
               <p className="self-center text-sm text-destructive">
