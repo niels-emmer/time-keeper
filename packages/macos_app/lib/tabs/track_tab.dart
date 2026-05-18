@@ -1,4 +1,6 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:macos_ui/macos_ui.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../services/api_service.dart';
@@ -109,17 +111,18 @@ class _ActiveTimerCard extends StatelessWidget {
               ],
             ),
           ),
-          TextButton(
+          PushButton(
+            controlSize: ControlSize.small,
+            secondary: true,
             onPressed: state.stopTimer,
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              textStyle:
-                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
+            child: Text(
+              'Stop',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: Colors.red.shade400,
+              ),
             ),
-            child: const Text('Stop'),
           ),
         ],
       ),
@@ -143,78 +146,74 @@ class _TkCategoryCard extends StatelessWidget {
     final color = _hexColor(category.color);
     final cs = Theme.of(context).colorScheme;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        decoration: BoxDecoration(
-          color: isActive
-              ? color.withValues(alpha: 0.15)
-              : cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Row(
-            children: [
-              // Left color bar
-              Container(
-                width: 3,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: isActive ? 1.0 : 0.5),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    bottomLeft: Radius.circular(8),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            color: isActive
+                ? color.withValues(alpha: 0.15)
+                : cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Row(
+              children: [
+                // Left color bar
+                Container(
+                  width: 3,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: isActive ? 1.0 : 0.5),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(8),
+                      bottomLeft: Radius.circular(8),
+                    ),
                   ),
                 ),
-              ),
-              // Card content
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              category.name,
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: cs.onSurface),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (category.workdayCode != null)
+                // Card content
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
                               Text(
-                                category.workdayCode!,
+                                category.name,
                                 style: TextStyle(
-                                    fontSize: 10,
-                                    color: cs.onSurface
-                                        .withValues(alpha: 0.5)),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: cs.onSurface),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                          ],
+                              if (category.workdayCode != null)
+                                Text(
+                                  category.workdayCode!,
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color: cs.onSurface
+                                          .withValues(alpha: 0.5)),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                      if (isActive)
-                        Icon(Icons.stop_circle_outlined,
-                            color: color, size: 16),
-                    ],
+                        if (isActive)
+                          Icon(CupertinoIcons.stop_circle,
+                              color: color, size: 16),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

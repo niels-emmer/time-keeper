@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:macos_ui/macos_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:screen_retriever/screen_retriever.dart';
 import 'package:tray_manager/tray_manager.dart';
@@ -11,28 +12,25 @@ import 'services/secure_storage.dart';
 import 'services/icon_generator.dart';
 import 'screens/setup_screen.dart';
 import 'screens/main_panel.dart';
-import 'screens/splash_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await windowManager.ensureInitialized();
 
-  // Start with the splash window: centered, compact size.
-  // After the user dismisses it (or after 5s) we resize + hide and
-  // the app lives entirely in the menu bar.
-  const splashOptions = WindowOptions(
-    size: Size(320, 540),
-    minimumSize: Size(280, 340),
-    center: true,
-    title: 'Time Keeper',
-    titleBarStyle: TitleBarStyle.normal,
-    alwaysOnTop: true,
+  // Start hidden — the app lives entirely in the menu bar.
+  // The window is shown when the user clicks the tray icon.
+  const popoverOptions = WindowOptions(
+    size: Size(380, 560),
+    minimumSize: Size(380, 560),
+    maximumSize: Size(380, 560),
+    center: false,
+    titleBarStyle: TitleBarStyle.hidden,
     skipTaskbar: true,
+    alwaysOnTop: false,
   );
-  await windowManager.waitUntilReadyToShow(splashOptions, () async {
-    await windowManager.show();
-  });
+  await windowManager.waitUntilReadyToShow(popoverOptions);
+  // Window stays hidden — tray click calls _showWindow().
 
   runApp(const TimeKeeperApp());
 }
@@ -49,8 +47,6 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
   final _storage = SecureStorageService();
   late final app_state.AppStateProvider _appState;
   late final SettingsProvider _settingsProvider;
-
-  bool _splashDone = false;
 
   // Track current icon so we only call setIcon when it actually changes
   String? _currentIconAsset;
@@ -78,15 +74,6 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
     windowManager.removeListener(this);
     _appState.dispose();
     super.dispose();
-  }
-
-  // ── Splash dismissal ─────────────────────────────────────────────────────────
-
-  Future<void> _finishSplash() async {
-    // Resize to popover dimensions before hiding
-    await windowManager.setSize(const Size(380, 560));
-    await windowManager.hide();
-    setState(() => _splashDone = true);
   }
 
   // ── Icon management ─────────────────────────────────────────────────────────
@@ -246,9 +233,7 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
 
   @override
   void onWindowBlur() {
-    // Close the popover when it loses focus (clicking elsewhere),
-    // but only once splash is done.
-    if (_splashDone) windowManager.hide();
+    windowManager.hide();
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────
@@ -288,7 +273,6 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
               onSurfaceVariant: onSurfaceVariantLight,
               primary: primaryLight,
               onPrimary: onPrimaryLight,
-              // required fields — map to sensible macOS equivalents
               secondary: primaryLight,
               onSecondary: onPrimaryLight,
               error: Color(0xFFFF3B30),
@@ -343,6 +327,7 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
       return ThemeData(
         colorScheme: cs,
         useMaterial3: true,
+        fontFamily: '.AppleSystemUIFont',
         dividerColor: outlineVariant,
         dividerTheme: DividerThemeData(
           color: outlineVariant,
@@ -373,8 +358,18 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
         themeMode: ThemeMode.system,
-        home: _splashDone
-            ? Consumer<app_state.AppStateProvider>(
+        home: Builder(
+          builder: (ctx) {
+            final brightness = Theme.of(ctx).brightness;
+            return MacosTheme(
+              data: brightness == Brightness.dark
+                  ? MacosThemeData.dark().copyWith(
+                      primaryColor: const Color(0xFF0A84FF),
+                    )
+                  : MacosThemeData.light().copyWith(
+                      primaryColor: const Color(0xFF007AFF),
+                    ),
+              child: Consumer<app_state.AppStateProvider>(
                 builder: (context, state, _) {
                   if (state.connection ==
                       app_state.ConnectionState.unconfigured) {
@@ -382,8 +377,10 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
                   }
                   return const MainPanel();
                 },
-              )
-            : SplashScreen(onDismiss: _finishSplash),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

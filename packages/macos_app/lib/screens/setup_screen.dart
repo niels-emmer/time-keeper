@@ -1,4 +1,6 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:macos_ui/macos_ui.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart' as app_state;
 import '../services/api_service.dart';
@@ -35,7 +37,6 @@ class _SetupScreenState extends State<SetupScreen> {
     setState(() { _testing = true; _testError = null; });
 
     try {
-      // Quick connectivity test before saving
       final testApi = ApiService(baseUrl: url, token: token);
       final ok = await testApi.checkHealth();
       if (!ok) throw const NetworkError('Health check failed — check the URL');
@@ -59,9 +60,9 @@ class _SetupScreenState extends State<SetupScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      backgroundColor: cs.surface,
-      body: Center(
+    return ColoredBox(
+      color: cs.surface,
+      child: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 340),
           padding: const EdgeInsets.all(24),
@@ -108,24 +109,9 @@ class _SetupScreenState extends State<SetupScreen> {
                       fontWeight: FontWeight.w500,
                       color: cs.onSurface)),
               const SizedBox(height: 4),
-              TextField(
+              MacosTextField(
                 controller: _urlController,
-                decoration: InputDecoration(
-                  hintText: 'https://api.timekeeper.yourdomain.com',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: cs.outlineVariant),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: cs.outlineVariant),
-                  ),
-                  filled: true,
-                  fillColor: cs.surfaceContainerLow,
-                  isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                ),
+                placeholder: 'https://api.timekeeper.yourdomain.com',
                 autocorrect: false,
                 keyboardType: TextInputType.url,
                 style: const TextStyle(fontSize: 13),
@@ -139,57 +125,41 @@ class _SetupScreenState extends State<SetupScreen> {
                       fontWeight: FontWeight.w500,
                       color: cs.onSurface)),
               const SizedBox(height: 4),
-              TextField(
+              MacosTextField(
                 controller: _tokenController,
+                placeholder: 'Paste your token here',
                 obscureText: !_tokenVisible,
-                decoration: InputDecoration(
-                  hintText: 'Paste your token here',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: cs.outlineVariant),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: cs.outlineVariant),
-                  ),
-                  filled: true,
-                  fillColor: cs.surfaceContainerLow,
-                  isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                        _tokenVisible
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                        size: 18),
-                    onPressed: () =>
-                        setState(() => _tokenVisible = !_tokenVisible),
+                suffix: GestureDetector(
+                  onTap: () => setState(() => _tokenVisible = !_tokenVisible),
+                  child: Icon(
+                    _tokenVisible
+                        ? CupertinoIcons.eye_slash
+                        : CupertinoIcons.eye,
+                    size: 16,
+                    color: cs.onSurfaceVariant,
                   ),
                 ),
-                style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                style: const TextStyle(fontSize: 13, fontFamily: 'Menlo'),
               ),
 
               if (_testError != null) ...[
                 const SizedBox(height: 10),
                 Text(
                   _testError!,
-                  style: const TextStyle(fontSize: 12, color: Colors.red),
+                  style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.error),
                 ),
               ],
 
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
-                child: FilledButton(
+                child: PushButton(
+                  controlSize: ControlSize.large,
                   onPressed: _testing ? null : _connect,
                   child: _testing
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
+                      ? const ProgressCircle(value: null, radius: 8)
                       : const Text('Connect'),
                 ),
               ),

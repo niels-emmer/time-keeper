@@ -1,4 +1,6 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:macos_ui/macos_ui.dart';
 import 'package:provider/provider.dart';
 // Alias to avoid naming conflict with Flutter's built-in ConnectionState enum
 import '../providers/app_state.dart' as app_state;
@@ -14,6 +16,7 @@ class SettingsTab extends StatefulWidget {
 
 class _SettingsTabState extends State<SettingsTab> {
   bool _disconnecting = false;
+  bool _disconnectHovered = false;
 
   @override
   void initState() {
@@ -57,32 +60,35 @@ class _SettingsTabState extends State<SettingsTab> {
         const _SectionHeader('Account'),
         _GroupedSection(
           children: [
-            InkWell(
-              onTap: _disconnecting ? null : _disconnect,
-              borderRadius: BorderRadius.circular(10),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 12),
-                child: Row(
-                  children: [
-                    Text(
-                      'Disconnect',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.red.shade400,
-                      ),
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              onEnter: (_) => setState(() => _disconnectHovered = true),
+              onExit: (_) => setState(() => _disconnectHovered = false),
+              child: GestureDetector(
+                onTap: _disconnecting ? null : _disconnect,
+                child: AnimatedOpacity(
+                  opacity: _disconnectHovered ? 0.65 : 1.0,
+                  duration: const Duration(milliseconds: 80),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 12),
+                    child: Row(
+                      children: [
+                        Text(
+                          'Disconnect',
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.red.shade400,
+                          ),
+                        ),
+                        const Spacer(),
+                        _disconnecting
+                            ? const ProgressCircle(value: null, radius: 9)
+                            : Icon(CupertinoIcons.square_arrow_left,
+                                size: 16, color: Colors.red.shade400),
+                      ],
                     ),
-                    const Spacer(),
-                    _disconnecting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child:
-                                CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : Icon(Icons.logout,
-                            size: 16, color: Colors.red.shade400),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -198,7 +204,9 @@ class _ConnectionCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   appState.connectionError,
-                  style: const TextStyle(fontSize: 11, color: Colors.red),
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context).colorScheme.error),
                 ),
               ],
             ],
@@ -261,21 +269,15 @@ class _WorkWeekCardState extends State<_WorkWeekCard> {
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-              SliderTheme(
-                data: SliderTheme.of(context).copyWith(
-                  trackHeight: 2,
-                  overlayShape: SliderComponentShape.noOverlay,
-                ),
-                child: Slider(
-                  value: _goalHours.toDouble(),
-                  min: 0,
-                  max: 40,
-                  divisions: 40,
-                  onChanged: (v) =>
-                      setState(() => _goalHours = v.round()),
-                  onChangeEnd: (_) => _save(),
-                ),
+              const SizedBox(height: 6),
+              MacosSlider(
+                value: _goalHours.toDouble(),
+                min: 0,
+                max: 40,
+                onChanged: (v) {
+                  setState(() => _goalHours = v.round());
+                  _save();
+                },
               ),
             ],
           ),

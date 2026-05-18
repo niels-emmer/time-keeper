@@ -31,6 +31,12 @@ dependencies:
   # ISO week number utilities
   intl: ^0.19.0
 
+  # macOS-native UI components (segmented control, text fields, buttons, sliders)
+  macos_ui: ^2.0.0
+
+  # SF Symbol / Cupertino icon set
+  cupertino_icons: ^1.0.6
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
