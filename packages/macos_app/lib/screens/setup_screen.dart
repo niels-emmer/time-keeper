@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart' as app_state;
@@ -35,7 +36,6 @@ class _SetupScreenState extends State<SetupScreen> {
     setState(() { _testing = true; _testError = null; });
 
     try {
-      // Quick connectivity test before saving
       final testApi = ApiService(baseUrl: url, token: token);
       final ok = await testApi.checkHealth();
       if (!ok) throw const NetworkError('Health check failed — check the URL');
@@ -59,9 +59,14 @@ class _SetupScreenState extends State<SetupScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      backgroundColor: cs.surface,
-      body: Center(
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
+    final fieldBg = isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7);
+    final borderColor = isDark ? const Color(0x1AFFFFFF) : const Color(0x1A000000);
+
+    return Material(
+      color: cs.surface,
+      child: Center(
         child: Container(
           constraints: const BoxConstraints(maxWidth: 340),
           padding: const EdgeInsets.all(24),
@@ -83,10 +88,13 @@ class _SetupScreenState extends State<SetupScreen> {
               ),
               const SizedBox(height: 16),
 
-              const Center(
+              Center(
                 child: Text(
                   'Connect to Time Keeper',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface),
                 ),
               ),
               const SizedBox(height: 6),
@@ -108,27 +116,20 @@ class _SetupScreenState extends State<SetupScreen> {
                       fontWeight: FontWeight.w500,
                       color: cs.onSurface)),
               const SizedBox(height: 4),
-              TextField(
+              CupertinoTextField(
                 controller: _urlController,
-                decoration: InputDecoration(
-                  hintText: 'https://api.timekeeper.yourdomain.com',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: cs.outlineVariant),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: cs.outlineVariant),
-                  ),
-                  filled: true,
-                  fillColor: cs.surfaceContainerLow,
-                  isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                ),
+                placeholder: 'https://api.timekeeper.yourdomain.com',
                 autocorrect: false,
                 keyboardType: TextInputType.url,
-                style: const TextStyle(fontSize: 13),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                decoration: BoxDecoration(
+                  color: fieldBg,
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: borderColor, width: 0.5),
+                ),
+                style: TextStyle(fontSize: 13, color: cs.onSurface),
+                placeholderStyle: TextStyle(
+                    fontSize: 13, color: cs.onSurfaceVariant),
               ),
               const SizedBox(height: 14),
 
@@ -139,58 +140,53 @@ class _SetupScreenState extends State<SetupScreen> {
                       fontWeight: FontWeight.w500,
                       color: cs.onSurface)),
               const SizedBox(height: 4),
-              TextField(
+              CupertinoTextField(
                 controller: _tokenController,
+                placeholder: 'Paste your token here',
                 obscureText: !_tokenVisible,
-                decoration: InputDecoration(
-                  hintText: 'Paste your token here',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: cs.outlineVariant),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                    borderSide: BorderSide(color: cs.outlineVariant),
-                  ),
-                  filled: true,
-                  fillColor: cs.surfaceContainerLow,
-                  isDense: true,
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                        _tokenVisible
-                            ? Icons.visibility_off
-                            : Icons.visibility,
-                        size: 18),
-                    onPressed: () =>
-                        setState(() => _tokenVisible = !_tokenVisible),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                decoration: BoxDecoration(
+                  color: fieldBg,
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: borderColor, width: 0.5),
+                ),
+                suffix: Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () => setState(() => _tokenVisible = !_tokenVisible),
+                    child: Icon(
+                      _tokenVisible
+                          ? CupertinoIcons.eye_slash
+                          : CupertinoIcons.eye,
+                      size: 16,
+                      color: cs.onSurfaceVariant,
+                    ),
                   ),
                 ),
-                style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                style: TextStyle(
+                    fontSize: 13, fontFamily: 'Menlo', color: cs.onSurface),
+                placeholderStyle: TextStyle(
+                    fontSize: 13, color: cs.onSurfaceVariant),
               ),
 
               if (_testError != null) ...[
                 const SizedBox(height: 10),
                 Text(
                   _testError!,
-                  style: const TextStyle(fontSize: 12, color: Colors.red),
+                  style: TextStyle(fontSize: 12, color: cs.error),
                 ),
               ],
 
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
-                child: FilledButton(
+                child: CupertinoButton.filled(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                   onPressed: _testing ? null : _connect,
                   child: _testing
-                      ? const SizedBox(
-                          height: 16,
-                          width: 16,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.white),
-                        )
-                      : const Text('Connect'),
+                      ? const CupertinoActivityIndicator(color: Colors.white)
+                      : const Text('Connect',
+                          style: TextStyle(fontSize: 15)),
                 ),
               ),
             ],

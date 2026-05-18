@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
@@ -75,6 +76,7 @@ class _ActiveTimerCard extends StatelessWidget {
     final cat = state.categoryById(entry.categoryId);
     final color = cat != null ? _hexColor(cat.color) : const Color(0xFF6366F1);
     final elapsed = state.elapsedHHMM;
+    final cs = Theme.of(context).colorScheme;
 
     return Container(
       color: color.withValues(alpha: 0.06),
@@ -93,8 +95,10 @@ class _ActiveTimerCard extends StatelessWidget {
               children: [
                 Text(
                   cat?.name ?? 'Unknown',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 13),
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: cs.onSurface),
                 ),
                 Text(
                   cat?.workdayCode != null
@@ -109,19 +113,44 @@ class _ActiveTimerCard extends StatelessWidget {
               ],
             ),
           ),
-          TextButton(
-            onPressed: state.stopTimer,
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              minimumSize: Size.zero,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              textStyle:
-                  const TextStyle(fontSize: 12, fontWeight: FontWeight.w500),
-            ),
-            child: const Text('Stop'),
-          ),
+          _StopButton(onPressed: state.stopTimer),
         ],
+      ),
+    );
+  }
+}
+
+class _StopButton extends StatefulWidget {
+  final VoidCallback onPressed;
+  const _StopButton({required this.onPressed});
+
+  @override
+  State<_StopButton> createState() => _StopButtonState();
+}
+
+class _StopButtonState extends State<_StopButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedOpacity(
+          opacity: _hovered ? 0.65 : 1.0,
+          duration: const Duration(milliseconds: 80),
+          child: Text(
+            'Stop',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.red.shade400,
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -143,78 +172,74 @@ class _TkCategoryCard extends StatelessWidget {
     final color = _hexColor(category.color);
     final cs = Theme.of(context).colorScheme;
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        decoration: BoxDecoration(
-          color: isActive
-              ? color.withValues(alpha: 0.15)
-              : cs.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.08),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
-          child: Row(
-            children: [
-              // Left color bar
-              Container(
-                width: 3,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: isActive ? 1.0 : 0.5),
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(8),
-                    bottomLeft: Radius.circular(8),
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            color: isActive
+                ? color.withValues(alpha: 0.15)
+                : cs.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Row(
+              children: [
+                // Left color bar
+                Container(
+                  width: 3,
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: isActive ? 1.0 : 0.5),
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(8),
+                      bottomLeft: Radius.circular(8),
+                    ),
                   ),
                 ),
-              ),
-              // Card content
-              Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 10, vertical: 8),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              category.name,
-                              style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w500,
-                                  color: cs.onSurface),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (category.workdayCode != null)
+                // Card content
+                Expanded(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 8),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
                               Text(
-                                category.workdayCode!,
+                                category.name,
                                 style: TextStyle(
-                                    fontSize: 10,
-                                    color: cs.onSurface
-                                        .withValues(alpha: 0.5)),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w500,
+                                    color: cs.onSurface),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
-                          ],
+                              if (category.workdayCode != null)
+                                Text(
+                                  category.workdayCode!,
+                                  style: TextStyle(
+                                      fontSize: 10,
+                                      color: cs.onSurface
+                                          .withValues(alpha: 0.5)),
+                                ),
+                            ],
+                          ),
                         ),
-                      ),
-                      if (isActive)
-                        Icon(Icons.stop_circle_outlined,
-                            color: color, size: 16),
-                    ],
+                        if (isActive)
+                          Icon(CupertinoIcons.stop_circle,
+                              color: color, size: 16),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

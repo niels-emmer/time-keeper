@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -33,6 +34,7 @@ class _WeeklyTabState extends State<WeeklyTab> {
   bool _loading = false;
   String? _error;
   bool _copied = false;
+  bool _copyHovered = false;
   String? _actionMessage;
   _EditingCell? _editingCell;
   final Map<String, int> _localOverrides = {};
@@ -275,6 +277,7 @@ class _WeeklyTabState extends State<WeeklyTab> {
     final weekLabel =
         '${DateFormat('d MMM').format(monday)} – ${DateFormat('d MMM').format(endOfWeek)}';
     final isCurrentWeek = _isoWeek(_referenceDate) == _isoWeek(DateTime.now());
+    final cs = Theme.of(context).colorScheme;
 
     return Column(
       children: [
@@ -283,12 +286,9 @@ class _WeeklyTabState extends State<WeeklyTab> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              IconButton(
+              _NavButton(
+                icon: CupertinoIcons.chevron_left,
                 onPressed: _prevWeek,
-                icon: const Icon(Icons.chevron_left),
-                iconSize: 20,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               ),
               Column(
                 children: [
@@ -304,24 +304,22 @@ class _WeeklyTabState extends State<WeeklyTab> {
                       '${_fmtHours(_summary!.totalMinutes.toDouble())} / ${_fmtHours(_summary!.goalMinutes.toDouble())}',
                       style: TextStyle(
                         fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                 ],
               ),
-              IconButton(
+              _NavButton(
+                icon: CupertinoIcons.chevron_right,
                 onPressed: isCurrentWeek ? null : _nextWeek,
-                icon: const Icon(Icons.chevron_right),
-                iconSize: 20,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
               ),
             ],
           ),
         ),
-        const Divider(height: 1),
+        Divider(height: 1, thickness: 0.5, color: cs.outlineVariant),
         if (_loading)
-          const Expanded(child: Center(child: CircularProgressIndicator()))
+          const Expanded(
+              child: Center(child: CupertinoActivityIndicator()))
         else if (_error != null)
           Expanded(
             child: Center(
@@ -330,10 +328,13 @@ class _WeeklyTabState extends State<WeeklyTab> {
                 children: [
                   Text(
                     _error!,
-                    style: const TextStyle(color: Colors.red, fontSize: 12),
+                    style: TextStyle(color: cs.error, fontSize: 12),
                   ),
                   const SizedBox(height: 8),
-                  TextButton(onPressed: _load, child: const Text('Retry')),
+                  _NavButton(
+                    label: 'Retry',
+                    onPressed: _load,
+                  ),
                 ],
               ),
             ),
@@ -345,7 +346,7 @@ class _WeeklyTabState extends State<WeeklyTab> {
                 'No categories yet.\nCreate some in the web app.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: cs.onSurfaceVariant,
                   fontSize: 13,
                 ),
               ),
@@ -357,7 +358,7 @@ class _WeeklyTabState extends State<WeeklyTab> {
               child: Text(
                 'No entries this week',
                 style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  color: cs.onSurfaceVariant,
                   fontSize: 13,
                 ),
               ),
@@ -370,7 +371,7 @@ class _WeeklyTabState extends State<WeeklyTab> {
               'Click a total cell to adjust that day/category total directly. Click a day header to inspect, edit, delete, or backfill the actual entries for that day.',
               style: TextStyle(
                 fontSize: 12,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: cs.onSurfaceVariant,
               ),
             ),
           ),
@@ -387,7 +388,7 @@ class _WeeklyTabState extends State<WeeklyTab> {
               onDayHeaderTap: _openDayLog,
             ),
           ),
-          const Divider(height: 1),
+          Divider(height: 1, thickness: 0.5, color: cs.outlineVariant),
           Padding(
             padding: const EdgeInsets.all(10),
             child: Column(
@@ -402,27 +403,36 @@ class _WeeklyTabState extends State<WeeklyTab> {
                       ),
                     ),
                     const Spacer(),
-                    TextButton.icon(
-                      onPressed: _copyToClipboard,
-                      icon: Icon(
-                        _copied ? Icons.check : Icons.copy,
-                        size: 14,
-                        color: _copied ? Colors.green : null,
-                      ),
-                      label: Text(
-                        _copied ? 'Copied!' : 'Copy',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _copied ? Colors.green : null,
+                    MouseRegion(
+                      cursor: SystemMouseCursors.click,
+                      onEnter: (_) => setState(() => _copyHovered = true),
+                      onExit: (_) => setState(() => _copyHovered = false),
+                      child: GestureDetector(
+                        onTap: _copyToClipboard,
+                        child: AnimatedOpacity(
+                          opacity: _copyHovered ? 0.65 : 1.0,
+                          duration: const Duration(milliseconds: 80),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                _copied
+                                    ? CupertinoIcons.checkmark
+                                    : CupertinoIcons.doc_on_clipboard,
+                                size: 14,
+                                color: _copied ? Colors.green : cs.onSurfaceVariant,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _copied ? 'Copied!' : 'Copy',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _copied ? Colors.green : cs.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
                     ),
                   ],
@@ -435,7 +445,7 @@ class _WeeklyTabState extends State<WeeklyTab> {
                       _actionMessage!,
                       style: TextStyle(
                         fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        color: cs.onSurfaceVariant,
                       ),
                     ),
                   ),
@@ -622,32 +632,34 @@ class _DayHeaderCell extends StatelessWidget {
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
-          child: Column(
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: cs.onSurfaceVariant,
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 2),
+            child: Column(
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: cs.onSurfaceVariant,
+                  ),
                 ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                date.substring(5),
-                style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                'Log',
-                style: TextStyle(fontSize: 10, color: cs.primary),
-              ),
-            ],
+                const SizedBox(height: 2),
+                Text(
+                  date.substring(5),
+                  style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Log',
+                  style: TextStyle(fontSize: 10, color: cs.primary),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -691,17 +703,20 @@ class _EditableSummaryCell extends StatelessWidget {
       );
     }
 
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
-        child: Text(
-          displayText,
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 12,
-            color: Theme.of(context).colorScheme.onSurface,
-            fontFeatures: const [FontFeature.tabularFigures()],
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 2),
+          child: Text(
+            displayText,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: Theme.of(context).colorScheme.onSurface,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
           ),
         ),
       ),
@@ -773,7 +788,7 @@ class _InlineEditFieldState extends State<_InlineEditField> {
         }
         return KeyEventResult.ignored;
       },
-      child: TextField(
+      child: CupertinoTextField(
         controller: _controller,
         focusNode: _focusNode,
         onChanged: widget.onChanged,
@@ -785,15 +800,10 @@ class _InlineEditFieldState extends State<_InlineEditField> {
         keyboardType:
             const TextInputType.numberWithOptions(decimal: true, signed: false),
         textAlign: TextAlign.center,
-        decoration: InputDecoration(
-          isDense: true,
-          contentPadding:
-              const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-        style: const TextStyle(fontSize: 12),
+        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+        style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurface),
       ),
     );
   }
@@ -879,6 +889,63 @@ class _CategoryCell extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Small hover-opacity button used for navigation arrows and inline actions.
+class _NavButton extends StatefulWidget {
+  final IconData? icon;
+  final String? label;
+  final VoidCallback? onPressed;
+
+  const _NavButton({this.icon, this.label, required this.onPressed})
+      : assert(icon != null || label != null);
+
+  @override
+  State<_NavButton> createState() => _NavButtonState();
+}
+
+class _NavButtonState extends State<_NavButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final disabled = widget.onPressed == null;
+    return MouseRegion(
+      cursor:
+          disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      onEnter: (_) { if (!disabled) setState(() => _hovered = true); },
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedOpacity(
+          opacity: disabled ? 0.3 : (_hovered ? 0.6 : 1.0),
+          duration: const Duration(milliseconds: 80),
+          child: Container(
+            constraints: widget.icon != null
+                ? const BoxConstraints(
+                    minWidth: 28, minHeight: 28,
+                    maxWidth: 28, maxHeight: 28)
+                : null,
+            padding: widget.label != null
+                ? const EdgeInsets.symmetric(horizontal: 10, vertical: 5)
+                : EdgeInsets.zero,
+            decoration: widget.label != null
+                ? BoxDecoration(
+                    border: Border.all(color: cs.outlineVariant),
+                    borderRadius: BorderRadius.circular(6),
+                  )
+                : null,
+            child: widget.icon != null
+                ? Icon(widget.icon, size: 16, color: cs.onSurface)
+                : Text(widget.label!,
+                    style:
+                        TextStyle(fontSize: 12, color: cs.onSurface)),
+          ),
+        ),
       ),
     );
   }
