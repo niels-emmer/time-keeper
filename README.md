@@ -29,7 +29,7 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
 - **Weekly overview** — time per category per day; click any cell to edit hours inline (totals update live as you type), open day logs to inspect/edit/delete the actual entries, backfill missed work, review the week, and copy or download CSV/plain-text/compact handoff formats
 - **End-of-day rounding** — round tracked minutes up to the nearest 30 or 60 minutes (configurable), capped at your weekly goal
 - **Light / dark / system theme** — follows your OS preference by default; override per-device in Settings
-- **PWA** — installable on macOS and Android, runs in standalone mode (no browser chrome), shows an in-app update banner when a new version is ready, and surfaces connectivity status/reconnect feedback
+- **PWA** — installable on macOS and Android, runs in standalone mode (no browser chrome), automatically checks for a new version when the app opens or resumes, shows an in-app update banner when one is ready, and surfaces connectivity status/reconnect feedback
 - **macOS status bar app** — native Flutter app lives in the menu bar; icon shows active timer color + `CODE hh:mm`; click to open a popover panel with full Track / Weekly / Settings functionality
 - **Self-hosted** — runs in Docker, no external services or accounts required beyond your own Authentik instance
 - **Personal access tokens** — browser-created tokens for the native app, shown once, hashed at rest, and expiring after one year
