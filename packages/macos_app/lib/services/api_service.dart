@@ -1,10 +1,12 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
 /// Thrown when the API returns 401 or 403 (expired or invalid token).
 class AuthError implements Exception {
   final int status;
   const AuthError(this.status);
+
   @override
   String toString() => 'AuthError(HTTP $status)';
 }
@@ -13,6 +15,7 @@ class AuthError implements Exception {
 class NetworkError implements Exception {
   final String message;
   const NetworkError(this.message);
+
   @override
   String toString() => 'NetworkError: $message';
 }
@@ -48,12 +51,16 @@ class TimeEntry {
   final int categoryId;
   final String startTime; // UTC ISO 8601
   final String? endTime;
+  final String? notes;
+  final bool rounded;
 
   const TimeEntry({
     required this.id,
     required this.categoryId,
     required this.startTime,
     this.endTime,
+    this.notes,
+    required this.rounded,
   });
 
   factory TimeEntry.fromJson(Map<String, dynamic> j) => TimeEntry(
@@ -61,6 +68,8 @@ class TimeEntry {
         categoryId: j['categoryId'] as int,
         startTime: j['startTime'] as String,
         endTime: j['endTime'] as String?,
+        notes: j['notes'] as String?,
+        rounded: j['rounded'] as bool? ?? false,
       );
 }
 
@@ -78,82 +87,79 @@ class TimerStatus {
       );
 }
 
+class WeeklyCategorySummary {
+  final int categoryId;
+  final String name;
+  final String color;
+  final String? workdayCode;
+  final int minutes;
+  final double roundedHours;
+
+  const WeeklyCategorySummary({
+    required this.categoryId,
+    required this.name,
+    required this.color,
+    required this.workdayCode,
+    required this.minutes,
+    required this.roundedHours,
+  });
+
+  factory WeeklyCategorySummary.fromJson(Map<String, dynamic> j) =>
+      WeeklyCategorySummary(
+        categoryId: j['categoryId'] as int,
+        name: j['name'] as String,
+        color: j['color'] as String,
+        workdayCode: j['workdayCode'] as String?,
+        minutes: j['minutes'] as int,
+        roundedHours: (j['roundedHours'] as num).toDouble(),
+      );
+}
+
 class WeeklyDay {
-  final String date;       // YYYY-MM-DD
-  final String dayName;    // "Mon", "Tue", …
-  final Map<int, double> minutesByCategory; // categoryId → minutes
-  final double totalMinutes;
+  final String date; // YYYY-MM-DD
+  final int totalMinutes;
+  final int goalMinutes;
+  final List<WeeklyCategorySummary> categories;
 
   const WeeklyDay({
     required this.date,
-    required this.dayName,
-    required this.minutesByCategory,
     required this.totalMinutes,
+    required this.goalMinutes,
+    required this.categories,
   });
+
+  factory WeeklyDay.fromJson(Map<String, dynamic> j) => WeeklyDay(
+        date: j['date'] as String,
+        totalMinutes: j['totalMinutes'] as int,
+        goalMinutes: j['goalMinutes'] as int,
+        categories: (j['categories'] as List)
+            .map((item) =>
+                WeeklyCategorySummary.fromJson(item as Map<String, dynamic>))
+            .toList(),
+      );
 }
 
 class WeeklySummary {
   final String week;
+  final int totalMinutes;
+  final int goalMinutes;
   final List<WeeklyDay> days;
-  final Map<int, double> totalByCategory;
-  final double grandTotal;
 
   const WeeklySummary({
     required this.week,
+    required this.totalMinutes,
+    required this.goalMinutes,
     required this.days,
-    required this.totalByCategory,
-    required this.grandTotal,
   });
 
-  factory WeeklySummary.fromJson(Map<String, dynamic> j) {
-    final days = (j['days'] as List)
-        .map((d) => _dayFromJson(d as Map<String, dynamic>))
-        .toList();
-
-    final Map<int, double> totals = {};
-    for (final day in days) {
-      day.minutesByCategory.forEach((catId, mins) {
-        totals[catId] = (totals[catId] ?? 0) + mins;
-      });
-    }
-    final grandTotal = totals.values.fold(0.0, (a, b) => a + b);
-
-    return WeeklySummary(
-      week: j['week'] as String,
-      days: days,
-      totalByCategory: totals,
-      grandTotal: grandTotal,
-    );
-  }
-
-  static WeeklyDay _dayFromJson(Map<String, dynamic> j) {
-    final date = j['date'] as String;
-    final entriesByCategory = j['entriesByCategory'] as Map<String, dynamic>? ?? {};
-    final Map<int, double> minutesByCategory = {};
-
-    entriesByCategory.forEach((catIdStr, entries) {
-      final catId = int.parse(catIdStr);
-      double total = 0;
-      for (final e in (entries as List)) {
-        total += (e['durationMinutes'] as num).toDouble();
-      }
-      if (total > 0) minutesByCategory[catId] = total;
-    });
-
-    final totalMinutes = minutesByCategory.values.fold(0.0, (a, b) => a + b);
-
-    // derive a short day name from the date
-    final dt = DateTime.parse(date);
-    const dayNames = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    final dayName = dayNames[dt.weekday - 1];
-
-    return WeeklyDay(
-      date: date,
-      dayName: dayName,
-      minutesByCategory: minutesByCategory,
-      totalMinutes: totalMinutes,
-    );
-  }
+  factory WeeklySummary.fromJson(Map<String, dynamic> j) => WeeklySummary(
+        week: j['week'] as String,
+        totalMinutes: j['totalMinutes'] as int,
+        goalMinutes: j['goalMinutes'] as int,
+        days: (j['days'] as List)
+            .map((item) => WeeklyDay.fromJson(item as Map<String, dynamic>))
+            .toList(),
+      );
 }
 
 class AppInfo {
@@ -183,18 +189,39 @@ class UserSettings {
       );
 }
 
+class EntryPayload {
+  final int categoryId;
+  final String startTime;
+  final String endTime;
+  final String? notes;
+
+  const EntryPayload({
+    required this.categoryId,
+    required this.startTime,
+    required this.endTime,
+    this.notes,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'categoryId': categoryId,
+        'startTime': startTime,
+        'endTime': endTime,
+        'notes': notes,
+      };
+}
+
 // ── API client ───────────────────────────────────────────────────────────────
 
 class ApiService {
-  final String baseUrl;   // e.g. https://api.timekeeper.yourdomain.com
+  final String baseUrl; // e.g. https://api.timekeeper.yourdomain.com
   final String token;
 
   ApiService({required this.baseUrl, required this.token});
 
   Map<String, String> get _headers => {
-    'Content-Type': 'application/json',
-    'Authorization': 'Bearer $token',
-  };
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $token',
+      };
 
   Future<dynamic> _request(
     String method,
@@ -206,31 +233,50 @@ class ApiService {
     if (query != null) uri = uri.replace(queryParameters: query);
 
     try {
-      final http.Response res;
+      final http.Response response;
       switch (method) {
         case 'GET':
-          res = await http.get(uri, headers: _headers);
+          response = await http.get(uri, headers: _headers);
+          break;
         case 'POST':
-          res = await http.post(uri, headers: _headers, body: json.encode(body ?? {}));
+          response = await http.post(
+            uri,
+            headers: _headers,
+            body: json.encode(body ?? {}),
+          );
+          break;
         case 'PUT':
-          res = await http.put(uri, headers: _headers, body: json.encode(body ?? {}));
+          response = await http.put(
+            uri,
+            headers: _headers,
+            body: json.encode(body ?? {}),
+          );
+          break;
         case 'PATCH':
-          res = await http.patch(uri, headers: _headers, body: json.encode(body ?? {}));
+          response = await http.patch(
+            uri,
+            headers: _headers,
+            body: json.encode(body ?? {}),
+          );
+          break;
         case 'DELETE':
-          res = await http.delete(uri, headers: _headers);
+          response = await http.delete(uri, headers: _headers);
+          break;
         default:
           throw ArgumentError('Unknown HTTP method: $method');
       }
 
-      if (res.statusCode == 401 || res.statusCode == 403) {
-        throw AuthError(res.statusCode);
+      if (response.statusCode == 401 || response.statusCode == 403) {
+        throw AuthError(response.statusCode);
       }
-      if (res.statusCode == 204) return null;
-      if (!_isOk(res.statusCode)) {
-        final b = json.decode(res.body) as Map<String, dynamic>;
-        throw NetworkError(b['error'] as String? ?? 'HTTP ${res.statusCode}');
+      if (response.statusCode == 204) return null;
+      if (!_isOk(response.statusCode)) {
+        final bodyJson = json.decode(response.body) as Map<String, dynamic>;
+        throw NetworkError(
+          bodyJson['error'] as String? ?? 'HTTP ${response.statusCode}',
+        );
       }
-      return json.decode(res.body);
+      return json.decode(response.body);
     } on AuthError {
       rethrow;
     } on NetworkError {
@@ -262,7 +308,9 @@ class ApiService {
 
   Future<List<TkCategory>> listCategories() async {
     final data = await _request('GET', '/categories');
-    return (data as List).map((e) => TkCategory.fromJson(e as Map<String, dynamic>)).toList();
+    return (data as List)
+        .map((e) => TkCategory.fromJson(e as Map<String, dynamic>))
+        .toList();
   }
 
   // ── Timer ──────────────────────────────────────────────────────────────────
@@ -284,14 +332,48 @@ class ApiService {
 
   Future<List<TimeEntry>> listEntriesByDate(String date) async {
     final data = await _request('GET', '/entries', query: {'date': date});
-    return (data as List).map((e) => TimeEntry.fromJson(e as Map<String, dynamic>)).toList();
+    return (data as List)
+        .map((e) => TimeEntry.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<TimeEntry> createEntry(EntryPayload payload) async {
+    final data = await _request('POST', '/entries', body: payload.toJson());
+    return TimeEntry.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<TimeEntry> updateEntry(int id, EntryPayload payload) async {
+    final data =
+        await _request('PATCH', '/entries/$id', body: payload.toJson());
+    return TimeEntry.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteEntry(int id) async {
+    await _request('DELETE', '/entries/$id');
   }
 
   // ── Weekly summary ─────────────────────────────────────────────────────────
 
   Future<WeeklySummary> getWeeklySummary(String week) async {
-    final data = await _request('GET', '/summary/weekly', query: {'week': week});
+    final data =
+        await _request('GET', '/summary/weekly', query: {'week': week});
     return WeeklySummary.fromJson(data as Map<String, dynamic>);
+  }
+
+  Future<void> adjustCell({
+    required String date,
+    required int categoryId,
+    required int minutes,
+  }) async {
+    await _request(
+      'PATCH',
+      '/summary/adjust-cell',
+      body: {
+        'date': date,
+        'categoryId': categoryId,
+        'minutes': minutes,
+      },
+    );
   }
 
   // ── Settings ───────────────────────────────────────────────────────────────

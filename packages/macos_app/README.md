@@ -9,7 +9,7 @@ A native macOS menu-bar app for [Time Keeper](../). Track time without opening a
 - **Right-click context menu**: start a timer for any category or stop the active one, without opening the panel
 - **Popover panel** (click the icon):
   - **Track tab** — category grid; tap to start/stop timers
-  - **Weekly tab** — hours by category × day; copy to clipboard for Workday
+  - **Weekly tab** — hours by category × day; inline cell editing, day-log repair/backfill dialog, and copy to clipboard for Workday
   - **Settings tab** — weekly goal, rounding increment, disconnect
 
 ## Prerequisites
@@ -62,8 +62,10 @@ lib/
     main_panel.dart        # Three-tab popover shell
   tabs/
     track_tab.dart         # Category grid + active timer
-    weekly_tab.dart        # Weekly summary table + copy
+    weekly_tab.dart        # Weekly summary table + inline edits + day-log entry points
     settings_tab.dart      # Settings + disconnect
+  widgets/
+    daily_log_dialog.dart  # Inspect/edit/delete/backfill actual entries for a selected day
 ```
 
 ## NPM / subdomain setup

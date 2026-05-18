@@ -38,7 +38,7 @@ function Section({
 
 export function Home() {
   const { data: timerStatus } = useTimer();
-  const { data: categories = [] } = useCategories();
+  const { data: categories = [], isFetched: hasFetchedCategories } = useCategories();
   const activeEntry = timerStatus?.active ? timerStatus.entry : undefined;
   const activeCategory = activeEntry
     ? categories.find((category) => category.id === activeEntry.categoryId)
@@ -54,8 +54,9 @@ export function Home() {
   }, [pinnedCategoryIds]);
 
   useEffect(() => {
+    if (!hasFetchedCategories) return;
     setPinnedCategoryIds((current) => current.filter((id) => categories.some((category) => category.id === id)));
-  }, [categories]);
+  }, [categories, hasFetchedCategories]);
 
   const pinnedSet = useMemo(() => new Set(pinnedCategoryIds), [pinnedCategoryIds]);
   const recentSet = useMemo(() => new Set(recentCategoryIds), [recentCategoryIds]);

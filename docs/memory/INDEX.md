@@ -43,6 +43,8 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `packages/frontend/src/lib/monthly.ts` | Monthly helpers — month navigation, hours formatting, focus ranking, and status metadata |
 | `packages/frontend/src/components/WeeklySummary.tsx` | Weekly tab — review panel, export-format picker + preview, editable hours-by-category table, day-log entry points, copy/download handoff formats, and round-week |
 | `packages/frontend/src/components/DailyLogDialog.tsx` | Day-level entry history UI — inspect actual entries, navigate dates, edit/delete completed entries, and backfill missed work |
+| `packages/macos_app/lib/tabs/weekly_tab.dart` | macOS Weekly tab — weekly totals table, inline cell editing, day-log launch points, and clipboard handoff |
+| `packages/macos_app/lib/widgets/daily_log_dialog.dart` | macOS day-log dialog — inspect, edit, delete, and backfill the underlying daily entries |
 | `packages/frontend/src/lib/weeklyExport.ts` | Weekly export utilities — format selection persistence plus CSV/plain-text/compact output builders |
 | `packages/frontend/src/components/CategoryManager.tsx` | Category CRUD + drag-to-reorder + A-Z sort; billable flag and target editor in the settings dialog |
 | `packages/frontend/src/components/WeeklyGoalSetting.tsx` | Settings UI for weekly goal (number input + slider) + rounding increment toggle |
