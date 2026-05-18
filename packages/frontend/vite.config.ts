@@ -16,6 +16,7 @@ const installAssetPaths = [
   'icons/icon-512x512.png',
   'icons/maskable-192x192.png',
   'icons/maskable-512x512.png',
+  'icons/notification-badge.svg',
   'icons/favicon.ico',
   'icons/apple-touch-icon.png',
   'icons/safari-pinned-tab.svg',
@@ -52,6 +53,7 @@ const installAssetHtmlReplacements = [
 export default defineConfig({
   define: {
     __INSTALL_NOTIFICATION_ICON_URL__: JSON.stringify(installAssetUrl('icons/icon-192x192.png')),
+    __INSTALL_NOTIFICATION_BADGE_URL__: JSON.stringify(installAssetUrl('icons/notification-badge.svg')),
   },
   plugins: [
     react(),

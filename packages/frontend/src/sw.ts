@@ -5,9 +5,10 @@
  * Vite-plugin-pwa injects the Workbox precache manifest into this file at
  * build time.  We extend it with:
  *
- *  - Notification lifecycle ownership: the SW polls /api/timer every 60 s
- *    and shows/refreshes a persistent "timer running" notification
- *    independently of whether any app window is open.
+ *  - Notification lifecycle ownership: the SW shows a persistent
+ *    "timer running" notification independently of whether any app window is
+ *    open, and polls /api/timer every 60 s on a best-effort basis so it can
+ *    clear stale notifications when the timer ends elsewhere.
  *
  *  - Notification action buttons: "Stop" calls POST /api/timer/stop directly
  *    from the SW so the timer can be stopped without opening the app.
@@ -26,6 +27,7 @@ import { NetworkFirst, NetworkOnly } from 'workbox-strategies';
 
 declare const self: ServiceWorkerGlobalScope;
 declare const __INSTALL_NOTIFICATION_ICON_URL__: string;
+declare const __INSTALL_NOTIFICATION_BADGE_URL__: string;
 
 // ── Workbox setup ──────────────────────────────────────────────────────────
 
@@ -48,7 +50,7 @@ registerRoute(
 
 // ── Constants ──────────────────────────────────────────────────────────────
 const NOTIFICATION_TAG = 'time-keeper-timer';
-const POLL_INTERVAL_MS = 60_000; // refresh notification every 60 s
+const POLL_INTERVAL_MS = 60_000; // best-effort timer-state recheck every 60 s
 
 // ── State ──────────────────────────────────────────────────────────────────
 let pollTimerId: ReturnType<typeof setTimeout> | null = null;
@@ -57,25 +59,16 @@ let currentStartTime: string | null = null;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function formatElapsed(startTime: string): string {
-  const elapsed = Math.floor((Date.now() - new Date(startTime).getTime()) / 1000);
-  const h = Math.floor(elapsed / 3600);
-  const m = Math.floor((elapsed % 3600) / 60);
-  const s = elapsed % 60;
-  return h > 0
-    ? `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
-    : `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
-}
-
 async function showNotification(categoryName: string, startTime: string): Promise<void> {
-  const timeStr = formatElapsed(startTime);
   await self.registration.showNotification('Time Keeper – timer running', {
     tag: NOTIFICATION_TAG,
-    body: `${categoryName}  ·  ${timeStr}`,
+    body: categoryName,
     icon: __INSTALL_NOTIFICATION_ICON_URL__,
-    badge: __INSTALL_NOTIFICATION_ICON_URL__,
+    badge: __INSTALL_NOTIFICATION_BADGE_URL__,
     silent: true,
+    renotify: false,
     requireInteraction: true,
+    timestamp: new Date(startTime).getTime(),
     data: { url: '/', categoryName, startTime },
     actions: [
       { action: 'stop', title: 'Stop timer' },
@@ -118,10 +111,10 @@ function schedulePoll(): void {
         return;
       }
 
-      // Timer still running — refresh notification with updated time
-      if (currentCategoryName && currentStartTime) {
-        await showNotification(currentCategoryName, currentStartTime);
-      }
+      // Timer still running — keep polling so we can clear the notification
+      // if the timer stops elsewhere. We intentionally avoid showing a live
+      // elapsed counter here because background SW timers are not reliable on
+      // Android and can leave stale durations in the drawer.
     } catch {
       // Network error — keep polling optimistically, don't clear notification
     }
@@ -178,8 +171,8 @@ self.addEventListener('activate', (event: ExtendableEvent) => {
           | { active: true; entry: { categoryId: number; startTime: string; categoryName?: string } };
 
         if (data.active) {
-          // We don't have the category name here — show a generic notification
-          // The page will send START_TRACKING with the full name once it loads
+          // We don't have the category name here — show a generic notification.
+          // The page will send START_TRACKING with the full name once it loads.
           const startTime = data.entry.startTime;
           currentStartTime = startTime;
           currentCategoryName = 'timer';
