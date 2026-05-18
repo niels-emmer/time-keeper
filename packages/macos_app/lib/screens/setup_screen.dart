@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:macos_ui/macos_ui.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart' as app_state;
 import '../services/api_service.dart';
@@ -60,7 +59,12 @@ class _SetupScreenState extends State<SetupScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return ColoredBox(
+    final brightness = Theme.of(context).brightness;
+    final isDark = brightness == Brightness.dark;
+    final fieldBg = isDark ? const Color(0xFF2C2C2E) : const Color(0xFFF2F2F7);
+    final borderColor = isDark ? const Color(0x1AFFFFFF) : const Color(0x1A000000);
+
+    return Material(
       color: cs.surface,
       child: Center(
         child: Container(
@@ -84,10 +88,13 @@ class _SetupScreenState extends State<SetupScreen> {
               ),
               const SizedBox(height: 16),
 
-              const Center(
+              Center(
                 child: Text(
                   'Connect to Time Keeper',
-                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w600,
+                      color: cs.onSurface),
                 ),
               ),
               const SizedBox(height: 6),
@@ -109,12 +116,20 @@ class _SetupScreenState extends State<SetupScreen> {
                       fontWeight: FontWeight.w500,
                       color: cs.onSurface)),
               const SizedBox(height: 4),
-              MacosTextField(
+              CupertinoTextField(
                 controller: _urlController,
                 placeholder: 'https://api.timekeeper.yourdomain.com',
                 autocorrect: false,
                 keyboardType: TextInputType.url,
-                style: const TextStyle(fontSize: 13),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                decoration: BoxDecoration(
+                  color: fieldBg,
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: borderColor, width: 0.5),
+                ),
+                style: TextStyle(fontSize: 13, color: cs.onSurface),
+                placeholderStyle: TextStyle(
+                    fontSize: 13, color: cs.onSurfaceVariant),
               ),
               const SizedBox(height: 14),
 
@@ -125,42 +140,53 @@ class _SetupScreenState extends State<SetupScreen> {
                       fontWeight: FontWeight.w500,
                       color: cs.onSurface)),
               const SizedBox(height: 4),
-              MacosTextField(
+              CupertinoTextField(
                 controller: _tokenController,
                 placeholder: 'Paste your token here',
                 obscureText: !_tokenVisible,
-                suffix: GestureDetector(
-                  onTap: () => setState(() => _tokenVisible = !_tokenVisible),
-                  child: Icon(
-                    _tokenVisible
-                        ? CupertinoIcons.eye_slash
-                        : CupertinoIcons.eye,
-                    size: 16,
-                    color: cs.onSurfaceVariant,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+                decoration: BoxDecoration(
+                  color: fieldBg,
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(color: borderColor, width: 0.5),
+                ),
+                suffix: Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: GestureDetector(
+                    onTap: () => setState(() => _tokenVisible = !_tokenVisible),
+                    child: Icon(
+                      _tokenVisible
+                          ? CupertinoIcons.eye_slash
+                          : CupertinoIcons.eye,
+                      size: 16,
+                      color: cs.onSurfaceVariant,
+                    ),
                   ),
                 ),
-                style: const TextStyle(fontSize: 13, fontFamily: 'Menlo'),
+                style: TextStyle(
+                    fontSize: 13, fontFamily: 'Menlo', color: cs.onSurface),
+                placeholderStyle: TextStyle(
+                    fontSize: 13, color: cs.onSurfaceVariant),
               ),
 
               if (_testError != null) ...[
                 const SizedBox(height: 10),
                 Text(
                   _testError!,
-                  style: TextStyle(
-                      fontSize: 12,
-                      color: Theme.of(context).colorScheme.error),
+                  style: TextStyle(fontSize: 12, color: cs.error),
                 ),
               ],
 
               const SizedBox(height: 20),
               SizedBox(
                 width: double.infinity,
-                child: PushButton(
-                  controlSize: ControlSize.large,
+                child: CupertinoButton.filled(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
                   onPressed: _testing ? null : _connect,
                   child: _testing
-                      ? const ProgressCircle(value: null, radius: 8)
-                      : const Text('Connect'),
+                      ? const CupertinoActivityIndicator(color: Colors.white)
+                      : const Text('Connect',
+                          style: TextStyle(fontSize: 15)),
                 ),
               ),
             ],

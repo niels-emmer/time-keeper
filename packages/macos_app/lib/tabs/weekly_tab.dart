@@ -2,7 +2,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
-import 'package:macos_ui/macos_ui.dart';
 import 'package:provider/provider.dart';
 
 import '../providers/app_state.dart';
@@ -287,13 +286,9 @@ class _WeeklyTabState extends State<WeeklyTab> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              MacosIconButton(
-                backgroundColor: Colors.transparent,
-                hoverColor: cs.surfaceContainerLow,
-                icon: const Icon(CupertinoIcons.chevron_left, size: 16),
+              _NavButton(
+                icon: CupertinoIcons.chevron_left,
                 onPressed: _prevWeek,
-                boxConstraints: const BoxConstraints(
-                    minWidth: 28, minHeight: 28, maxWidth: 28, maxHeight: 28),
               ),
               Column(
                 children: [
@@ -314,17 +309,9 @@ class _WeeklyTabState extends State<WeeklyTab> {
                     ),
                 ],
               ),
-              MacosIconButton(
-                backgroundColor: Colors.transparent,
-                hoverColor: cs.surfaceContainerLow,
-                icon: Icon(
-                  CupertinoIcons.chevron_right,
-                  size: 16,
-                  color: isCurrentWeek ? cs.onSurfaceVariant.withValues(alpha: 0.3) : null,
-                ),
+              _NavButton(
+                icon: CupertinoIcons.chevron_right,
                 onPressed: isCurrentWeek ? null : _nextWeek,
-                boxConstraints: const BoxConstraints(
-                    minWidth: 28, minHeight: 28, maxWidth: 28, maxHeight: 28),
               ),
             ],
           ),
@@ -332,7 +319,7 @@ class _WeeklyTabState extends State<WeeklyTab> {
         Divider(height: 1, thickness: 0.5, color: cs.outlineVariant),
         if (_loading)
           const Expanded(
-              child: Center(child: ProgressCircle(value: null)))
+              child: Center(child: CupertinoActivityIndicator()))
         else if (_error != null)
           Expanded(
             child: Center(
@@ -344,11 +331,9 @@ class _WeeklyTabState extends State<WeeklyTab> {
                     style: TextStyle(color: cs.error, fontSize: 12),
                   ),
                   const SizedBox(height: 8),
-                  PushButton(
-                    controlSize: ControlSize.small,
-                    secondary: true,
+                  _NavButton(
+                    label: 'Retry',
                     onPressed: _load,
-                    child: const Text('Retry'),
                   ),
                 ],
               ),
@@ -803,7 +788,7 @@ class _InlineEditFieldState extends State<_InlineEditField> {
         }
         return KeyEventResult.ignored;
       },
-      child: MacosTextField(
+      child: CupertinoTextField(
         controller: _controller,
         focusNode: _focusNode,
         onChanged: widget.onChanged,
@@ -816,7 +801,9 @@ class _InlineEditFieldState extends State<_InlineEditField> {
             const TextInputType.numberWithOptions(decimal: true, signed: false),
         textAlign: TextAlign.center,
         padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        style: const TextStyle(fontSize: 12),
+        style: TextStyle(
+            fontSize: 12,
+            color: Theme.of(context).colorScheme.onSurface),
       ),
     );
   }
@@ -902,6 +889,63 @@ class _CategoryCell extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// Small hover-opacity button used for navigation arrows and inline actions.
+class _NavButton extends StatefulWidget {
+  final IconData? icon;
+  final String? label;
+  final VoidCallback? onPressed;
+
+  const _NavButton({this.icon, this.label, required this.onPressed})
+      : assert(icon != null || label != null);
+
+  @override
+  State<_NavButton> createState() => _NavButtonState();
+}
+
+class _NavButtonState extends State<_NavButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final disabled = widget.onPressed == null;
+    return MouseRegion(
+      cursor:
+          disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      onEnter: (_) { if (!disabled) setState(() => _hovered = true); },
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedOpacity(
+          opacity: disabled ? 0.3 : (_hovered ? 0.6 : 1.0),
+          duration: const Duration(milliseconds: 80),
+          child: Container(
+            constraints: widget.icon != null
+                ? const BoxConstraints(
+                    minWidth: 28, minHeight: 28,
+                    maxWidth: 28, maxHeight: 28)
+                : null,
+            padding: widget.label != null
+                ? const EdgeInsets.symmetric(horizontal: 10, vertical: 5)
+                : EdgeInsets.zero,
+            decoration: widget.label != null
+                ? BoxDecoration(
+                    border: Border.all(color: cs.outlineVariant),
+                    borderRadius: BorderRadius.circular(6),
+                  )
+                : null,
+            child: widget.icon != null
+                ? Icon(widget.icon, size: 16, color: cs.onSurface)
+                : Text(widget.label!,
+                    style:
+                        TextStyle(fontSize: 12, color: cs.onSurface)),
+          ),
+        ),
       ),
     );
   }

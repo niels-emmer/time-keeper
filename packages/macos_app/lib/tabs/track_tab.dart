@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:macos_ui/macos_ui.dart';
 import 'package:provider/provider.dart';
 import '../providers/app_state.dart';
 import '../services/api_service.dart';
@@ -77,6 +76,7 @@ class _ActiveTimerCard extends StatelessWidget {
     final cat = state.categoryById(entry.categoryId);
     final color = cat != null ? _hexColor(cat.color) : const Color(0xFF6366F1);
     final elapsed = state.elapsedHHMM;
+    final cs = Theme.of(context).colorScheme;
 
     return Container(
       color: color.withValues(alpha: 0.06),
@@ -95,8 +95,10 @@ class _ActiveTimerCard extends StatelessWidget {
               children: [
                 Text(
                   cat?.name ?? 'Unknown',
-                  style: const TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 13),
+                  style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: cs.onSurface),
                 ),
                 Text(
                   cat?.workdayCode != null
@@ -111,20 +113,44 @@ class _ActiveTimerCard extends StatelessWidget {
               ],
             ),
           ),
-          PushButton(
-            controlSize: ControlSize.small,
-            secondary: true,
-            onPressed: state.stopTimer,
-            child: Text(
-              'Stop',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w500,
-                color: Colors.red.shade400,
-              ),
+          _StopButton(onPressed: state.stopTimer),
+        ],
+      ),
+    );
+  }
+}
+
+class _StopButton extends StatefulWidget {
+  final VoidCallback onPressed;
+  const _StopButton({required this.onPressed});
+
+  @override
+  State<_StopButton> createState() => _StopButtonState();
+}
+
+class _StopButtonState extends State<_StopButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onPressed,
+        child: AnimatedOpacity(
+          opacity: _hovered ? 0.65 : 1.0,
+          duration: const Duration(milliseconds: 80),
+          child: Text(
+            'Stop',
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: Colors.red.shade400,
             ),
           ),
-        ],
+        ),
       ),
     );
   }

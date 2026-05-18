@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:macos_ui/macos_ui.dart';
 import 'package:provider/provider.dart';
 // Alias to avoid naming conflict with Flutter's built-in ConnectionState enum
 import '../providers/app_state.dart' as app_state;
@@ -83,7 +82,7 @@ class _SettingsTabState extends State<SettingsTab> {
                         ),
                         const Spacer(),
                         _disconnecting
-                            ? const ProgressCircle(value: null, radius: 9)
+                            ? const CupertinoActivityIndicator()
                             : Icon(CupertinoIcons.square_arrow_left,
                                 size: 16, color: Colors.red.shade400),
                       ],
@@ -204,9 +203,7 @@ class _ConnectionCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(
                   appState.connectionError,
-                  style: TextStyle(
-                      fontSize: 11,
-                      color: Theme.of(context).colorScheme.error),
+                  style: TextStyle(fontSize: 11, color: cs.error),
                 ),
               ],
             ],
@@ -259,8 +256,8 @@ class _WorkWeekCardState extends State<_WorkWeekCard> {
             children: [
               Row(
                 children: [
-                  const Text('Weekly goal',
-                      style: TextStyle(fontSize: 13)),
+                  Text('Weekly goal',
+                      style: TextStyle(fontSize: 13, color: cs.onSurface)),
                   const Spacer(),
                   Text(
                     '${_goalHours}h',
@@ -269,15 +266,14 @@ class _WorkWeekCardState extends State<_WorkWeekCard> {
                   ),
                 ],
               ),
-              const SizedBox(height: 6),
-              MacosSlider(
+              const SizedBox(height: 4),
+              CupertinoSlider(
                 value: _goalHours.toDouble(),
                 min: 0,
                 max: 40,
-                onChanged: (v) {
-                  setState(() => _goalHours = v.round());
-                  _save();
-                },
+                divisions: 40,
+                onChanged: (v) => setState(() => _goalHours = v.round()),
+                onChangeEnd: (_) => _save(),
               ),
             ],
           ),
@@ -288,7 +284,8 @@ class _WorkWeekCardState extends State<_WorkWeekCard> {
               const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           child: Row(
             children: [
-              const Text('Rounding', style: TextStyle(fontSize: 13)),
+              Text('Rounding',
+                  style: TextStyle(fontSize: 13, color: cs.onSurface)),
               const Spacer(),
               Row(
                 children: [
@@ -320,6 +317,7 @@ class _ToggleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
@@ -327,25 +325,18 @@ class _ToggleButton extends StatelessWidget {
         padding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: selected
-              ? Theme.of(context).colorScheme.primary
-              : Colors.transparent,
+          color: selected ? cs.primary : Colors.transparent,
           borderRadius: BorderRadius.circular(6),
           border: Border.all(
-            color: selected
-                ? Theme.of(context).colorScheme.primary
-                : Theme.of(context).colorScheme.outlineVariant,
+            color: selected ? cs.primary : cs.outlineVariant,
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            color: selected
-                ? Theme.of(context).colorScheme.onPrimary
-                : Theme.of(context).colorScheme.onSurface,
-            fontWeight:
-                selected ? FontWeight.w600 : FontWeight.normal,
+            color: selected ? cs.onPrimary : cs.onSurface,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
           ),
         ),
       ),

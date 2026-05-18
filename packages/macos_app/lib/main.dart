@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:macos_ui/macos_ui.dart';
 import 'package:provider/provider.dart';
 import 'package:screen_retriever/screen_retriever.dart';
 import 'package:tray_manager/tray_manager.dart';
@@ -358,27 +357,12 @@ class _TimeKeeperAppState extends State<TimeKeeperApp>
         theme: buildTheme(Brightness.light),
         darkTheme: buildTheme(Brightness.dark),
         themeMode: ThemeMode.system,
-        home: Builder(
-          builder: (ctx) {
-            final brightness = Theme.of(ctx).brightness;
-            return MacosTheme(
-              data: brightness == Brightness.dark
-                  ? MacosThemeData.dark().copyWith(
-                      primaryColor: const Color(0xFF0A84FF),
-                    )
-                  : MacosThemeData.light().copyWith(
-                      primaryColor: const Color(0xFF007AFF),
-                    ),
-              child: Consumer<app_state.AppStateProvider>(
-                builder: (context, state, _) {
-                  if (state.connection ==
-                      app_state.ConnectionState.unconfigured) {
-                    return const SetupScreen();
-                  }
-                  return const MainPanel();
-                },
-              ),
-            );
+        home: Consumer<app_state.AppStateProvider>(
+          builder: (context, state, _) {
+            if (state.connection == app_state.ConnectionState.unconfigured) {
+              return const SetupScreen();
+            }
+            return const MainPanel();
           },
         ),
       ),
