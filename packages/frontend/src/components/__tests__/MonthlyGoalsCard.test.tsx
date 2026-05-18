@@ -1,22 +1,9 @@
 import React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { MonthlyGoalsCard } from '../MonthlyGoalsCard';
 import type { MonthlySummary } from '@time-keeper/shared';
-
-const { apiMock } = vi.hoisted(() => ({
-  apiMock: {
-    monthlyGoals: {
-      set: vi.fn(),
-    },
-  },
-}));
-
-vi.mock('@/lib/api', () => ({
-  api: apiMock,
-  AuthError: class AuthError extends Error {},
-}));
 
 const summary: MonthlySummary = {
   monthYear: '2026-05',
@@ -36,13 +23,31 @@ const summary: MonthlySummary = {
       color: '#3366ff',
       workdayCode: 'ALPHA',
       billable: true,
+      targetCadence: 'weekly',
       actualMinutes: 420,
+      progressMinutes: 420,
       goalMinutes: 480,
       expectedMinutesByNow: 160,
       remainingMinutes: 60,
       projectedMinutes: 1302,
       requiredDailyMinutes: 3,
       status: 'on-pace',
+    },
+    {
+      categoryId: 2,
+      name: 'Health Check',
+      color: '#8844ff',
+      workdayCode: 'HC',
+      billable: true,
+      targetCadence: 'one_time',
+      actualMinutes: 180,
+      progressMinutes: 660,
+      goalMinutes: 600,
+      expectedMinutesByNow: 0,
+      remainingMinutes: -60,
+      projectedMinutes: 720,
+      requiredDailyMinutes: 0,
+      status: 'over-target',
     },
   ],
 };
@@ -56,38 +61,29 @@ function renderWithClient(ui: React.ReactElement) {
 }
 
 describe('MonthlyGoalsCard', () => {
-  afterEach(() => {
-    vi.clearAllMocks();
-  });
-
-  it('shows progress, status, and pace guidance', async () => {
+  it('shows target status, cadence, and one-time budget overrun details', async () => {
     renderWithClient(<MonthlyGoalsCard summary={summary} />);
 
     expect(screen.getByText('Project Alpha')).not.toBeNull();
-    expect(screen.getByText('On pace')).not.toBeNull();
-    expect(screen.getByText('Actual: 7.0h')).not.toBeNull();
-    expect(screen.getByText('Goal: 8.0h')).not.toBeNull();
+    expect(screen.getByText('Weekly')).not.toBeNull();
+    expect(screen.getByText('Target: 8.0h')).not.toBeNull();
+    expect(screen.getByText('Health Check')).not.toBeNull();
+    expect(screen.getByText('One-time')).not.toBeNull();
+    expect(screen.getByText('Spent 11.0h')).not.toBeNull();
+    expect(screen.getByText('Overrun 1.0h')).not.toBeNull();
   });
 
-  it('opens the editor and saves an updated monthly goal for the selected month', async () => {
-    apiMock.monthlyGoals.set.mockResolvedValue({ goal: { availableHours: 10, availableMinutes: 30 } });
+  it('shows an empty-state message when no active targets exist for the month', async () => {
+    renderWithClient(
+      <MonthlyGoalsCard
+        summary={{
+          ...summary,
+          totalGoalMinutes: 0,
+          categories: summary.categories.map((category) => ({ ...category, goalMinutes: 0 })),
+        }}
+      />
+    );
 
-    renderWithClient(<MonthlyGoalsCard summary={summary} />);
-
-    fireEvent.click(screen.getByRole('button', { name: /project alpha/i }));
-
-    const inputs = screen.getAllByRole('spinbutton');
-    fireEvent.change(inputs[0], { target: { value: '10' } });
-    fireEvent.change(inputs[1], { target: { value: '30' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-    await waitFor(() => {
-      expect(apiMock.monthlyGoals.set).toHaveBeenCalledWith({
-        categoryId: 1,
-        monthYear: '2026-05',
-        availableHours: 10,
-        availableMinutes: 30,
-      });
-    });
+    expect(screen.getByText(/No categories with active targets for this month/i)).not.toBeNull();
   });
 });

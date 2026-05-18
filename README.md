@@ -15,7 +15,7 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
   </tr>
   <tr>
     <td align="center"><img src="docs/screenshots/monthly.png" width="380" alt="Monthly tab — projected vs actual + billable breakdown"/><br/><sub><b>Monthly</b> — projected vs actual + billable breakdown</sub></td>
-    <td align="center"><img src="docs/screenshots/settings.png" width="380" alt="Settings tab — categories and weekly goal"/><br/><sub><b>Settings</b> — categories &amp; weekly goal</sub></td>
+    <td align="center"><img src="docs/screenshots/settings.png" width="380" alt="Settings tab — categories, targets, and weekly goal"/><br/><sub><b>Settings</b> — categories, targets &amp; weekly goal</sub></td>
   </tr>
 </table>
 
@@ -24,7 +24,7 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
 
 - **One-tap timer** — tap a category to start, tap Stop to finish; starting a new category auto-stops the previous one, and the Track screen now supports search, pinned categories, and recent-category sections for faster switching
 - **Weekly goal** — configurable hours per week (0–40); shown in the top bar and weekly summary, drives the rounding cap
-- **Monthly tab** — dedicated monthly planning view with month navigation, per-category goals, status chips, projected vs actual comparison, pace guidance, and billable vs non-billable breakdown
+- **Monthly tab** — dedicated monthly planning view with month navigation, per-category targets, status chips, projected vs actual comparison, pace guidance, and billable vs non-billable breakdown
 - **Billable activity** — mark categories as billable or non-billable for monthly overview reporting
 - **Weekly overview** — time per category per day; click any cell to edit hours inline (totals update live as you type), open day logs to inspect/edit/delete the actual entries, backfill missed work, review the week, and copy or download CSV/plain-text/compact handoff formats
 - **End-of-day rounding** — round tracked minutes up to the nearest 30 or 60 minutes (configurable), capped at your weekly goal
@@ -106,7 +106,7 @@ Repo-local Pi surfaces above are defined by this repository. Your runtime may al
 
 ## Customising categories
 
-Categories are managed in the app itself (Settings tab). Add one category per booking type you want to track. The optional "Workday code" field appears in the weekly copy output.
+Categories are managed in the app itself (Settings tab). Add one category per booking type you want to track, then optionally configure target hours directly in the category editor as a monthly target, weekly target, or one-time budget. The optional "Workday code" field appears in the weekly copy output.
 
 ## Multi-user support
 

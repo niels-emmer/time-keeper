@@ -11,6 +11,9 @@ export const categories = sqliteTable(
     workdayCode: text('workday_code'),
     billable: integer('billable', { mode: 'boolean' }).notNull().default(false),
     sortOrder: integer('sort_order').notNull().default(0),
+    targetCadence: text('target_cadence', { enum: ['monthly', 'weekly', 'one_time'] }),
+    targetMinutes: integer('target_minutes'),
+    targetStartedAt: text('target_started_at'),
     createdAt: text('created_at')
       .notNull()
       .default(sql`(datetime('now'))`),
@@ -86,8 +89,6 @@ export const monthlyProjectGoals = sqliteTable('monthly_project_goals', {
     .notNull()
     .default(sql`(datetime('now'))`)
 });
-
-export type NewMonthlyProjectGoal = typeof monthlyProjectGoals.$inferInsert;
 
 export type CategoryRow = typeof categories.$inferSelect;
 export type NewCategory = typeof categories.$inferInsert;

@@ -8,7 +8,7 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 
 - One active timer at a time per user
 - Configurable weekly goal (default 40 h) stored per user in `user_settings`
-- Per-category monthly hour budgets (`monthly_project_goals`) — plan time allocation month-by-month
+- Per-category targets — optional monthly targets, weekly targets converted to a month total, or one-time budgets that do not renew
 - Billable categories — flag categories for billable vs non-billable reporting
 - End-of-day rounding: minutes → nearest 30 or 60 min interval (configurable, default 60; capped at user's weekly goal)
 - Auth: Authentik embedded outpost via NPM forward auth (no auth code in the app)
@@ -26,7 +26,7 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `.pi/agents/repo-governor.md` | Project-local governance helper agent |
 | `.pi/agents/local-builder.md` | Project-local Ollama-backed builder for bounded, low-context tasks |
 | `.pi/agents/local-reviewer.md` | Project-local Ollama-backed reviewer for bounded, low-context reviews |
-| `packages/backend/src/db/schema.ts` | All data types flow from here (`categories`, `time_entries`, `user_settings`, `monthly_project_goals`) |
+| `packages/backend/src/db/schema.ts` | All data types flow from here (`categories` now carries target cadence/minutes/start fields; `time_entries`, `user_settings`, and legacy `monthly_project_goals`) |
 | `packages/shared/src/utils/rounding.ts` | Core business logic — the rounding algorithm |
 | `packages/backend/src/middleware/auth.ts` | Auth boundary — validates Bearer tokens, trusts `X-authentik-email` only with a matching `X-Internal-Token` in production |
 | `packages/backend/src/routes/settings.ts` | GET/PUT `/api/settings` — weekly goal hours + rounding increment |
@@ -38,13 +38,13 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `packages/frontend/src/pages/Monthly.tsx` | Monthly tab shell — month navigation plus the monthly overview, focus, and goal cards |
 | `packages/frontend/src/components/MonthlyOverviewCard.tsx` | Monthly overview — headline metrics, projected vs actual by category, and billable vs non-billable hours |
 | `packages/frontend/src/components/MonthlyFocusCard.tsx` | Monthly focus panel — surfaces the categories that need attention most |
-| `packages/frontend/src/components/MonthlyGoalsCard.tsx` | Monthly Goals card — per-category budgets, status chips, pace guidance, and inline goal editing |
+| `packages/frontend/src/components/MonthlyGoalsCard.tsx` | Monthly Targets card — target-only category list, status chips, pace/budget guidance, and no inline editing |
 | `packages/frontend/src/hooks/useMonthlySummary.ts` | Fetches the canonical monthly summary payload used by the Monthly tab |
 | `packages/frontend/src/lib/monthly.ts` | Monthly helpers — month navigation, hours formatting, focus ranking, and status metadata |
 | `packages/frontend/src/components/WeeklySummary.tsx` | Weekly tab — review panel, export-format picker + preview, editable hours-by-category table, day-log entry points, copy/download handoff formats, and round-week |
 | `packages/frontend/src/components/DailyLogDialog.tsx` | Day-level entry history UI — inspect actual entries, navigate dates, edit/delete completed entries, and backfill missed work |
 | `packages/frontend/src/lib/weeklyExport.ts` | Weekly export utilities — format selection persistence plus CSV/plain-text/compact output builders |
-| `packages/frontend/src/components/CategoryManager.tsx` | Category CRUD + drag-to-reorder + A-Z sort; billable flag toggle in edit dialog |
+| `packages/frontend/src/components/CategoryManager.tsx` | Category CRUD + drag-to-reorder + A-Z sort; billable flag and target editor in the settings dialog |
 | `packages/frontend/src/components/WeeklyGoalSetting.tsx` | Settings UI for weekly goal (number input + slider) + rounding increment toggle |
 | `packages/frontend/src/components/SessionExpiredOverlay.tsx` | Full-screen overlay shown on 401/403; prompts user to log in again |
 | `packages/frontend/src/lib/theme.ts` | Pure theme utilities — `getStoredTheme`, `setStoredTheme`, `applyTheme`, `resolveTheme` |
@@ -64,16 +64,15 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `packages/frontend/src/lib/__tests__/theme.test.ts` | Unit tests for theme utilities — 18 tests covering get/set/apply/resolve |
 | `packages/frontend/src/lib/__tests__/track.test.ts` | Unit tests for Track helpers — filtering, recency, pin toggling, and sort modes |
 | `packages/frontend/src/components/__tests__/CategoryGrid.test.tsx` | Frontend tests for Track cards — active state, pin toggles, and timer starts |
-| `packages/frontend/src/components/__tests__/MonthlyGoalsCard.test.tsx` | Frontend tests for monthly goal status/pacing and goal editing |
+| `packages/frontend/src/components/__tests__/MonthlyGoalsCard.test.tsx` | Frontend tests for target status/pacing and one-time budget rendering |
 | `packages/frontend/src/components/__tests__/MonthlyOverviewCard.test.tsx` | Frontend tests for monthly headline metrics and chart rendering |
 | `packages/frontend/src/components/__tests__/MonthlyFocusCard.test.tsx` | Frontend tests for the monthly focus/attention panel |
 | `packages/frontend/src/components/__tests__/DailyLogDialog.test.tsx` | Frontend tests for the day-log entry history UI and manual-entry creation flow |
 | `packages/frontend/src/components/__tests__/WeeklySummary.test.tsx` | Frontend tests for weekly export preview, format switching, and copy workflow |
 | `packages/frontend/src/hooks/__tests__/useServiceWorkerUpdate.test.tsx` | Frontend tests for PWA update-ready detection and reload flow |
 | `packages/frontend/src/lib/__tests__/weeklyExport.test.ts` | Unit tests for weekly export builders and last-used export format persistence |
-| `packages/backend/src/routes/categories.test.ts` | Backend tests for category billable validation and persistence |
+| `packages/backend/src/routes/categories.test.ts` | Backend tests for category billable + target validation and persistence |
 | `packages/backend/src/routes/entries.test.ts` | Backend tests for manual-entry validation and entry persistence guardrails |
-| `packages/backend/src/utils/monthlyGoalHelper.test.ts` | Backend tests for monthly-goal insert/update/lookup behavior |
 | `SECURITY.md` | Security posture — **must be kept current** (see task routing below) |
 
 ## Task routing
@@ -87,7 +86,7 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | Change weekly-cell edit behaviour | `packages/frontend/src/components/WeeklySummary.tsx` + `PATCH /api/summary/adjust-cell` in `routes/summary.ts` |
 | Change the theme / add colour tokens | `packages/frontend/src/index.css` (`:root` = light, `.dark` = dark), `src/lib/theme.ts` |
 | Change the weekly goal setting | `packages/backend/src/routes/settings.ts` + `WeeklyGoalSetting.tsx` |
-| Add per-category monthly hour goals | `packages/backend/src/utils/monthlyGoalHelper.ts` + `api.monthlyGoals` + `MonthlyGoalsCard.tsx` |
+| Change category targets | `packages/backend/src/routes/categories.ts` + `CategoryManager.tsx` + `summaryService.ts` |
 | Change monthly projections / billable charts | `packages/frontend/src/components/MonthlyOverviewCard.tsx` |
 | Change billable eligibility per category | `packages/frontend/src/components/CategoryManager.tsx` (checkbox in edit dialog) |
 | Debug auth issues | `docs/integration/auth.md`, `packages/backend/src/middleware/auth.ts` |
@@ -110,12 +109,10 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `GET /api/settings` | Yes | Returns `{ weeklyGoalHours, roundingIncrementMinutes }` |
 | `PUT /api/settings` | Yes | Update `{ weeklyGoalHours, roundingIncrementMinutes }` (increment: 30 or 60) |
 | `GET /api/categories` | Yes | List user's categories, ordered by `sort_order ASC` |
-| `POST /api/categories` | Yes | Create category; auto-assigns next `sort_order` |
-| `PUT /api/categories/:id` | Yes | Update a category |
+| `POST /api/categories` | Yes | Create category; auto-assigns next `sort_order`; optional target config lives here |
+| `PUT /api/categories/:id` | Yes | Update a category, including target cadence/minutes |
 | `DELETE /api/categories/:id` | Yes | Delete a category |
 | `PATCH /api/categories/reorder` | Yes | Bulk update `sort_order`; body: `[{id, sortOrder}]` |
-| `GET /api/settings/monthly-goals` | Yes | Fetch monthly budget for a category; query: `categoryId`, `monthYear` (YYYY-MM) |
-| `POST /api/settings/set-monthly-goal` | Yes | Set/update monthly budget for a category; body: `{categoryId, monthYear, availableHours, availableMinutes}` |
 | `GET /api/timer` | Yes | Active timer status |
 | `POST /api/timer/start` | Yes | Start timer |
 | `POST /api/timer/stop` | Yes | Stop timer |
@@ -124,7 +121,7 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `PATCH /api/entries/:id` | Yes | Update a time entry |
 | `DELETE /api/entries/:id` | Yes | Delete a time entry |
 | `GET /api/summary/weekly` | Yes | Weekly summary (goalMinutes comes from user_settings) |
-| `GET /api/summary/monthly` | Yes | Canonical monthly summary with per-category goals, pace, projections, and billable split |
+| `GET /api/summary/monthly` | Yes | Canonical monthly summary with per-category targets, pace/budget status, projections, and billable split |
 | `POST /api/summary/round` | Yes | Apply end-of-day rounding for a single date (cap = user's weekly goal) |
 | `POST /api/summary/round-week` | Yes | Apply rounding to all 7 days of an ISO week; idempotent, skips already-rounded entries |
 | `PATCH /api/summary/adjust-cell` | Yes | Set total minutes for a (date, categoryId) cell; creates/adjusts/deletes underlying time entries |
@@ -177,7 +174,7 @@ yarn workspace @time-keeper/frontend test      # frontend component/hook tests
 Key test files:
 
 - `packages/shared/src/utils/rounding.test.ts` — covers `computeRounding`, including ceiling rounding, zero-minute no-ops, the weekly cap, idempotency, and 30/60 minute increments.
-- `packages/backend/src/routes/settings.test.ts`, `packages/backend/src/routes/categories.test.ts`, `packages/backend/src/utils/monthlyGoalHelper.test.ts` — cover settings validation and persistence, category billable validation and persistence, and monthly-goal insert/update/lookup behavior.
-- `packages/frontend/src/lib/__tests__/theme.test.ts`, `packages/frontend/src/components/__tests__/MonthlyGoalsCard.test.tsx`, `packages/frontend/src/components/__tests__/MonthlyOverviewCard.test.tsx`, `packages/frontend/src/hooks/__tests__/useServiceWorkerUpdate.test.tsx` — cover theme utilities, monthly-goal rendering and editing, monthly overview rendering, and the PWA update prompt flow.
+- `packages/backend/src/routes/settings.test.ts`, `packages/backend/src/routes/categories.test.ts`, `packages/backend/src/services/summaryService.test.ts` — cover settings validation/persistence, category billable+target validation, and monthly target derivation/one-time budget semantics.
+- `packages/frontend/src/lib/__tests__/theme.test.ts`, `packages/frontend/src/components/__tests__/MonthlyGoalsCard.test.tsx`, `packages/frontend/src/components/__tests__/MonthlyOverviewCard.test.tsx`, `packages/frontend/src/hooks/__tests__/useServiceWorkerUpdate.test.tsx` — cover theme utilities, monthly target rendering, monthly overview rendering, and the PWA update prompt flow.
 
 Vitest config for the frontend lives in `packages/frontend/vitest.config.ts` (jsdom environment, global APIs).

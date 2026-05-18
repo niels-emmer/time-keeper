@@ -57,6 +57,13 @@
       "when": 1778674416719,
       "tag": "0007_careful_legion",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1779105000000,
+      "tag": "0008_category_targets",
+      "breakpoints": true
     }
   ]
 }

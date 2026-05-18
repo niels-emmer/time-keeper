@@ -22,7 +22,9 @@ const summary: MonthlySummary = {
       color: '#3366ff',
       workdayCode: 'ALPHA',
       billable: true,
+      targetCadence: 'monthly',
       actualMinutes: 420,
+      progressMinutes: 420,
       goalMinutes: 480,
       expectedMinutesByNow: 160,
       remainingMinutes: 60,
@@ -36,7 +38,9 @@ const summary: MonthlySummary = {
       color: '#22aa66',
       workdayCode: 'MAINT',
       billable: false,
+      targetCadence: 'weekly',
       actualMinutes: 120,
+      progressMinutes: 120,
       goalMinutes: 240,
       expectedMinutesByNow: 80,
       remainingMinutes: 120,
@@ -75,8 +79,8 @@ describe('MonthlyOverviewCard', () => {
     expect(screen.getByText('9.0h')).not.toBeNull();
     expect(screen.getByText('ALPHA')).not.toBeNull();
     expect(screen.getByText('MAINT')).not.toBeNull();
-    expect(screen.getByText('Goal')).not.toBeNull();
-    expect(screen.getByText('Actual')).not.toBeNull();
+    expect(screen.getByText('Target')).not.toBeNull();
+    expect(screen.getByText('Progress')).not.toBeNull();
   });
 
   it('renders the billable breakdown when monthly hours exist', async () => {

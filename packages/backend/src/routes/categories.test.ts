@@ -6,6 +6,43 @@ import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 
+const targetCadenceSchema = z.enum(['monthly', 'weekly', 'one_time']);
+const targetMinutesSchema = z.number().int().min(1).max(525_600);
+
+function withTargetValidation<T extends z.ZodRawShape>(shape: T) {
+  return z.object(shape).superRefine((value, ctx) => {
+    const hasTargetCadence = Object.prototype.hasOwnProperty.call(value, 'targetCadence');
+    const hasTargetMinutes = Object.prototype.hasOwnProperty.call(value, 'targetMinutes');
+
+    if (!hasTargetCadence && !hasTargetMinutes) {
+      return;
+    }
+
+    const targetCadence = value.targetCadence;
+    const targetMinutes = value.targetMinutes;
+
+    if (targetCadence == null && targetMinutes == null) {
+      return;
+    }
+
+    if (targetCadence == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['targetCadence'],
+        message: 'targetCadence is required when targetMinutes is set.',
+      });
+    }
+
+    if (targetMinutes == null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['targetMinutes'],
+        message: 'targetMinutes is required when targetCadence is set.',
+      });
+    }
+  });
+}
+
 const categories = sqliteTable('categories', {
   id: integer('id').primaryKey({ autoIncrement: true }),
   userId: text('user_id').notNull(),
@@ -14,23 +51,30 @@ const categories = sqliteTable('categories', {
   workdayCode: text('workday_code'),
   billable: integer('billable', { mode: 'boolean' }).notNull().default(false),
   sortOrder: integer('sort_order').notNull().default(0),
+  targetCadence: text('target_cadence'),
+  targetMinutes: integer('target_minutes'),
+  targetStartedAt: text('target_started_at'),
   createdAt: text('created_at').notNull().default(sql`(datetime('now'))`),
   updatedAt: text('updated_at').notNull().default(sql`(datetime('now'))`),
 });
 
-const createSchema = z.object({
+const createSchema = withTargetValidation({
   name: z.string().min(1).max(100),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   workdayCode: z.string().max(100).optional(),
   billable: z.boolean().optional(),
+  targetCadence: targetCadenceSchema.nullable().optional(),
+  targetMinutes: targetMinutesSchema.nullable().optional(),
 });
 
-const updateSchema = z.object({
+const updateSchema = withTargetValidation({
   name: z.string().min(1).max(100).optional(),
   color: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional(),
   workdayCode: z.string().max(100).nullable().optional(),
   billable: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
+  targetCadence: targetCadenceSchema.nullable().optional(),
+  targetMinutes: targetMinutesSchema.nullable().optional(),
 });
 
 function makeDb() {
@@ -44,6 +88,9 @@ function makeDb() {
       workday_code TEXT,
       billable INTEGER NOT NULL DEFAULT 0,
       sort_order INTEGER NOT NULL DEFAULT 0,
+      target_cadence TEXT,
+      target_minutes INTEGER,
+      target_started_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
@@ -52,28 +99,40 @@ function makeDb() {
 }
 
 describe('categories route validation', () => {
-  it('accepts billable on create', () => {
-    expect(() => createSchema.parse({ name: 'Project A', billable: true })).not.toThrow();
+  it('accepts billable and target fields on create', () => {
+    expect(() => createSchema.parse({
+      name: 'Project A',
+      billable: true,
+      targetCadence: 'weekly',
+      targetMinutes: 600,
+    })).not.toThrow();
   });
 
-  it('accepts billable and nullable workdayCode on update', () => {
-    expect(() => updateSchema.parse({ billable: false, workdayCode: null })).not.toThrow();
+  it('accepts nullable workdayCode and clearing target fields on update', () => {
+    expect(() => updateSchema.parse({
+      billable: false,
+      workdayCode: null,
+      targetCadence: null,
+      targetMinutes: null,
+    })).not.toThrow();
   });
 
-  it('rejects invalid billable values', () => {
+  it('rejects invalid billable or incomplete target values', () => {
     expect(() => createSchema.parse({ name: 'Project A', billable: 'yes' })).toThrow();
     expect(() => updateSchema.parse({ billable: 1 })).toThrow();
+    expect(() => createSchema.parse({ name: 'Project A', targetCadence: 'monthly' })).toThrow();
+    expect(() => createSchema.parse({ name: 'Project A', targetMinutes: 120 })).toThrow();
   });
 });
 
-describe('categories billable persistence', () => {
+describe('categories target persistence', () => {
   let db: ReturnType<typeof makeDb>;
 
   beforeEach(() => {
     db = makeDb();
   });
 
-  it('defaults billable to false when omitted', () => {
+  it('defaults target fields to null when omitted', () => {
     const row = db.insert(categories).values({
       userId: 'alice@example.com',
       name: 'Project A',
@@ -83,30 +142,20 @@ describe('categories billable persistence', () => {
       updatedAt: new Date().toISOString(),
     }).returning().get();
 
-    expect(row?.billable).toBe(false);
+    expect(row?.targetCadence).toBeNull();
+    expect(row?.targetMinutes).toBeNull();
+    expect(row?.targetStartedAt).toBeNull();
   });
 
-  it('stores billable=true when explicitly set', () => {
-    const row = db.insert(categories).values({
+  it('stores recurring targets without affecting another user row', () => {
+    const alice = db.insert(categories).values({
       userId: 'alice@example.com',
       name: 'Project A',
       color: '#6366f1',
       billable: true,
       sortOrder: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }).returning().get();
-
-    expect(row?.billable).toBe(true);
-  });
-
-  it('updates billable without affecting another user row', () => {
-    const alice = db.insert(categories).values({
-      userId: 'alice@example.com',
-      name: 'Project A',
-      color: '#6366f1',
-      billable: false,
-      sortOrder: 0,
+      targetCadence: 'monthly',
+      targetMinutes: 1200,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }).returning().get()!;
@@ -122,14 +171,16 @@ describe('categories billable persistence', () => {
     }).run();
 
     db.update(categories)
-      .set({ billable: true, updatedAt: new Date().toISOString() })
+      .set({ targetCadence: 'weekly', targetMinutes: 600, updatedAt: new Date().toISOString() })
       .where(and(eq(categories.id, alice.id), eq(categories.userId, 'alice@example.com')))
       .run();
 
     const aliceRow = db.select().from(categories).where(eq(categories.userId, 'alice@example.com')).get();
     const bobRow = db.select().from(categories).where(eq(categories.userId, 'bob@example.com')).get();
 
-    expect(aliceRow?.billable).toBe(true);
-    expect(bobRow?.billable).toBe(false);
+    expect(aliceRow?.targetCadence).toBe('weekly');
+    expect(aliceRow?.targetMinutes).toBe(600);
+    expect(bobRow?.targetCadence).toBeNull();
+    expect(bobRow?.targetMinutes).toBeNull();
   });
 });

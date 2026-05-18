@@ -1,8 +1,9 @@
 import { eq, and, gte, lte, isNotNull, asc } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { timeEntries, categories, userSettings, monthlyProjectGoals } from '../db/schema.js';
+import { timeEntries, categories, userSettings } from '../db/schema.js';
 import { isoWeekBounds, toDateString, toISOWeek } from '@time-keeper/shared';
 import type {
+  CategoryTargetCadence,
   WeeklySummary,
   DaySummary,
   CategorySummary,
@@ -129,16 +130,54 @@ function getDaysElapsed(monthYear: string, daysInMonth: number) {
   return Math.min(now.getUTCDate(), daysInMonth);
 }
 
-function computeMonthlyStatus(goalMinutes: number, actualMinutes: number, expectedMinutesByNow: number): MonthlyCategoryStatus {
+function computeMonthlyStatus(
+  goalMinutes: number,
+  progressMinutes: number,
+  expectedMinutesByNow: number,
+  targetCadence: CategoryTargetCadence | null
+): MonthlyCategoryStatus {
   if (goalMinutes === 0) return 'no-goal';
-  if (actualMinutes > goalMinutes) return 'over-target';
-  if (actualMinutes + 30 < expectedMinutesByNow) return 'behind';
+  if (progressMinutes > goalMinutes) return 'over-target';
+  if (targetCadence !== 'one_time' && progressMinutes + 30 < expectedMinutesByNow) return 'behind';
   return 'on-pace';
+}
+
+function getEffectiveGoalMinutes(
+  targetCadence: CategoryTargetCadence | null,
+  targetMinutes: number | null,
+  daysInMonth: number,
+  monthEndMs: number,
+  targetStartedAt: string | null
+) {
+  if (!targetCadence || targetMinutes == null || targetMinutes <= 0) {
+    return 0;
+  }
+
+  if (targetCadence === 'monthly') {
+    return targetMinutes;
+  }
+
+  if (targetCadence === 'weekly') {
+    return Math.round(targetMinutes * (daysInMonth / 7));
+  }
+
+  if (!targetStartedAt) {
+    return 0;
+  }
+
+  const startMs = new Date(targetStartedAt).getTime();
+  if (!Number.isFinite(startMs) || startMs > monthEndMs) {
+    return 0;
+  }
+
+  return targetMinutes;
 }
 
 export function buildMonthlySummaryData(input: {
   monthYear: string;
   monthLabel: string;
+  monthStart: string;
+  monthEnd: string;
   daysElapsed: number;
   daysInMonth: number;
   categories: Array<{
@@ -148,11 +187,9 @@ export function buildMonthlySummaryData(input: {
     workdayCode: string | null;
     billable: boolean;
     sortOrder: number;
-  }>;
-  goals: Array<{
-    categoryId: number;
-    availableHours: number;
-    availableMinutes: number;
+    targetCadence: CategoryTargetCadence | null;
+    targetMinutes: number | null;
+    targetStartedAt: string | null;
   }>;
   entries: Array<{
     categoryId: number;
@@ -160,31 +197,77 @@ export function buildMonthlySummaryData(input: {
     endTime: string;
   }>;
 }): MonthlySummary {
+  const monthStartMs = new Date(input.monthStart).getTime();
+  const monthEndMs = new Date(input.monthEnd).getTime();
   const actualMinutesByCategory = new Map<number, number>();
+  const entriesByCategory = new Map<number, Array<{ startMs: number; minutes: number }>>();
 
   for (const entry of input.entries) {
-    const durationMs = new Date(entry.endTime).getTime() - new Date(entry.startTime).getTime();
-    const minutes = Math.max(0, Math.floor(durationMs / 60000));
-    actualMinutesByCategory.set(entry.categoryId, (actualMinutesByCategory.get(entry.categoryId) ?? 0) + minutes);
-  }
+    const startMs = new Date(entry.startTime).getTime();
+    const endMs = new Date(entry.endTime).getTime();
+    const minutes = Math.max(0, Math.floor((endMs - startMs) / 60000));
 
-  const goalsByCategory = new Map(
-    input.goals.map((goal) => [goal.categoryId, goal.availableHours * 60 + goal.availableMinutes] as const)
-  );
+    if (!Number.isFinite(startMs)) {
+      continue;
+    }
+
+    if (startMs >= monthStartMs && startMs <= monthEndMs) {
+      actualMinutesByCategory.set(entry.categoryId, (actualMinutesByCategory.get(entry.categoryId) ?? 0) + minutes);
+    }
+
+    if (!entriesByCategory.has(entry.categoryId)) {
+      entriesByCategory.set(entry.categoryId, []);
+    }
+    entriesByCategory.get(entry.categoryId)!.push({ startMs, minutes });
+  }
 
   const remainingDays = Math.max(input.daysInMonth - input.daysElapsed, 0);
 
   const categorySummaries: MonthlyCategorySummary[] = input.categories.map((category) => {
     const actualMinutes = actualMinutesByCategory.get(category.id) ?? 0;
-    const goalMinutes = goalsByCategory.get(category.id) ?? 0;
-    const expectedMinutesByNow = input.daysElapsed > 0
+    const goalMinutes = getEffectiveGoalMinutes(
+      category.targetCadence,
+      category.targetMinutes,
+      input.daysInMonth,
+      monthEndMs,
+      category.targetStartedAt
+    );
+
+    const categoryEntries = entriesByCategory.get(category.id) ?? [];
+    let progressMinutes = actualMinutes;
+    let spentBeforeMonthMinutes = 0;
+
+    if (category.targetCadence === 'one_time' && category.targetStartedAt) {
+      const targetStartMs = new Date(category.targetStartedAt).getTime();
+
+      if (Number.isFinite(targetStartMs) && targetStartMs <= monthEndMs) {
+        progressMinutes = 0;
+        spentBeforeMonthMinutes = 0;
+
+        for (const entry of categoryEntries) {
+          if (entry.startMs < targetStartMs || entry.startMs > monthEndMs) {
+            continue;
+          }
+
+          progressMinutes += entry.minutes;
+          if (entry.startMs < monthStartMs) {
+            spentBeforeMonthMinutes += entry.minutes;
+          }
+        }
+      }
+    }
+
+    const expectedMinutesByNow = goalMinutes > 0 && input.daysElapsed > 0 && category.targetCadence !== 'one_time'
       ? Math.round(goalMinutes * (input.daysElapsed / input.daysInMonth))
       : 0;
-    const projectedMinutes = input.daysElapsed > 0
+    const projectedMonthMinutes = input.daysElapsed > 0
       ? Math.round((actualMinutes / input.daysElapsed) * input.daysInMonth)
       : 0;
-    const remainingMinutes = Math.max(goalMinutes - actualMinutes, 0);
-    const requiredDailyMinutes = remainingDays > 0
+    const projectedMinutes = category.targetCadence === 'one_time'
+      ? spentBeforeMonthMinutes + projectedMonthMinutes
+      : projectedMonthMinutes;
+    const remainingMinutes = goalMinutes - progressMinutes;
+    const requiredDailyMinutes = remainingDays > 0 && remainingMinutes > 0
       ? Math.ceil(remainingMinutes / remainingDays)
       : 0;
 
@@ -194,13 +277,15 @@ export function buildMonthlySummaryData(input: {
       color: category.color,
       workdayCode: category.workdayCode,
       billable: category.billable,
+      targetCadence: category.targetCadence,
       actualMinutes,
+      progressMinutes,
       goalMinutes,
       expectedMinutesByNow,
       remainingMinutes,
       projectedMinutes,
       requiredDailyMinutes,
-      status: computeMonthlyStatus(goalMinutes, actualMinutes, expectedMinutesByNow),
+      status: computeMonthlyStatus(goalMinutes, progressMinutes, expectedMinutesByNow, category.targetCadence),
     };
   });
 
@@ -240,21 +325,27 @@ export function getMonthlySummary(userId: string, monthYear: string): MonthlySum
       workdayCode: categories.workdayCode,
       billable: categories.billable,
       sortOrder: categories.sortOrder,
+      targetCadence: categories.targetCadence,
+      targetMinutes: categories.targetMinutes,
+      targetStartedAt: categories.targetStartedAt,
     })
     .from(categories)
     .where(eq(categories.userId, userId))
     .orderBy(asc(categories.sortOrder))
     .all();
 
-  const goalRows = db
-    .select({
-      categoryId: monthlyProjectGoals.categoryId,
-      availableHours: monthlyProjectGoals.availableHours,
-      availableMinutes: monthlyProjectGoals.availableMinutes,
-    })
-    .from(monthlyProjectGoals)
-    .where(and(eq(monthlyProjectGoals.userId, userId), eq(monthlyProjectGoals.monthYear, monthYear)))
-    .all();
+  const entryWindowStartMs = categoryRows.reduce((earliest, category) => {
+    if (category.targetCadence !== 'one_time' || !category.targetStartedAt) {
+      return earliest;
+    }
+
+    const startMs = new Date(category.targetStartedAt).getTime();
+    if (!Number.isFinite(startMs) || startMs > end.getTime()) {
+      return earliest;
+    }
+
+    return Math.min(earliest, startMs);
+  }, start.getTime());
 
   const entryRows = db
     .select({
@@ -267,7 +358,7 @@ export function getMonthlySummary(userId: string, monthYear: string): MonthlySum
       and(
         eq(timeEntries.userId, userId),
         isNotNull(timeEntries.endTime),
-        gte(timeEntries.startTime, start.toISOString()),
+        gte(timeEntries.startTime, new Date(entryWindowStartMs).toISOString()),
         lte(timeEntries.startTime, end.toISOString())
       )
     )
@@ -281,10 +372,11 @@ export function getMonthlySummary(userId: string, monthYear: string): MonthlySum
   return buildMonthlySummaryData({
     monthYear,
     monthLabel: getMonthLabel(year, monthIndex),
+    monthStart: start.toISOString(),
+    monthEnd: end.toISOString(),
     daysElapsed,
     daysInMonth,
     categories: categoryRows,
-    goals: goalRows,
     entries: entryRows,
   });
 }

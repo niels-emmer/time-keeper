@@ -1,4 +1,4 @@
-import type { MonthlyCategoryStatus, MonthlySummary } from '@time-keeper/shared';
+import type { CategoryTargetCadence, MonthlyCategoryStatus, MonthlySummary } from '@time-keeper/shared';
 
 export function getCurrentMonthYear() {
   const now = new Date();
@@ -29,7 +29,7 @@ export function getMonthlyStatusMeta(status: MonthlyCategoryStatus) {
       };
     case 'no-goal':
       return {
-        label: 'No goal',
+        label: 'No target',
         className: 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300',
       };
     case 'on-pace':
@@ -41,6 +41,19 @@ export function getMonthlyStatusMeta(status: MonthlyCategoryStatus) {
   }
 }
 
+export function getTargetCadenceLabel(targetCadence: CategoryTargetCadence | null) {
+  switch (targetCadence) {
+    case 'monthly':
+      return 'Monthly';
+    case 'weekly':
+      return 'Weekly';
+    case 'one_time':
+      return 'One-time';
+    default:
+      return 'No target';
+  }
+}
+
 export function getFocusCategories(summary: MonthlySummary) {
   return [...summary.categories]
     .filter((category) => category.goalMinutes > 0 || category.actualMinutes > 0)
@@ -48,14 +61,16 @@ export function getFocusCategories(summary: MonthlySummary) {
       const score = (category: MonthlySummary['categories'][number]) => {
         switch (category.status) {
           case 'behind':
-            return 3_000 + (category.remainingMinutes - category.actualMinutes);
+            return 3_000 + (category.remainingMinutes - category.progressMinutes);
           case 'over-target':
-            return 2_000 + (category.actualMinutes - category.goalMinutes);
+            return 2_000 + (category.progressMinutes - category.goalMinutes);
           case 'no-goal':
             return 1_000 + category.actualMinutes;
           case 'on-pace':
           default:
-            return category.remainingMinutes;
+            return category.targetCadence === 'one_time'
+              ? Math.max(category.goalMinutes - category.progressMinutes, 0)
+              : category.remainingMinutes;
         }
       };
       return score(right) - score(left);

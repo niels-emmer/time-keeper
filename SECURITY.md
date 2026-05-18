@@ -22,21 +22,28 @@ This is a single-user (or small-team) personal productivity tool, not a public-f
 - Renamed the `categories` classification field from `bonus` to `billable`: marks categories for billable vs non-billable reporting in the monthly overview
 - The monthly-goals addition remains backward-compatible; the category classification rename required a schema migration to preserve existing values
 
+## Data schema / API changes (2026-05-18)
+
+- Added `categories.target_cadence`, `categories.target_minutes`, and `categories.target_started_at`
+- Existing `monthly_project_goals` rows are backfilled into the new category target fields during migration; the legacy table remains in the database but the canonical monthly summary now derives targets from `categories`
+- One-time budgets use `target_started_at` as the server-authoritative start boundary, so overruns persist across month changes instead of resetting
+- `POST /api/categories` and `PUT /api/categories/:id` now accept optional target configuration alongside name/color/workday-code/billable fields
+- `GET /api/summary/monthly` remains read-only, but now derives per-category targets from category settings: monthly targets are direct, weekly targets are converted to a month-specific total, and one-time budgets compare against cumulative spend since `target_started_at`
+- `GET /api/settings/monthly-goals` and `POST /api/settings/set-monthly-goal` were removed from the active API surface after target editing moved into Settings → Edit Category
+- All category-target reads/writes remain authenticated and scoped to `req.userId`
+
 ## New API endpoints (2026-05-13)
 
-- `GET /api/settings/monthly-goals` — fetch a category's monthly budget
-- `POST /api/settings/set-monthly-goal` — set/update a category's monthly budget
 - `GET /api/summary/monthly` — read-only monthly analytics payload for the Monthly tab (goals, pace, projections, billable split)
 - `POST /api/entries` — create a completed manual/backfilled time entry from the day log UI
 - `PATCH /api/entries/:id` now validates any reassigned `categoryId` against the caller's own categories and rejects invalid time ranges (`endTime <= startTime`)
 - All of the above endpoints require Authentik auth and scope writes/reads to `req.userId`
-- The monthly-goal endpoints still do **not** currently verify that `categoryId` belongs to the caller; the main risk is orphan monthly-goal rows inside the caller's own namespace, not cross-user access
 - The monthly summary endpoint is read-only and derives all data from rows already scoped to `req.userId`
 - The manual-entry endpoint validates category ownership and requires a completed time range, so it cannot be used to forge a second running timer
 
 ## What has not been done
 
-- Monthly-goal endpoints still accept any numeric `categoryId` for the authenticated user instead of checking category existence/ownership against the `categories` table
+- The legacy `monthly_project_goals` table is retained for migration/backward-compatibility, but no automated cleanup/removal migration has been added yet
 
 ---
 

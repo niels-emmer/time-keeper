@@ -21,7 +21,9 @@ const summary: MonthlySummary = {
       color: '#3366ff',
       workdayCode: 'ALPHA',
       billable: true,
+      targetCadence: 'monthly',
       actualMinutes: 420,
+      progressMinutes: 420,
       goalMinutes: 480,
       expectedMinutesByNow: 160,
       remainingMinutes: 60,
@@ -35,7 +37,9 @@ const summary: MonthlySummary = {
       color: '#22aa66',
       workdayCode: 'MAINT',
       billable: false,
+      targetCadence: 'weekly',
       actualMinutes: 120,
+      progressMinutes: 120,
       goalMinutes: 600,
       expectedMinutesByNow: 200,
       remainingMinutes: 480,
@@ -52,6 +56,7 @@ describe('MonthlyFocusCard', () => {
 
     expect(screen.getByText('Needs attention')).not.toBeNull();
     expect(screen.getByText('Maintenance')).not.toBeNull();
+    expect(screen.getByText('Weekly')).not.toBeNull();
     expect(screen.getByText(/Need 0\.4h/)).not.toBeNull();
   });
 });

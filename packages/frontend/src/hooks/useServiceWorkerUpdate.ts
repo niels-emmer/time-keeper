@@ -4,6 +4,7 @@ export function useServiceWorkerUpdate() {
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [applyingUpdate, setApplyingUpdate] = useState(false);
   const waitingWorkerRef = useRef<ServiceWorker | null>(null);
+  const applyingUpdateRef = useRef(false);
 
   const markUpdateAvailable = useCallback((worker?: ServiceWorker | null) => {
     if (worker) {
@@ -16,6 +17,7 @@ export function useServiceWorkerUpdate() {
     const target = waitingWorkerRef.current ?? navigator.serviceWorker?.controller ?? null;
     if (!target) return;
 
+    applyingUpdateRef.current = true;
     setApplyingUpdate(true);
     target.postMessage({ type: 'SKIP_WAITING' });
   }, []);
@@ -28,7 +30,7 @@ export function useServiceWorkerUpdate() {
     if (!navigator.serviceWorker) return;
 
     const handleControllerChange = () => {
-      if (applyingUpdate) {
+      if (applyingUpdateRef.current) {
         window.location.reload();
       }
     };
@@ -63,7 +65,7 @@ export function useServiceWorkerUpdate() {
       navigator.serviceWorker.removeEventListener('controllerchange', handleControllerChange);
       navigator.serviceWorker.removeEventListener('message', handleMessage);
     };
-  }, [applyingUpdate, markUpdateAvailable]);
+  }, [markUpdateAvailable]);
 
   return {
     updateAvailable,

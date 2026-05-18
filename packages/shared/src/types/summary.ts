@@ -1,3 +1,5 @@
+import type { CategoryTargetCadence } from './category.js';
+
 export interface CategorySummary {
   categoryId: number;
   name: string;
@@ -29,7 +31,9 @@ export interface MonthlyCategorySummary {
   color: string;
   workdayCode: string | null;
   billable: boolean;
+  targetCadence: CategoryTargetCadence | null;
   actualMinutes: number;
+  progressMinutes: number;
   goalMinutes: number;
   expectedMinutesByNow: number;
   remainingMinutes: number;

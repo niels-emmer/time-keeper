@@ -117,16 +117,4 @@ export const api = {
       }),
     revoke: (id: number) => request<void>(`/tokens/${id}`, { method: 'DELETE' }),
   },
-
-  monthlyGoals: {
-    get: (categoryId: number, monthYear: string) =>
-      request<{ goal: { availableHours: number; availableMinutes: number } | null; message: string }>(
-        `/settings/monthly-goals?categoryId=${categoryId}&monthYear=${encodeURIComponent(monthYear)}`
-      ),
-    set: (dto: { categoryId: number; monthYear: string; availableHours: number; availableMinutes: number }) =>
-      request<{ message: string; goal: { availableHours: number; availableMinutes: number } }>(
-        '/settings/set-monthly-goal',
-        { method: 'POST', body: JSON.stringify(dto) }
-      ),
-  },
 } as const;

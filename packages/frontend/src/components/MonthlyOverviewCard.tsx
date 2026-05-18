@@ -10,15 +10,15 @@ export function MonthlyOverviewCard({ summary }: { summary: MonthlySummary }) {
       .filter((category) => category.goalMinutes > 0 || category.actualMinutes > 0)
       .map((category) => ({
         name: category.workdayCode || category.name,
-        projected: Number((category.goalMinutes / 60).toFixed(1)),
-        actual: Number((category.actualMinutes / 60).toFixed(1)),
+        target: Number((category.goalMinutes / 60).toFixed(1)),
+        progress: Number((category.progressMinutes / 60).toFixed(1)),
       })),
     [summary]
   );
 
   const maxValue = useMemo(() => {
     if (comparisonData.length === 0) return 0;
-    const max = Math.max(...comparisonData.map((item) => Math.max(item.projected, item.actual)));
+    const max = Math.max(...comparisonData.map((item) => Math.max(item.target, item.progress)));
     return Math.ceil(max * 1.2);
   }, [comparisonData]);
 
@@ -38,7 +38,7 @@ export function MonthlyOverviewCard({ summary }: { summary: MonthlySummary }) {
             <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tracked so far</p>
             <p className="mt-1 text-2xl font-semibold tabular-nums">{formatHoursFromMinutes(summary.totalActualMinutes)}</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Goal total {formatHoursFromMinutes(summary.totalGoalMinutes)}
+              Target total {formatHoursFromMinutes(summary.totalGoalMinutes)}
             </p>
           </div>
           <div className="rounded-xl border bg-muted/20 p-3">
@@ -59,7 +59,7 @@ export function MonthlyOverviewCard({ summary }: { summary: MonthlySummary }) {
 
         {comparisonData.length > 0 && (
           <div>
-            <h3 className="mb-4 text-sm font-medium">Projected vs Actual Hours by Category</h3>
+            <h3 className="mb-4 text-sm font-medium">Target vs Progress by Category</h3>
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={comparisonData} margin={{ top: 20, right: 30, left: 0, bottom: 20 }}>
                 <CartesianGrid strokeDasharray="3 3" />
@@ -67,8 +67,8 @@ export function MonthlyOverviewCard({ summary }: { summary: MonthlySummary }) {
                 <YAxis domain={[0, maxValue]} />
                 <Tooltip formatter={(value) => `${value}h`} />
                 <Legend />
-                <Bar dataKey="projected" fill="#8884d8" name="Goal" radius={[8, 8, 0, 0]} />
-                <Bar dataKey="actual" fill="#00C49F" name="Actual" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="target" fill="#8884d8" name="Target" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="progress" fill="#00C49F" name="Progress" radius={[8, 8, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

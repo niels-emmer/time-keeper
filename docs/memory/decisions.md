@@ -263,3 +263,25 @@ On save, the override stays visible during the in-flight request; it is cleared 
 **Trade-off:** if the sum of all-but-last entries already exceeds the requested total, the last entry is clamped to 0 duration (the cell would still show less than requested). Entering 0 explicitly deletes all entries cleanly.
 
 **No new npm dependencies.**
+
+## D-017: Per-category targets live on categories, not month-scoped goal rows
+
+**Date:** 2026-05-18
+**Status:** Accepted
+
+Category target configuration moved into Settings → Edit Category and is now stored directly on `categories` via:
+- `target_cadence` (`monthly` | `weekly` | `one_time` | null)
+- `target_minutes` (integer minutes | null)
+- `target_started_at` (UTC ISO timestamp | null, used only for one-time budgets)
+
+Why this replaced month-tab editing as the canonical flow:
+- The configuration belongs to the category itself, so Settings is the simpler and more discoverable home
+- Weekly-derived monthly targets and one-time budgets cannot be modelled cleanly as month-scoped rows alone
+- A one-time budget must persist across month boundaries without resetting, which requires a durable start boundary rather than a new row every month
+
+Monthly summary behaviour now derives an effective month target from the category settings:
+- `monthly` → use the configured minutes directly
+- `weekly` → convert to a month-specific target using the viewed month length
+- `one_time` → compare the fixed budget against cumulative spend since `target_started_at`
+
+Migration note: existing `monthly_project_goals` rows are backfilled into category targets as `monthly` targets. The legacy table remains in the schema for now, but it is no longer the canonical source for the Monthly tab.
