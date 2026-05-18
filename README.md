@@ -116,4 +116,4 @@ There is no shared data, cross-user reporting, or admin interface — each user 
 
 ## Attribution
 
-Original idea and product direction by the author. Built entirely by AI: [Claude Code](https://claude.ai/claude-code) (Claude Sonnet 4.5 / Opus 4.6, Anthropic), [GitHub Copilot](https://github.com/features/copilot) (Claude Haiku, Anthropic), and [GPT-4](https://openai.com/gpt-4) (OpenAI). Guided by exceptional iterative prompting — the key to coherent, self-documenting AI-driven development.
+Original idea and product direction by the author. Built entirely by AI: [Pi](https://pi.ai) (Inflection AI), [Claude Code](https://claude.ai/claude-code) (Claude Sonnet 4.5 / Opus 4.6, Anthropic), and [GPT-5.4](https://openai.com/gpt-4) (OpenAI). Guided by exceptional iterative prompting — the key to coherent, self-documenting AI-driven development.
