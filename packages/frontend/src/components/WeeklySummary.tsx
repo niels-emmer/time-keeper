@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Check, ChevronLeft, ChevronRight, Copy, Download } from 'lucide-react';
+import { Check, ChevronLeft, ChevronRight, Copy, Download, Plus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DailyLogDialog } from '@/components/DailyLogDialog';
 import { useWeeklySummary, useRoundWeek, useAdjustCell } from '@/hooks/useSummary';
+import { useCategories } from '@/hooks/useCategories';
 import {
   buildWeeklyExport,
   getStoredWeeklyExportFormat,
@@ -45,7 +46,11 @@ export function WeeklySummary() {
   const [localOverrides, setLocalOverrides] = useState<Map<string, number>>(new Map());
   const [editingCell, setEditingCell] = useState<{ categoryId: number; date: string; value: string } | null>(null);
   const [dayLogDate, setDayLogDate] = useState<string | null>(null);
+  const [addedCategoryIds, setAddedCategoryIds] = useState<Set<number>>(new Set());
+  const [showCategoryPicker, setShowCategoryPicker] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { data: allCategoriesData } = useCategories();
 
   useEffect(() => {
     setStoredWeeklyExportFormat(exportFormat);
@@ -60,6 +65,8 @@ export function WeeklySummary() {
   useEffect(() => {
     setLocalOverrides(new Map());
     setEditingCell(null);
+    setAddedCategoryIds(new Set());
+    setShowCategoryPicker(false);
   }, [week]);
 
   useEffect(() => {
@@ -68,6 +75,17 @@ export function WeeklySummary() {
       inputRef.current?.select();
     }
   }, [editingCell]);
+
+  useEffect(() => {
+    if (!showCategoryPicker) return;
+    function handleClickOutside(event: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(event.target as Node)) {
+        setShowCategoryPicker(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showCategoryPicker]);
 
   const exportArtifact = useMemo(
     () => summary ? buildWeeklyExport(summary, exportFormat) : null,
@@ -88,6 +106,14 @@ export function WeeklySummary() {
         color: category.color,
         workdayCode: category.workdayCode,
       });
+    }
+  }
+  for (const id of addedCategoryIds) {
+    if (!allCategories.has(id)) {
+      const cat = allCategoriesData?.find((c) => c.id === id);
+      if (cat) {
+        allCategories.set(id, { name: cat.name, color: cat.color, workdayCode: cat.workdayCode });
+      }
     }
   }
   const categoryList = Array.from(allCategories.entries());
@@ -249,7 +275,7 @@ export function WeeklySummary() {
               {categoryList.map(([categoryId, category]) => {
                 const rowDisplayMinutes = summary.days.map((day) => getDisplayMinutes(categoryId, day.date));
                 const rowTotal = rowDisplayMinutes.reduce((sum, value) => sum + value, 0);
-                if (rowTotal === 0) return null;
+                if (rowTotal === 0 && !addedCategoryIds.has(categoryId)) return null;
 
                 return (
                   <tr key={categoryId} className="border-b last:border-0">
@@ -327,6 +353,57 @@ export function WeeklySummary() {
             </tbody>
           </table>
           <div className="flex gap-2 border-t p-3">
+            <div className="relative" ref={pickerRef}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowCategoryPicker((v) => !v)}
+              >
+                <Plus className="mr-1 h-3.5 w-3.5" />
+                Add category
+              </Button>
+              {showCategoryPicker && (
+                <div
+                  className="absolute bottom-full left-0 z-50 mb-1 w-56 overflow-hidden rounded-xl border bg-card shadow-xl"
+                  onKeyDown={(e) => { if (e.key === 'Escape') setShowCategoryPicker(false); }}
+                >
+                  <div className="flex items-center justify-between border-b px-3 py-2">
+                    <span className="text-xs font-medium text-muted-foreground">Add to this week</span>
+                    <button type="button" onClick={() => setShowCategoryPicker(false)} className="rounded p-0.5 hover:bg-muted">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                  <ul className="max-h-60 overflow-y-auto py-1">
+                    {(allCategoriesData ?? [])
+                      .filter((cat) => !allCategories.has(cat.id))
+                      .map((cat) => (
+                        <li key={cat.id}>
+                          <button
+                            type="button"
+                            className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-muted"
+                            onClick={() => {
+                              setAddedCategoryIds((prev) => new Set(prev).add(cat.id));
+                              setShowCategoryPicker(false);
+                            }}
+                          >
+                            <span
+                              className="inline-block h-2.5 w-2.5 flex-shrink-0 rounded-full"
+                              style={{ backgroundColor: cat.color }}
+                            />
+                            <span className="flex-1 truncate text-left">{cat.name}</span>
+                            {cat.workdayCode && (
+                              <span className="text-xs text-muted-foreground">{cat.workdayCode}</span>
+                            )}
+                          </button>
+                        </li>
+                      ))}
+                    {(allCategoriesData ?? []).filter((cat) => !allCategories.has(cat.id)).length === 0 && (
+                      <li className="px-3 py-2 text-sm text-muted-foreground">All categories already shown</li>
+                    )}
+                  </ul>
+                </div>
+              )}
+            </div>
             <Button
               variant="secondary"
               onClick={() => roundWeek.mutate(week)}
