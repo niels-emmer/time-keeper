@@ -125,7 +125,7 @@ See [docs/integration/api-subdomain.md](docs/integration/api-subdomain.md).
 
 ## Dependency audit
 
-Audited with `yarn npm audit --all --recursive --severity high` on **2026-11-14**. The audit is **not** clean: pre-existing high/critical advisories remain in transitive dependencies (a mix of runtime, build-time, and dev-only packages). Triage is tracked in the remediation plan's Phase 4; until then the CI `audit` job runs the command above and fails on findings rather than hiding them behind `continue-on-error`.
+Audited with `yarn npm audit --all --recursive --severity high` on **2026-11-14**. The audit is **clean** (`No audit suggestions`) after this change cleared the remaining high advisory in `zod` (GHSA-mrhx-c7xc-m3w5). The CI `audit` job runs the command above and fails on any future finding rather than hiding it behind `continue-on-error`.
 
 The frontend dependency graph was also refreshed on 2026-05-13: app/runtime deps now include `@tanstack/react-query` 5.100.x and `react-router-dom` 7.15.x, the frontend build/test toolchain was refreshed (`vite` 6.4.2, `vite-plugin-pwa` 1.3.0, `vitest` 4.1.6), backend tooling now uses `drizzle-kit` 0.31.10, and the root `resolutions` pin patched transitive versions for packages such as `@babel/plugin-transform-modules-systemjs`, `esbuild`, `fast-uri`, `ip-address`, `postcss`, `rollup`, and `serialize-javascript`.
 
@@ -140,7 +140,7 @@ Runtime dependencies and their risk profiles:
 | `express` | `^4` | 15+ years old, very widely used, actively maintained |
 | `better-sqlite3` | `^13` | Widely used SQLite binding; includes a native C++ addon. 13.x ships prebuilt binaries for current Node versions (including Node 26) and falls back to compiling with node-gyp — highest-risk category by nature of native code |
 | `drizzle-orm` | `^0.45` | Newer library (2022–); less battle-tested than Prisma but growing adoption. Upgraded from 0.38 to fix CVE-2026-39356 (SQL injection via identifier escaping). |
-| `zod` | `^3` | Pure TypeScript; used for all input validation on the backend |
+| `zod` | `^4` | Pure TypeScript; used for all input validation on the backend. Upgraded from 3.x to clear GHSA-mrhx-c7xc-m3w5 (memory exhaustion when validating oversized constrained collections) |
 | `express-rate-limit` | `^7` | Simple, auditable rate-limiting middleware |
 | `react` + `vite` | current | Mainstream, heavily used |
 | `@tanstack/react-query` | current | Mainstream, well-maintained |

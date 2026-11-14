@@ -10,8 +10,16 @@ export const categoriesRouter = Router();
 const targetCadenceSchema = z.enum(['monthly', 'weekly', 'one_time']);
 const targetMinutesSchema = z.number().int().min(1).max(525_600);
 
+type TargetValidationInput = {
+  targetCadence?: 'monthly' | 'weekly' | 'one_time' | null;
+  targetMinutes?: number | null;
+};
+
 function withTargetValidation<T extends z.ZodRawShape>(shape: T) {
-  return z.object(shape).superRefine((value, ctx) => {
+  return z.object(shape).superRefine((rawValue, ctx) => {
+    // Zod 4 loses the concrete object shape inside a generic `superRefine`
+    // callback; narrow to the fields this refinement actually inspects.
+    const value = rawValue as TargetValidationInput;
     const hasTargetCadence = Object.prototype.hasOwnProperty.call(value, 'targetCadence');
     const hasTargetMinutes = Object.prototype.hasOwnProperty.call(value, 'targetMinutes');
 
