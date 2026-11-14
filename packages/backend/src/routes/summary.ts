@@ -10,10 +10,32 @@ import { createError } from '../middleware/errorHandler.js';
 
 export const summaryRouter = Router();
 
+/**
+ * ISO-8601 week key, e.g. `2026-W07`.
+ *
+ * `isoWeekBounds()` in `@time-keeper/shared` splits on `-W` and `parseInt`s the
+ * parts, so arbitrary strings can produce Invalid Date / RangeError and turn a
+ * bad query parameter into a 500. Validating the shape first (finding L-2)
+ * makes garbage a 400 via the error handler instead.
+ */
+const isoWeekSchema = z.string().regex(/^\d{4}-W\d{2}$/);
+
+/**
+ * Calendar month key, `YYYY-MM` with a real 01–12 month (finding L-3).
+ */
+const monthSchema = z
+  .string()
+  .regex(/^\d{4}-\d{2}$/)
+  .refine((value) => {
+    const month = Number(value.slice(5, 7));
+    return month >= 1 && month <= 12;
+  }, { message: 'Month must be between 01 and 12' });
+
 summaryRouter.get('/weekly', (req, res, next) => {
   try {
     const week =
-      (req.query.week as string | undefined) ?? toISOWeek(new Date());
+      z.object({ week: isoWeekSchema.optional() }).parse(req.query).week ??
+      toISOWeek(new Date());
     const summary = getWeeklySummary(req.userId, week);
     res.json(summary);
   } catch (err) {
@@ -23,10 +45,9 @@ summaryRouter.get('/weekly', (req, res, next) => {
 
 summaryRouter.get('/monthly', (req, res, next) => {
   try {
-    const month = z
-      .object({ month: z.string().regex(/^\d{4}-\d{2}$/).optional() })
-      .parse(req.query)
-      .month ?? new Date().toISOString().slice(0, 7);
+    const month =
+      z.object({ month: monthSchema.optional() }).parse(req.query).month ??
+      new Date().toISOString().slice(0, 7);
 
     const summary = getMonthlySummary(req.userId, month);
     res.json(summary);
@@ -50,9 +71,7 @@ summaryRouter.post('/round', (req, res, next) => {
 
 summaryRouter.post('/round-week', (req, res, next) => {
   try {
-    const { week } = z
-      .object({ week: z.string().regex(/^\d{4}-W\d{2}$/) })
-      .parse(req.body);
+    const { week } = z.object({ week: isoWeekSchema }).parse(req.body);
 
     const { dates } = getWeekDateRange(week);
     const results = dates.map((date) => applyRounding(req.userId, date));
