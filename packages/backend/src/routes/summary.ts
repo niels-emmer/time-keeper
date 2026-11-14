@@ -1,12 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { eq, and, gte, lte, isNotNull, asc } from 'drizzle-orm';
+import { eq, and, gte, lt, isNotNull, asc } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { timeEntries } from '../db/schema.js';
-import { getWeeklySummary, getMonthlySummary, getWeekDateRange } from '../services/summaryService.js';
+import { getWeeklySummary, getMonthlySummary, getWeekDateRange, getUserTimeZone } from '../services/summaryService.js';
 import { applyRounding } from '../services/roundingService.js';
 import { assertOwnedCategory } from '../services/categoryService.js';
-import { toISOWeek } from '@time-keeper/shared';
+import { localDayBounds, toISOWeek } from '@time-keeper/shared';
 
 export const summaryRouter = Router();
 
@@ -74,7 +74,9 @@ summaryRouter.post('/round-week', (req, res, next) => {
     const { week } = z.object({ week: isoWeekSchema }).parse(req.body);
 
     const { dates } = getWeekDateRange(week);
-    const results = dates.map((date) => applyRounding(req.userId, date));
+    // One outer transaction: a failure on any day rolls the whole week back
+    // instead of leaving earlier days committed (finding M-9).
+    const results = db.transaction(() => dates.map((date) => applyRounding(req.userId, date)));
     res.json({ week, results });
   } catch (err) {
     next(err);
@@ -93,8 +95,12 @@ summaryRouter.patch('/adjust-cell', (req, res, next) => {
 
     assertOwnedCategory(req.userId, categoryId, 404);
 
-    const startOfDay = `${date}T00:00:00.000Z`;
-    const endOfDay   = `${date}T23:59:59.999Z`;
+    // Local-day window (H-3 follow-up): the Weekly summary edits a local day,
+    // so adjust-cell must find the same entries.
+    const timeZone = getUserTimeZone(req.userId);
+    const dayBounds = localDayBounds(date, timeZone);
+    const startOfDay = dayBounds.start.toISOString();
+    const endOfDay = dayBounds.endExclusive.toISOString();
     const now = new Date().toISOString();
 
     const existing = db.select().from(timeEntries)
@@ -103,7 +109,7 @@ summaryRouter.patch('/adjust-cell', (req, res, next) => {
         eq(timeEntries.categoryId, categoryId),
         isNotNull(timeEntries.endTime),
         gte(timeEntries.startTime, startOfDay),
-        lte(timeEntries.startTime, endOfDay),
+        lt(timeEntries.startTime, endOfDay),
       ))
       .orderBy(asc(timeEntries.startTime))
       .all();
@@ -115,11 +121,13 @@ summaryRouter.patch('/adjust-cell', (req, res, next) => {
           .run();
       }
     } else if (existing.length === 0) {
-      const startTime = `${date}T09:00:00.000Z`;
+      // 09:00 inside the user's local day, not 09:00 UTC.
+      const startTime = new Date(dayBounds.start.getTime() + 9 * 60 * 60 * 1000).toISOString();
       const endTime   = new Date(new Date(startTime).getTime() + minutes * 60000).toISOString();
       db.insert(timeEntries).values({
         userId: req.userId, categoryId, startTime, endTime,
-        rounded: false, createdAt: now, updatedAt: now,
+        // The user typed this value: never re-round it (finding M-9).
+        rounded: true, createdAt: now, updatedAt: now,
       }).run();
     } else {
       const allButLast    = existing.slice(0, -1);
@@ -132,9 +140,22 @@ summaryRouter.patch('/adjust-cell', (req, res, next) => {
         new Date(lastEntry.startTime).getTime() + desiredLastMin * 60000
       ).toISOString();
       db.update(timeEntries)
-        .set({ endTime: newEndTime, updatedAt: now })
+        // The typed value is authoritative: mark it rounded so "Round week"
+        // does not silently change it (finding M-9).
+        .set({ endTime: newEndTime, rounded: true, updatedAt: now })
         .where(and(eq(timeEntries.id, lastEntry.id), eq(timeEntries.userId, req.userId)))
         .run();
+
+      // The cell total is what the user typed, so freeze the category's other
+      // entries for the day as well — otherwise rounding could still shift
+      // the cell total through them.
+      for (const entry of existing) {
+        if (entry.id === lastEntry.id) continue;
+        db.update(timeEntries)
+          .set({ rounded: true, updatedAt: now })
+          .where(and(eq(timeEntries.id, entry.id), eq(timeEntries.userId, req.userId)))
+          .run();
+      }
     }
 
     res.status(200).json({ ok: true });

@@ -4,8 +4,11 @@
  * Rules:
  * - Round each category's raw minutes UP to the nearest rounding increment (30 or 60 min).
  * - If the resulting day total would push the ISO week over the weekly goal,
- *   cap the day at the remaining weekly headroom.
- *   Excess is removed from the category with the most minutes (greedy smallest-first removal).
+ *   remove the rounding bonus starting with the category with the most minutes
+ *   (greedy largest-first removal). The bonus is never removed below raw
+ *   minutes, so real work is never discarded; when the day's raw minutes alone
+ *   still exceed the remaining headroom, `weekWouldExceed` reports that
+ *   instead of hiding the overrun.
  * - Already-rounded entries are not re-rounded (idempotent via `rounded` flag).
  * - A day with 0 minutes produces no rounding adjustments.
  */
