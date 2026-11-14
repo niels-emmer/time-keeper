@@ -127,7 +127,7 @@ Runtime dependencies and their risk profiles:
 | `express` | `^4` | 15+ years old, very widely used, actively maintained |
 | `better-sqlite3` | `^13` | Widely used SQLite binding; includes a native C++ addon. 13.x ships prebuilt binaries for current Node versions (including Node 26) and falls back to compiling with node-gyp — highest-risk category by nature of native code |
 | `drizzle-orm` | `^0.45` | Newer library (2022–); less battle-tested than Prisma but growing adoption. Upgraded from 0.38 to fix CVE-2026-39356 (SQL injection via identifier escaping). |
-| `zod` | `^3` | Pure TypeScript; used for all input validation on the backend |
+| `zod` | `^4` | Pure TypeScript; used for all input validation on the backend |
 | `express-rate-limit` | `^7` | Simple, auditable rate-limiting middleware |
 | `react` + `vite` | current | Mainstream, heavily used |
 | `@tanstack/react-query` | current | Mainstream, well-maintained |
