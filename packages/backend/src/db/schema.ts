@@ -48,6 +48,12 @@ export const timeEntries = sqliteTable(
   (t) => [
     index('idx_entries_user_start').on(t.userId, t.startTime),
     index('idx_entries_user_category').on(t.userId, t.categoryId),
+    // Enforce invariant I-003 in the database: at most one open timer per user
+    // (finding H-1). A partial index allows many completed rows but only one
+    // row with `end_time IS NULL` for each user.
+    uniqueIndex('idx_entries_one_open_per_user')
+      .on(t.userId)
+      .where(sql`end_time IS NULL`),
   ]
 );
 

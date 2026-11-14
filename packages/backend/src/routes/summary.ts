@@ -2,11 +2,11 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { eq, and, gte, lte, isNotNull, asc } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { timeEntries, categories } from '../db/schema.js';
+import { timeEntries } from '../db/schema.js';
 import { getWeeklySummary, getMonthlySummary, getWeekDateRange } from '../services/summaryService.js';
 import { applyRounding } from '../services/roundingService.js';
+import { assertOwnedCategory } from '../services/categoryService.js';
 import { toISOWeek } from '@time-keeper/shared';
-import { createError } from '../middleware/errorHandler.js';
 
 export const summaryRouter = Router();
 
@@ -91,11 +91,7 @@ summaryRouter.patch('/adjust-cell', (req, res, next) => {
   try {
     const { date, categoryId, minutes } = adjustCellSchema.parse(req.body);
 
-    // Verify category belongs to this user
-    const cat = db.select({ id: categories.id }).from(categories)
-      .where(and(eq(categories.id, categoryId), eq(categories.userId, req.userId)))
-      .get();
-    if (!cat) throw createError('Category not found', 404);
+    assertOwnedCategory(req.userId, categoryId, 404);
 
     const startOfDay = `${date}T00:00:00.000Z`;
     const endOfDay   = `${date}T23:59:59.999Z`;
