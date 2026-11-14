@@ -98,8 +98,22 @@ takes a backup, migrates a copy and prints before/after tables:
 yarn workspace @time-keeper/backend verify:migration
 ```
 
-## 3. What must be identical after the rehearsal
+### If the rehearsal aborts
 
+The migration is designed to stop rather than detach a row, so an abort is a
+result, not a crash. Two cases are reachable, and both roll the database back
+untouched:
+
+| Abort message | Cause | What to do |
+|---|---|---|
+| `UNIQUE constraint failed: __new_user_settings.user_id` | The same person owns rows under two spellings of their email (`Alice@…` and `alice@…`). They collapse into one account, so their settings rows collide. | Merge the duplicate before migrating: keep one `user_settings` row under the spelling you want, and update the other tables' `user_id` to match. The old proxy path stored whatever casing Authentik sent, so this is a realistic case. |
+| `UNIQUE constraint failed: users.username` | Two different emails derive the same username — for example `a.b@…` and `a+b@…` both slug to `a-b`, and a third account is literally `a-b-2@…`. | Rename one of the colliding accounts' data by changing its `user_id` to an email with a distinct local part, or decide the usernames by hand and migrate with a scripted mapping. |
+
+Anything else that aborts means the migration met a shape it does not
+understand. Stop, keep the backup, and treat it as a bug in the migration
+rather than something to work around by hand.
+
+## 3. What must be identical after the rehearsal
 ```sql
 -- Row counts: identical before and after.
 SELECT 'categories', COUNT(*) FROM categories

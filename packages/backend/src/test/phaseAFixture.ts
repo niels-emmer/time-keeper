@@ -51,7 +51,10 @@ function readMigrationSql(tag: string, drizzleDir: string = DRIZZLE_DIR): string
  * real migrator see exactly one pending migration (0011) on the next call,
  * reproducing an upgrade rather than a fresh install.
  */
-export function createLegacySeededDatabase(databasePath: string): void {
+export function createLegacySeededDatabase(
+  databasePath: string,
+  mutate?: (sqlite: Database.Database) => void
+): void {
   const sqlite = new Database(databasePath);
   try {
     sqlite.pragma('journal_mode = WAL');
@@ -75,6 +78,9 @@ export function createLegacySeededDatabase(databasePath: string): void {
       .run('legacy-fixture', lastLegacy.when);
 
     seedLegacyRows(sqlite);
+    // Tests inject a messier database (duplicate identities, colliding
+    // usernames) to prove the migration fails closed rather than detaching.
+    mutate?.(sqlite);
   } finally {
     sqlite.close();
   }

@@ -242,6 +242,93 @@ describe('Phase A migration (D7)', () => {
   });
 });
 
+/** Drizzle wraps failures with the query text; the SQLite reason is on `cause`. */
+function migrationFailure(run: () => void): string {
+  try {
+    run();
+  } catch (error) {
+    const wrapped = error as { message?: string; cause?: { message?: string } };
+    return `${wrapped.message ?? ''} ${wrapped.cause?.message ?? ''}`;
+  }
+  return '';
+}
+
+describe('migration fails closed on a messier database', () => {
+  /**
+   * The documented promise is that a row which cannot be attributed aborts the
+   * migration instead of being detached. These two cases are the reachable ways
+   * that happens; both must leave the database exactly as it was.
+   */
+
+  it('aborts and rolls back when two email spellings collapse into one account', () => {
+    const collisionPath = path.join(workDir, 'legacy-case-collision.db');
+
+    // The old proxy path stored whatever casing Authentik sent, so the same
+    // person can genuinely own rows under two spellings. Both collapse to one
+    // normalised email, which would collide on user_settings' primary key.
+    createLegacySeededDatabase(collisionPath, (sqlite) => {
+      sqlite
+        .prepare('INSERT INTO user_settings ("user_id", "weekly_goal_hours") VALUES (?, ?)')
+        .run('ALICE@example.com', 20);
+    });
+
+    const before = tableCounts(collisionPath);
+
+    expect(migrationFailure(() => migrateToHead(collisionPath))).toMatch(
+      /UNIQUE constraint failed: __new_user_settings\.user_id/
+    );
+
+    // Rolled back completely: still the legacy shape, no half-migrated tables.
+    const after = tableCounts(collisionPath);
+    expect(after).toEqual(before);
+    expect(after.users).toBeUndefined();
+    expect(after.sessions).toBeUndefined();
+  });
+
+  it('aborts when two different emails derive the same username', () => {
+    const collisionPath = path.join(workDir, 'legacy-username-collision.db');
+
+    // `a.b@` and `a+b@` both slug to `a-b`; the runner de-collides the second
+    // as `a-b-2`. An account literally named `a-b-2@` therefore collides with
+    // a generated name — which the unique index must refuse, not silently merge.
+    createLegacySeededDatabase(collisionPath, (sqlite) => {
+      sqlite
+        .prepare('INSERT INTO categories ("user_id", "name") VALUES (?, ?)')
+        .run('a-b-2@example.com', 'Collider');
+    });
+
+    const before = tableCounts(collisionPath);
+
+    expect(migrationFailure(() => migrateToHead(collisionPath))).toMatch(
+      /UNIQUE constraint failed: users\.username/
+    );
+
+    expect(tableCounts(collisionPath)).toEqual(before);
+  });
+
+  it('migrates cleanly once the duplicate identity is resolved', () => {
+    const fixedPath = path.join(workDir, 'legacy-case-collision-fixed.db');
+
+    createLegacySeededDatabase(fixedPath, (sqlite) => {
+      // The operator merges the two spellings before migrating, which is the
+      // remediation the runbook prescribes.
+      const row = sqlite
+        .prepare('SELECT weekly_goal_hours FROM user_settings WHERE user_id = ?')
+        .get('alice@example.com') as { weekly_goal_hours: number } | undefined;
+      if (row) {
+        sqlite.prepare('DELETE FROM user_settings WHERE user_id = ?').run('alice@example.com');
+        sqlite
+          .prepare('UPDATE user_settings SET weekly_goal_hours = ? WHERE user_id = ?')
+          .run(row.weekly_goal_hours, 'ALICE@example.com');
+      }
+    });
+
+    expect(() => migrateToHead(fixedPath)).not.toThrow();
+    expect(tableCounts(fixedPath).users).toBe(7);
+    expect(foreignKeyViolations(fixedPath)).toEqual([]);
+  });
+});
+
 describe('migration runner', () => {
   it('restores foreign-key enforcement after the rebuild batch', async () => {
     const { default: Database } = await import('better-sqlite3');
