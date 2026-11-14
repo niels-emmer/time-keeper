@@ -13,6 +13,7 @@ import { eq } from 'drizzle-orm';
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 import { sql } from 'drizzle-orm';
 import { z } from 'zod';
+import { isValidTimeZone } from '@time-keeper/shared';
 
 // ── Inline schema (mirrors packages/backend/src/db/schema.ts) ───────────────
 
@@ -20,6 +21,7 @@ const userSettings = sqliteTable('user_settings', {
   userId: text('user_id').primaryKey(),
   weeklyGoalHours: integer('weekly_goal_hours').notNull().default(40),
   roundingIncrementMinutes: integer('rounding_increment_minutes').notNull().default(60),
+  timezone: text('timezone').notNull().default('UTC'),
   updatedAt: text('updated_at')
     .notNull()
     .default(sql`(datetime('now'))`),
@@ -30,6 +32,7 @@ const userSettings = sqliteTable('user_settings', {
 const updateSchema = z.object({
   weeklyGoalHours: z.number().int().min(0).max(40),
   roundingIncrementMinutes: z.union([z.literal(30), z.literal(60)]),
+  timezone: z.string().refine(isValidTimeZone).optional(),
 });
 
 // ── Test DB factory ──────────────────────────────────────────────────────────
@@ -41,6 +44,7 @@ function makeDb() {
       user_id TEXT PRIMARY KEY,
       weekly_goal_hours INTEGER NOT NULL DEFAULT 40,
       rounding_increment_minutes INTEGER NOT NULL DEFAULT 60,
+      timezone TEXT NOT NULL DEFAULT 'UTC',
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     )
   `);
@@ -65,14 +69,15 @@ function upsertSettings(
   db: ReturnType<typeof makeDb>,
   userId: string,
   weeklyGoalHours: number,
-  roundingIncrementMinutes: 30 | 60 = 60
+  roundingIncrementMinutes: 30 | 60 = 60,
+  timezone = 'UTC'
 ) {
   const now = new Date().toISOString();
   db.insert(userSettings)
-    .values({ userId, weeklyGoalHours, roundingIncrementMinutes, updatedAt: now })
+    .values({ userId, weeklyGoalHours, roundingIncrementMinutes, timezone, updatedAt: now })
     .onConflictDoUpdate({
       target: userSettings.userId,
-      set: { weeklyGoalHours, roundingIncrementMinutes, updatedAt: now },
+      set: { weeklyGoalHours, roundingIncrementMinutes, timezone, updatedAt: now },
     })
     .run();
 }
@@ -95,6 +100,11 @@ describe('settings service — getOrCreate', () => {
   it('creates a row with the default 60-min rounding increment', () => {
     const settings = getOrCreate(db, 'alice@example.com');
     expect(settings.roundingIncrementMinutes).toBe(60);
+  });
+
+  it('defaults the timezone to UTC so an untouched install is unchanged', () => {
+    const settings = getOrCreate(db, 'alice@example.com');
+    expect(settings.timezone).toBe('UTC');
   });
 
   it('returns the existing row without creating a duplicate', () => {
@@ -153,6 +163,12 @@ describe('settings service — upsertSettings', () => {
     const row = db.select().from(userSettings).where(eq(userSettings.userId, 'alice@example.com')).get();
     expect(row?.roundingIncrementMinutes).toBe(30);
   });
+
+  it('stores an IANA timezone', () => {
+    upsertSettings(db, 'alice@example.com', 40, 60, 'Europe/Amsterdam');
+    const row = db.select().from(userSettings).where(eq(userSettings.userId, 'alice@example.com')).get();
+    expect(row?.timezone).toBe('Europe/Amsterdam');
+  });
 });
 
 describe('settings PUT validation schema', () => {
@@ -197,5 +213,10 @@ describe('settings PUT validation schema', () => {
   it('rejects non-numeric roundingIncrementMinutes', () => {
     expect(() => updateSchema.parse({ weeklyGoalHours: 40, roundingIncrementMinutes: '60' })).toThrow();
     expect(() => updateSchema.parse({ weeklyGoalHours: 40, roundingIncrementMinutes: null })).toThrow();
+  });
+
+  it('accepts a valid IANA timezone and rejects an invalid one', () => {
+    expect(() => updateSchema.parse({ weeklyGoalHours: 40, roundingIncrementMinutes: 60, timezone: 'Europe/Amsterdam' })).not.toThrow();
+    expect(() => updateSchema.parse({ weeklyGoalHours: 40, roundingIncrementMinutes: 60, timezone: 'Not/AZone' })).toThrow();
   });
 });

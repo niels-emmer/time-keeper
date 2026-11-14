@@ -61,6 +61,9 @@ export const userSettings = sqliteTable('user_settings', {
   userId: text('user_id').primaryKey(),
   weeklyGoalHours: integer('weekly_goal_hours').notNull().default(40),
   roundingIncrementMinutes: integer('rounding_increment_minutes').notNull().default(60),
+  // IANA zone used to bucket entries into local days (DEC-2 / finding H-3).
+  // Default UTC keeps an untouched install behaving exactly as before.
+  timezone: text('timezone').notNull().default('UTC'),
   updatedAt: text('updated_at')
     .notNull()
     .default(sql`(datetime('now'))`),

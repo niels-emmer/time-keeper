@@ -79,17 +79,25 @@ If `APP_VERSION` is omitted, the image now falls back to the latest git tag avai
 
 ## Backup
 
-The entire application state is a single SQLite file:
+The entire application state is a single SQLite file, but WAL mode means the file alone is not a consistent snapshot while the backend is running (finding M-5). Use the online `better-sqlite3` backup, or stop the backend first. Full detail, cron, and verification: [runbooks.md#rb-006-wal-safe-backup](runbooks.md#rb-006-wal-safe-backup).
 
 ```bash
 mkdir -p /opt/time-keeper/backups
-docker compose cp backend:/data/time-keeper.db /opt/time-keeper/backups/time-keeper-$(date +%Y%m%d).db
+docker compose exec -T backend node - <<'NODE'
+const Database = require('better-sqlite3');
+const db = new Database('/data/time-keeper.db');
+db.backup('/data/backup.db')
+  .then(() => { db.close(); console.log('WAL-safe snapshot written to /data/backup.db'); })
+  .catch((error) => { console.error(error); process.exit(1); });
+NODE
+docker compose cp backend:/data/backup.db "/opt/time-keeper/backups/time-keeper-$(date +%Y%m%d).db"
+docker compose exec backend rm /data/backup.db
 ```
 
 Daily cron job:
 
 ```cron
-0 2 * * * cd /opt/time-keeper && docker compose cp backend:/data/time-keeper.db backups/time-keeper-$(date +\%Y\%m\%d).db
+0 2 * * * cd /opt/time-keeper && docker compose exec -T backend node -e "const D=require('better-sqlite3');const db=new D('/data/time-keeper.db');db.backup('/data/backup.db').then(()=>db.close()).catch((e)=>{console.error(e);process.exit(1);})" && docker compose cp backend:/data/backup.db backups/time-keeper-$(date +\%Y\%m\%d).db && docker compose exec -T backend rm -f /data/backup.db
 ```
 
 ## Restore
@@ -97,5 +105,9 @@ Daily cron job:
 ```bash
 docker compose stop backend
 docker compose cp /opt/time-keeper/backups/time-keeper-YYYYMMDD.db backend:/data/time-keeper.db
+# remove stale WAL/SHM from the replaced database, or SQLite may replay them
+docker compose run --rm --entrypoint sh backend -c 'rm -f /data/time-keeper.db-wal /data/time-keeper.db-shm'
 docker compose start backend
 ```
+
+Verify with the restore drill in [runbooks.md#rb-007-restore-drill](runbooks.md#rb-007-restore-drill).

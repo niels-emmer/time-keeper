@@ -23,6 +23,13 @@ export class AuthError extends Error {
   }
 }
 
+export interface SettingsPayload {
+  weeklyGoalHours: number;
+  roundingIncrementMinutes: 30 | 60;
+  /** IANA zone used for local-day bucketing (DEC-2); defaults to UTC. */
+  timezone: string;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     headers: { 'Content-Type': 'application/json', ...init?.headers },
@@ -99,9 +106,9 @@ export const api = {
   },
 
   settings: {
-    get: () => request<{ weeklyGoalHours: number; roundingIncrementMinutes: 30 | 60 }>('/settings'),
-    update: (settings: { weeklyGoalHours: number; roundingIncrementMinutes: 30 | 60 }) =>
-      request<{ weeklyGoalHours: number; roundingIncrementMinutes: 30 | 60 }>('/settings', {
+    get: () => request<SettingsPayload>('/settings'),
+    update: (settings: SettingsPayload) =>
+      request<SettingsPayload>('/settings', {
         method: 'PUT',
         body: JSON.stringify(settings),
       }),

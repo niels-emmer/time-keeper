@@ -1,11 +1,18 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { eq, and, gte, lte, asc } from 'drizzle-orm';
+import { eq, and, gte, lt, asc } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { timeEntries } from '../db/schema.js';
-import { isoWeekBounds } from '@time-keeper/shared';
+import {
+  isoWeekBounds,
+  toDateString,
+  localDayKey,
+  localDayBounds,
+  addDaysToDayKey,
+} from '@time-keeper/shared';
 import { createError } from '../middleware/errorHandler.js';
 import { assertOwnedCategory } from '../services/categoryService.js';
+import { getUserTimeZone } from '../services/summaryService.js';
 import { createEntrySchema, updateEntrySchema, assertEntryRange } from '../utils/entryValidation.js';
 
 export const entriesRouter = Router();
@@ -16,23 +23,31 @@ export const entriesRouter = Router();
  * (finding L-2). Validate the shape first so garbage is a 400, not a 500.
  */
 const isoWeekSchema = z.string().regex(/^\d{4}-W\d{2}$/);
+const isoDateSchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 
 entriesRouter.get('/', (req, res, next) => {
   try {
-    const { date } = req.query;
-    const week = z.object({ week: isoWeekSchema.optional() }).parse(req.query).week;
+    const query = z
+      .object({ date: isoDateSchema.optional(), week: isoWeekSchema.optional() })
+      .parse(req.query);
+    const week = query.week;
+    const timeZone = getUserTimeZone(req.userId);
 
     let startStr: string;
     let endStr: string;
 
     if (week) {
-      const bounds = isoWeekBounds(week);
-      startStr = bounds.start.toISOString();
-      endStr = new Date(bounds.end.getTime() + 86_399_999).toISOString();
+      // Monday..Sunday as local calendar days (finding H-3).
+      const mondayKey = toDateString(isoWeekBounds(week).start);
+      const sundayKey = addDaysToDayKey(mondayKey, 6);
+      startStr = localDayBounds(mondayKey, timeZone).start.toISOString();
+      endStr = localDayBounds(sundayKey, timeZone).endExclusive.toISOString();
     } else {
-      const dateStr = (date as string | undefined) ?? new Date().toISOString().slice(0, 10);
-      startStr = `${dateStr}T00:00:00.000Z`;
-      endStr = `${dateStr}T23:59:59.999Z`;
+      const dateStr =
+        query.date ?? localDayKey(new Date().toISOString(), timeZone);
+      const bounds = localDayBounds(dateStr, timeZone);
+      startStr = bounds.start.toISOString();
+      endStr = bounds.endExclusive.toISOString();
     }
 
     const rows = db
@@ -42,7 +57,7 @@ entriesRouter.get('/', (req, res, next) => {
         and(
           eq(timeEntries.userId, req.userId),
           gte(timeEntries.startTime, startStr),
-          lte(timeEntries.startTime, endStr)
+          lt(timeEntries.startTime, endStr)
         )
       )
       .orderBy(asc(timeEntries.startTime))

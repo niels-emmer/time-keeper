@@ -1,8 +1,8 @@
-import { eq, and, gte, lte, isNotNull } from 'drizzle-orm';
+import { eq, and, gte, lt, isNotNull } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { timeEntries, categories } from '../db/schema.js';
-import { computeRounding } from '@time-keeper/shared';
-import { getWeekMinutesBefore, getWeeklyGoalMinutes, getRoundingIncrementMinutes } from './summaryService.js';
+import { computeRounding, localDayBounds } from '@time-keeper/shared';
+import { getWeekMinutesBefore, getWeeklyGoalMinutes, getRoundingIncrementMinutes, getUserTimeZone } from './summaryService.js';
 import type { RoundingResult } from '@time-keeper/shared';
 
 /**
@@ -10,8 +10,11 @@ import type { RoundingResult } from '@time-keeper/shared';
  * Idempotent: already-rounded entries are excluded from rounding input.
  */
 export function applyRounding(userId: string, date: string): RoundingResult {
-  const startStr = `${date}T00:00:00.000Z`;
-  const endStr = `${date}T23:59:59.999Z`;
+  const timeZone = getUserTimeZone(userId);
+  // Half-open local-day window, so DST days are 23/25 h without special cases.
+  const bounds = localDayBounds(date, timeZone);
+  const startStr = bounds.start.toISOString();
+  const endStr = bounds.endExclusive.toISOString();
 
   // Get all completed, not-yet-rounded entries for this day
   const dayEntries = db
@@ -23,7 +26,7 @@ export function applyRounding(userId: string, date: string): RoundingResult {
         isNotNull(timeEntries.endTime),
         eq(timeEntries.rounded, false),
         gte(timeEntries.startTime, startStr),
-        lte(timeEntries.startTime, endStr)
+        lt(timeEntries.startTime, endStr)
       )
     )
     .all();

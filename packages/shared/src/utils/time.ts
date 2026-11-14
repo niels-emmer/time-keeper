@@ -65,3 +65,131 @@ export function isoWeekBounds(week: string): { start: Date; end: Date } {
 export function toDateString(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
+
+// ── Local-day bucketing (DEC-2 / finding H-3) ──────────────────────────────
+//
+// Storage stays UTC (invariant I-004). These helpers answer "which calendar day
+// is this instant for this user?" using the IANA tz database through
+// `Intl.DateTimeFormat`, so DST transitions are handled by the runtime rather
+// than by fixed offsets.
+
+export const DEFAULT_TIME_ZONE = 'UTC';
+
+const DAY_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/** True when `timeZone` is an IANA zone name the runtime understands. */
+export function isValidTimeZone(timeZone: string): boolean {
+  if (typeof timeZone !== 'string' || timeZone.trim() === '') {
+    return false;
+  }
+  try {
+    const resolved = new Intl.DateTimeFormat('en-US', { timeZone }).resolvedOptions().timeZone;
+    // ES2024 also accepts raw UTC offsets like `+02:00`. They carry no DST
+    // rules, so they are not a valid "local day" definition here.
+    return !/^[+-]/.test(resolved);
+  } catch {
+    return false;
+  }
+}
+
+interface ZonedParts {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, '0');
+}
+
+function formatZonedParts(instantMs: number, timeZone: string): ZonedParts {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    hourCycle: 'h23',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  });
+  const parts = formatter.formatToParts(new Date(instantMs));
+  const value = (type: string) => {
+    const part = parts.find((candidate) => candidate.type === type);
+    return part ? Number(part.value) : NaN;
+  };
+
+  return {
+    year: value('year'),
+    month: value('month'),
+    day: value('day'),
+    hour: value('hour'),
+    minute: value('minute'),
+    second: value('second'),
+  };
+}
+
+/** Offset (local − UTC) in minutes at a given instant, for `timeZone`. */
+function offsetMinutesAt(instantMs: number, timeZone: string): number {
+  const parts = formatZonedParts(instantMs, timeZone);
+  const asUtcMs = Date.UTC(parts.year, parts.month - 1, parts.day, parts.hour, parts.minute, parts.second);
+  const instantSecond = Math.floor(instantMs / 1000) * 1000;
+  return Math.round((asUtcMs - instantSecond) / 60_000);
+}
+
+/** UTC instant of local midnight on `dayKey` in `timeZone`. */
+function localMidnightMs(dayKey: string, timeZone: string): number {
+  const [year, month, day] = dayKey.split('-').map(Number);
+  const wallAsUtcMs = Date.UTC(year, month - 1, day, 0, 0, 0, 0);
+
+  // A wall-clock time maps to an instant via the zone offset. The offset can
+  // change at the instant itself (DST boundary), so resolve twice.
+  const firstGuess = wallAsUtcMs - offsetMinutesAt(wallAsUtcMs, timeZone) * 60_000;
+  return wallAsUtcMs - offsetMinutesAt(firstGuess, timeZone) * 60_000;
+}
+
+function assertDayKey(dayKey: string): void {
+  if (!DAY_KEY_PATTERN.test(dayKey)) {
+    throw new RangeError(`Invalid day key "${dayKey}" (expected YYYY-MM-DD)`);
+  }
+}
+
+/** Add calendar days to a `YYYY-MM-DD` key. */
+export function addDaysToDayKey(dayKey: string, days: number): string {
+  assertDayKey(dayKey);
+  const [year, month, day] = dayKey.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return toDateString(date);
+}
+
+/** The local calendar day (`YYYY-MM-DD`) of a UTC ISO instant. */
+export function localDayKey(isoUtc: string, timeZone: string = DEFAULT_TIME_ZONE): string {
+  const instantMs = new Date(isoUtc).getTime();
+  if (!Number.isFinite(instantMs)) {
+    throw new RangeError(`Invalid ISO timestamp "${isoUtc}"`);
+  }
+  const parts = formatZonedParts(instantMs, timeZone);
+  return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}`;
+}
+
+/**
+ * Half-open UTC range for a local calendar day: `[start, endExclusive)`.
+ *
+ * `endExclusive` is the next local midnight, so a spring-forward day is 23 h
+ * and a fall-back day is 25 h without any special cases.
+ */
+export function localDayBounds(
+  dayKey: string,
+  timeZone: string = DEFAULT_TIME_ZONE
+): { start: Date; endExclusive: Date } {
+  assertDayKey(dayKey);
+  return {
+    start: new Date(localMidnightMs(dayKey, timeZone)),
+    endExclusive: new Date(localMidnightMs(addDaysToDayKey(dayKey, 1), timeZone)),
+  };
+}
+

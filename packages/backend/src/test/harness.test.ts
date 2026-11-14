@@ -38,7 +38,7 @@ describe('HTTP harness', () => {
       .set('X-authentik-email', 'harness@example.com');
 
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ weeklyGoalHours: 40, roundingIncrementMinutes: 60 });
+    expect(res.body).toEqual({ weeklyGoalHours: 40, roundingIncrementMinutes: 60, timezone: 'UTC' });
   });
 
   it('gives each call its own database, even within one test file', async () => {
@@ -61,6 +61,6 @@ describe('HTTP harness', () => {
     // If the second call had reused the first call's module-level db, this
     // would return the 12 h / 30 min row the first app wrote.
     expect(res.status).toBe(200);
-    expect(res.body).toEqual({ weeklyGoalHours: 40, roundingIncrementMinutes: 60 });
+    expect(res.body).toEqual({ weeklyGoalHours: 40, roundingIncrementMinutes: 60, timezone: 'UTC' });
   });
 });
