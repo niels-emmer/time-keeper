@@ -24,7 +24,27 @@ vi.mock('../db/schema.js', () => ({
     tokenHash: 'token_hash',
     id: 'id',
   },
+  users: {
+    id: 'users.id',
+    email: 'users.email',
+  },
+  sessions: {
+    idHash: 'sessions.id_hash',
+    userId: 'sessions.user_id',
+  },
 }));
+
+/**
+ * Phase A (D7): the header path now resolves the email to a `users` row and
+ * attaches `users.id`. The unit tests below mock that lookup, so this is the
+ * account the mocked `get()` returns.
+ */
+const resolvedUser = {
+  id: '11111111-1111-4111-8111-111111111111',
+  email: 'alice@example.com',
+  role: 'user' as const,
+  disabled: false,
+};
 
 const originalEnv = { ...process.env };
 
@@ -109,6 +129,7 @@ describe('authMiddleware', () => {
   it('accepts header auth in production when X-Internal-Token matches', async () => {
     const { authMiddleware } = await import('./auth.js');
     process.env.INTERNAL_PROXY_SECRET = 'expected-secret';
+    mockGet.mockReturnValue(resolvedUser);
 
     const req = makeRequest({
       headers: {
@@ -122,7 +143,8 @@ describe('authMiddleware', () => {
     authMiddleware(req, res, next);
 
     expect(next).toHaveBeenCalledOnce();
-    expect(req.userId).toBe('alice@example.com');
+    expect(req.userId).toBe(resolvedUser.id);
+    expect(req.userEmail).toBe('alice@example.com');
     expect(req.authMethod).toBe('header');
     expect(res.statusCode).toBe(200);
   });
@@ -151,6 +173,7 @@ describe('authMiddleware', () => {
   it('treats an IPv4-mapped loopback peer as trusted', async () => {
     const { authMiddleware } = await import('./auth.js');
     process.env.INTERNAL_PROXY_SECRET = 'expected-secret';
+    mockGet.mockReturnValue(resolvedUser);
 
     const req = makeRequest({
       headers: {
@@ -165,13 +188,15 @@ describe('authMiddleware', () => {
     authMiddleware(req, res, next);
 
     expect(next).toHaveBeenCalledOnce();
-    expect(req.userId).toBe('alice@example.com');
+    expect(req.userId).toBe(resolvedUser.id);
+    expect(req.userEmail).toBe('alice@example.com');
   });
 
   it('keeps DEV_USER_ID fallback available outside production', async () => {
     const { authMiddleware } = await import('./auth.js');
     process.env.NODE_ENV = 'development';
     process.env.DEV_USER_ID = 'dev@example.com';
+    mockGet.mockReturnValue({ ...resolvedUser, email: 'dev@example.com' });
 
     const req = makeRequest();
     const res = makeResponse();
@@ -180,7 +205,8 @@ describe('authMiddleware', () => {
     authMiddleware(req, res, next);
 
     expect(next).toHaveBeenCalledOnce();
-    expect(req.userId).toBe('dev@example.com');
+    expect(req.userId).toBe(resolvedUser.id);
+    expect(req.userEmail).toBe('dev@example.com');
     expect(req.authMethod).toBe('header');
   });
 

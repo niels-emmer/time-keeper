@@ -11,7 +11,7 @@ import type { Express } from 'express';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { and, eq, isNull } from 'drizzle-orm';
-import { createTestApp } from '../test/harness.js';
+import { createTestApp, seedUser } from '../test/harness.js';
 import { timeEntries } from '../db/schema.js';
 import type { AppDatabase } from '../db/client.js';
 
@@ -40,6 +40,7 @@ describe('timer start ownership (P2-2)', () => {
   it("rejects starting a timer on another user's category with 400 and inserts nothing", async () => {
     const alice = 'owner-alice@example.com';
     const bob = 'intruder-bob@example.com';
+    const bobId = seedUser(db, bob);
     const aliceCategory = await createCategory(app, alice, "Alice's project");
 
     const res = await request(app)
@@ -53,7 +54,7 @@ describe('timer start ownership (P2-2)', () => {
     const bobRows = db
       .select()
       .from(timeEntries)
-      .where(eq(timeEntries.userId, bob))
+      .where(eq(timeEntries.userId, bobId))
       .all();
     expect(bobRows).toHaveLength(0);
   });
@@ -74,6 +75,7 @@ describe('timer start ownership (P2-2)', () => {
 
   it('auto-stops the previous timer so exactly one open row remains', async () => {
     const user = 'auto-stop@example.com';
+    const userId = seedUser(db, user);
     const first = await createCategory(app, user, 'First project');
     const second = await createCategory(app, user, 'Second project');
 
@@ -92,7 +94,7 @@ describe('timer start ownership (P2-2)', () => {
     const open = db
       .select()
       .from(timeEntries)
-      .where(and(eq(timeEntries.userId, user), isNull(timeEntries.endTime)))
+      .where(and(eq(timeEntries.userId, userId), isNull(timeEntries.endTime)))
       .all();
     expect(open).toHaveLength(1);
     expect(open[0].categoryId).toBe(second);

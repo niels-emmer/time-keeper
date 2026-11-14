@@ -1,9 +1,9 @@
 import Database from 'better-sqlite3';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
-import { migrate } from 'drizzle-orm/better-sqlite3/migrator';
 import path from 'path';
 import fs from 'fs';
 import * as schema from './schema.js';
+import { migrateWithRebuildSafety } from './migrationRunner.js';
 
 /**
  * Open a SQLite database at `databasePath` and wrap it in a Drizzle client.
@@ -39,9 +39,14 @@ export const db = createDb(DB_PATH);
 /**
  * Run Drizzle migrations from the ./drizzle directory.
  * Called once at server startup; tests pass their own database.
+ *
+ * Foreign-key enforcement is toggled around the batch by
+ * `migrateWithRebuildSafety` — migration 0011 rebuilds tables, which SQLite
+ * cannot do with enforcement on. The helper re-validates with
+ * `PRAGMA foreign_key_check` before restoring it.
  */
 export function runMigrations(database: AppDatabase = db): void {
   const migrationsFolder = path.join(import.meta.dirname, '..', '..', 'drizzle');
-  migrate(database, { migrationsFolder });
+  migrateWithRebuildSafety(database, database.$client, migrationsFolder);
   console.log('Database migrations applied.');
 }

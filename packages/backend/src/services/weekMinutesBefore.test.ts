@@ -8,7 +8,7 @@
 import type { Express } from 'express';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp } from '../test/harness.js';
+import { createTestApp, seedUser } from '../test/harness.js';
 import { timeEntries } from '../db/schema.js';
 import type { AppDatabase } from '../db/client.js';
 
@@ -42,7 +42,7 @@ describe('getWeekMinutesBefore half-open interval (P2-6)', () => {
     const insert = (startTime: string, endTime: string) =>
       db
         .insert(timeEntries)
-        .values({ userId: user, categoryId, startTime, endTime, rounded: false, createdAt: now, updatedAt: now })
+        .values({ userId: seedUser(db, user), categoryId, startTime, endTime, rounded: false, createdAt: now, updatedAt: now })
         .run();
 
     // Monday 2026-03-30, earlier in week 2026-W14 — 60 minutes.
@@ -50,6 +50,6 @@ describe('getWeekMinutesBefore half-open interval (P2-6)', () => {
     // Wednesday 2026-04-01 00:00:00.000Z exactly — the day's own bucket.
     insert('2026-04-01T00:00:00.000Z', '2026-04-01T01:00:00.000Z');
 
-    expect(getWeekMinutesBefore(user, '2026-04-01')).toBe(60);
+    expect(getWeekMinutesBefore(seedUser(db, user), '2026-04-01')).toBe(60);
   });
 });

@@ -13,7 +13,7 @@ import express, { type Express } from 'express';
 import request from 'supertest';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { AppDatabase } from '../db/client.js';
-import { createTestApp } from '../test/harness.js';
+import { createTestApp, seedUser } from '../test/harness.js';
 
 const PROXY_SECRET = 'peer-test-secret';
 const originalEnv = { ...process.env };
@@ -43,11 +43,11 @@ function asHeaderUser(req: request.Test, email = 'alice@example.com'): request.T
   return req.set('X-authentik-email', email).set('X-Internal-Token', PROXY_SECRET);
 }
 
-async function seedToken(rawToken: string, userId: string): Promise<void> {
+async function seedToken(rawToken: string, email: string): Promise<void> {
   const { apiTokens } = await import('../db/schema.js');
   db.insert(apiTokens)
     .values({
-      userId,
+      userId: seedUser(db, email),
       tokenHash: createHash('sha256').update(rawToken).digest('hex'),
       label: 'peer-test',
       expiresAt: '2999-01-01T00:00:00.000Z',

@@ -12,7 +12,7 @@ import type { Express } from 'express';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { and, eq, isNull } from 'drizzle-orm';
-import { createTestApp } from '../test/harness.js';
+import { createTestApp, seedUser } from '../test/harness.js';
 import { timeEntries } from '../db/schema.js';
 import type { AppDatabase } from '../db/client.js';
 
@@ -59,6 +59,7 @@ describe('one-active-timer invariant (P2-1)', () => {
 
   it('rejects PATCH endTime:null with 400 instead of reopening an entry', async () => {
     const user = 'patch-null@example.com';
+    const userId = seedUser(db, user);
     const categoryId = await createCategory(app, user, 'Project Alpha');
     const entryId = await createCompletedEntry(app, user, categoryId);
 
@@ -75,19 +76,20 @@ describe('one-active-timer invariant (P2-1)', () => {
     const open = db
       .select()
       .from(timeEntries)
-      .where(and(eq(timeEntries.userId, user), isNull(timeEntries.endTime)))
+      .where(and(eq(timeEntries.userId, userId), isNull(timeEntries.endTime)))
       .all();
     expect(open).toHaveLength(0);
   });
 
   it('fails a direct INSERT of a second open row for the same user', async () => {
     const user = 'direct-insert@example.com';
+    const userId = seedUser(db, user);
     const categoryId = await createCategory(app, user, 'Project Beta');
     const now = nowIso();
 
     db.insert(timeEntries)
       .values({
-        userId: user,
+        userId,
         categoryId,
         startTime: '2026-03-03T09:00:00.000Z',
         endTime: null,
@@ -101,7 +103,7 @@ describe('one-active-timer invariant (P2-1)', () => {
       db
         .insert(timeEntries)
         .values({
-          userId: user,
+          userId,
           categoryId,
           startTime: '2026-03-03T11:00:00.000Z',
           endTime: null,
@@ -115,7 +117,7 @@ describe('one-active-timer invariant (P2-1)', () => {
     const open = db
       .select()
       .from(timeEntries)
-      .where(and(eq(timeEntries.userId, user), isNull(timeEntries.endTime)))
+      .where(and(eq(timeEntries.userId, userId), isNull(timeEntries.endTime)))
       .all();
     expect(open).toHaveLength(1);
   });
@@ -123,13 +125,15 @@ describe('one-active-timer invariant (P2-1)', () => {
   it('still allows each user their own single open row (partial index)', async () => {
     const alice = 'partial-alice@example.com';
     const bob = 'partial-bob@example.com';
+    const aliceId = seedUser(db, alice);
+    const bobId = seedUser(db, bob);
     const aliceCategory = await createCategory(app, alice, 'Project A');
     const bobCategory = await createCategory(app, bob, 'Project A');
     const now = nowIso();
 
     for (const [user, categoryId] of [
-      [alice, aliceCategory],
-      [bob, bobCategory],
+      [aliceId, aliceCategory],
+      [bobId, bobCategory],
     ] as const) {
       db.insert(timeEntries)
         .values({
@@ -145,7 +149,7 @@ describe('one-active-timer invariant (P2-1)', () => {
     }
 
     const open = db.select().from(timeEntries).where(isNull(timeEntries.endTime)).all();
-    expect(open.filter((row) => row.userId === alice)).toHaveLength(1);
-    expect(open.filter((row) => row.userId === bob)).toHaveLength(1);
+    expect(open.filter((row) => row.userId === aliceId)).toHaveLength(1);
+    expect(open.filter((row) => row.userId === bobId)).toHaveLength(1);
   });
 });

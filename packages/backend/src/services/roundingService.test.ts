@@ -11,7 +11,7 @@ import type { Express } from 'express';
 import request from 'supertest';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { eq } from 'drizzle-orm';
-import { createTestApp } from '../test/harness.js';
+import { createTestApp, seedUser } from '../test/harness.js';
 import { timeEntries } from '../db/schema.js';
 import type { AppDatabase } from '../db/client.js';
 
@@ -39,7 +39,7 @@ function insertEntry(
   const now = new Date().toISOString();
   return db
     .insert(timeEntries)
-    .values({ userId: user, categoryId, startTime, endTime, rounded: false, createdAt: now, updatedAt: now })
+    .values({ userId: seedUser(db, user), categoryId, startTime, endTime, rounded: false, createdAt: now, updatedAt: now })
     .returning()
     .get().id;
 }
@@ -79,6 +79,7 @@ describe('rounding atomicity and manual edits (P2-5)', () => {
 
   it('rolls back every write when a mid-loop update throws', async () => {
     const user = 'txn@example.com';
+    const userId = seedUser(db, user);
     const firstCategory = await createCategory(app, user, 'First');
     const secondCategory = await createCategory(app, user, 'Second');
 
@@ -89,7 +90,7 @@ describe('rounding atomicity and manual edits (P2-5)', () => {
 
     const restore = failOnUpdateCall(db, 2);
     try {
-      expect(() => applyRounding(user, '2026-04-06')).toThrow('injected rounding failure');
+      expect(() => applyRounding(userId, '2026-04-06')).toThrow('injected rounding failure');
     } finally {
       restore();
     }

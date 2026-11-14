@@ -12,6 +12,9 @@ infoRouter.get('/', (req, res) => {
   res.json({
     version: process.env.APP_VERSION ?? 'dev',
     repoUrl: 'https://github.com/niels-emmer/time-keeper',
-    user: req.userId,
+    // The account's email, not `users.id`: the identity model changed in
+    // Phase A (D7) but this response is part of the existing API surface, and
+    // Settings -> About still shows the address the user knows.
+    user: req.userEmail,
   });
 });

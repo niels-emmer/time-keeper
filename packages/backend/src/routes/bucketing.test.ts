@@ -10,7 +10,7 @@
 import type { Express } from 'express';
 import request from 'supertest';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createTestApp } from '../test/harness.js';
+import { createTestApp, seedUser } from '../test/harness.js';
 import { timeEntries } from '../db/schema.js';
 import type { AppDatabase } from '../db/client.js';
 
@@ -45,7 +45,7 @@ function addEntry(
 ) {
   const now = new Date().toISOString();
   db.insert(timeEntries)
-    .values({ userId: user, categoryId, startTime, endTime, rounded: false, createdAt: now, updatedAt: now })
+    .values({ userId: seedUser(db, user), categoryId, startTime, endTime, rounded: false, createdAt: now, updatedAt: now })
     .run();
 }
 
