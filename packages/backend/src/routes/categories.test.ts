@@ -11,15 +11,20 @@ const targetMinutesSchema = z.number().int().min(1).max(525_600);
 
 function withTargetValidation<T extends z.ZodRawShape>(shape: T) {
   return z.object(shape).superRefine((value, ctx) => {
-    const hasTargetCadence = Object.prototype.hasOwnProperty.call(value, 'targetCadence');
-    const hasTargetMinutes = Object.prototype.hasOwnProperty.call(value, 'targetMinutes');
+    // Zod 4 resolves a generic object output to a union; narrow to the fields we inspect.
+    const fields = value as {
+      targetCadence?: 'monthly' | 'weekly' | 'one_time' | null;
+      targetMinutes?: number | null;
+    };
+    const hasTargetCadence = Object.prototype.hasOwnProperty.call(fields, 'targetCadence');
+    const hasTargetMinutes = Object.prototype.hasOwnProperty.call(fields, 'targetMinutes');
 
     if (!hasTargetCadence && !hasTargetMinutes) {
       return;
     }
 
-    const targetCadence = value.targetCadence;
-    const targetMinutes = value.targetMinutes;
+    const targetCadence = fields.targetCadence;
+    const targetMinutes = fields.targetMinutes;
 
     if (targetCadence == null && targetMinutes == null) {
       return;
