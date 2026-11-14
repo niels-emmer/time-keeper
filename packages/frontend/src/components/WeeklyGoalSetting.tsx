@@ -1,16 +1,28 @@
 import { useState, useEffect } from 'react';
 import { useSettings, useUpdateSettings } from '@/hooks/useSettings';
 
+function getTimeZoneOptions(current: string): string[] {
+  const intl = Intl as typeof Intl & { supportedValuesOf?: (key: 'timeZone') => string[] };
+  const supported = typeof intl.supportedValuesOf === 'function' ? intl.supportedValuesOf('timeZone') : [];
+  const base =
+    supported.length > 0
+      ? supported
+      : ['UTC', 'Europe/Amsterdam', 'Europe/London', 'America/New_York', 'Asia/Tokyo'];
+  return base.includes(current) ? base : [current, ...base];
+}
+
 export function WeeklyGoalSetting() {
   const { data, isLoading } = useSettings();
   const update = useUpdateSettings();
   const [value, setValue] = useState<number>(40);
   const [increment, setIncrement] = useState<30 | 60>(60);
+  const [timeZone, setTimeZone] = useState<string>('UTC');
 
   useEffect(() => {
     if (data !== undefined) {
       setValue(data.weeklyGoalHours);
       setIncrement(data.roundingIncrementMinutes);
+      setTimeZone(data.timezone);
     }
   }, [data]);
 
@@ -21,7 +33,7 @@ export function WeeklyGoalSetting() {
 
   function handleBlur() {
     if (data !== undefined && value !== data.weeklyGoalHours) {
-      update.mutate({ weeklyGoalHours: value, roundingIncrementMinutes: increment });
+      update.mutate({ weeklyGoalHours: value, roundingIncrementMinutes: increment, timezone: timeZone });
     }
   }
 
@@ -30,8 +42,20 @@ export function WeeklyGoalSetting() {
     update.mutate({
       weeklyGoalHours: value,
       roundingIncrementMinutes: next,
+      timezone: timeZone,
     });
   }
+
+  function handleTimeZoneChange(next: string) {
+    setTimeZone(next);
+    update.mutate({
+      weeklyGoalHours: value,
+      roundingIncrementMinutes: increment,
+      timezone: next,
+    });
+  }
+
+  const timeZoneOptions = getTimeZoneOptions(timeZone);
 
   return (
     <div className="space-y-4">
@@ -108,6 +132,31 @@ export function WeeklyGoalSetting() {
               </button>
             ))}
           </div>
+        </div>
+        {/* ── Divider ─────────────────────────────────────────── */}
+        <div className="border-t" />
+
+        {/* ── Time zone ───────────────────────────────────────── */}
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <span className="font-medium">Time zone</span>
+            <p className="text-muted-foreground text-xs mt-0.5">
+              Groups entries into local days. Defaults to UTC
+            </p>
+          </div>
+          <select
+            aria-label="Time zone"
+            value={isLoading ? 'UTC' : timeZone}
+            onChange={(event) => handleTimeZoneChange(event.target.value)}
+            disabled={isLoading || update.isPending}
+            className="max-w-[16rem] rounded-md border bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
+          >
+            {timeZoneOptions.map((zone) => (
+              <option key={zone} value={zone}>
+                {zone}
+              </option>
+            ))}
+          </select>
         </div>
       </div>
     </div>

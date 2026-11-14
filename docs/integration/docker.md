@@ -33,7 +33,20 @@ Docker network (proxy-net):
 |--------|-------|----------|
 | `db-data` | `/data` in `backend` | SQLite database file (`time-keeper.db`) |
 
-**Backup**: `docker compose cp backend:/data/time-keeper.db ./backup.db`
+**Backup**: do not copy the `.db` file while the backend is running — WAL mode keeps recent commits in `time-keeper.db-wal`, so a plain copy can silently miss the newest entries (finding M-5). Use the WAL-safe snapshot in [docs/operations/runbooks.md](../operations/runbooks.md#rb-006-wal-safe-backup) (online, `sqlite3 .backup`-equivalent via the bundled `better-sqlite3`) or stop the backend before copying. The image does not ship the `sqlite3` CLI.
+
+```bash
+# Online, consistent snapshot (no downtime)
+docker compose exec -T backend node - <<'NODE'
+const Database = require('better-sqlite3');
+const db = new Database('/data/time-keeper.db');
+db.backup('/data/backup.db')
+  .then(() => { db.close(); console.log('WAL-safe snapshot written to /data/backup.db'); })
+  .catch((error) => { console.error(error); process.exit(1); });
+NODE
+docker compose cp backend:/data/backup.db ./time-keeper-$(date +%Y%m%d).db
+docker compose exec backend rm /data/backup.db
+```
 
 ## Build contexts
 
@@ -71,8 +84,8 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 |----------|------|---------|
 | `GET /api/health` | No | Docker healthcheck; returns `{"status":"ok","version":"<current>"}` |
 | `GET /api/info` | Yes | Returns `{ version, repoUrl, user }` — shown in Settings → About |
-| `GET /api/settings` | Yes | Returns `{ weeklyGoalHours, roundingIncrementMinutes }` — user's configurable weekly target and rounding granularity |
-| `PUT /api/settings` | Yes | Update `{ weeklyGoalHours }` (integer, 0–40) and/or `{ roundingIncrementMinutes }` (30 or 60) |
+| `GET /api/settings` | Yes | Returns `{ weeklyGoalHours, roundingIncrementMinutes, timezone }` — weekly target, rounding granularity, and the IANA zone used for local-day bucketing |
+| `PUT /api/settings` | Yes | Update `{ weeklyGoalHours }` (integer, 0–40) and/or `{ roundingIncrementMinutes }` (30 or 60) and/or `{ timezone }` (IANA zone, e.g. `Europe/Amsterdam`) |
 | `GET /api/categories` | Yes | List categories ordered by `sort_order ASC` |
 | `POST /api/categories` | Yes | Create category (auto-assigns `sort_order`) |
 | `PUT /api/categories/:id` | Yes | Update a category |

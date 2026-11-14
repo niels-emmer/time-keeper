@@ -119,7 +119,8 @@ See [docs/integration/api-subdomain.md](docs/integration/api-subdomain.md).
 - There is no external database, no cloud sync, no analytics, no telemetry.
 - The file is readable by anyone with shell access to the host. Protect it with standard filesystem permissions and volume encryption if required.
 - The backend container now drops to the non-root `node` user at runtime; SQLite still remains host-readable to anyone with host access.
-- Backup = copy the file. See [docs/integration/docker.md](docs/integration/docker.md) for the one-liner.
+- WAL mode is enabled, so recent commits live in `time-keeper.db-wal` until checkpointed. **Backup must take a consistent snapshot** (online `better-sqlite3` backup, or stop the backend first) — copying only `time-keeper.db` while the backend runs can silently lose the newest entries (finding M-5). Procedure and restore drill: [docs/operations/runbooks.md](docs/operations/runbooks.md#rb-006-wal-safe-backup).
+- Timestamps stay UTC (invariant I-004). `user_settings.timezone` stores only the IANA zone used to bucket entries into local days; it contains no location history or telemetry.
 
 ---
 

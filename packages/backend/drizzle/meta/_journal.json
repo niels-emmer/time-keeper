@@ -71,6 +71,13 @@
       "when": 1794661263896,
       "tag": "0009_bent_nebula",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1794661788194,
+      "tag": "0010_marvelous_lifeguard",
+      "breakpoints": true
     }
   ]
 }

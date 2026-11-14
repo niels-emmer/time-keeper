@@ -24,6 +24,7 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
 
 - **One-tap timer** — tap a category to start, tap Stop to finish; starting a new category auto-stops the previous one, and the Track screen now supports search, pinned categories, and recent-category sections for faster switching
 - **Weekly goal** — configurable hours per week (0–40); shown in the top bar and weekly summary, drives the rounding cap
+- **Local-day bucketing** — pick your time zone in Settings and entries group by *your* calendar day (00:30 and 23:30 local stay on the day you logged them); storage stays UTC, and the default UTC keeps existing behaviour unchanged
 - **Monthly tab** — dedicated monthly planning view with month navigation, per-category targets, status chips, projected vs actual comparison, pace guidance, and billable vs non-billable breakdown
 - **Billable activity** — mark categories as billable or non-billable for monthly overview reporting
 - **Weekly overview** — time per category per day; click any cell to edit hours inline (totals update live as you type), open day logs to inspect/edit/delete the actual entries, backfill missed work, review the week, and copy or download CSV/plain-text/compact handoff formats

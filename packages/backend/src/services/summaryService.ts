@@ -1,7 +1,14 @@
-import { eq, and, gte, lte, isNotNull, asc } from 'drizzle-orm';
+import { eq, and, gte, lt, isNotNull, asc } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { timeEntries, categories, userSettings } from '../db/schema.js';
-import { isoWeekBounds, toDateString, toISOWeek } from '@time-keeper/shared';
+import {
+  isoWeekBounds,
+  toDateString,
+  toISOWeek,
+  localDayKey,
+  localDayBounds,
+  addDaysToDayKey,
+} from '@time-keeper/shared';
 import type {
   CategoryTargetCadence,
   WeeklySummary,
@@ -23,11 +30,31 @@ function getRoundingIncrementMinutes(userId: string): number {
   return row?.roundingIncrementMinutes ?? 60;
 }
 
-export function getWeeklySummary(userId: string, week: string): WeeklySummary {
-  const { start, end } = isoWeekBounds(week);
+/**
+ * The user's IANA time zone for local-day bucketing (DEC-2 / finding H-3).
+ * An install that never touched settings has no row, or a row defaulted to
+ * UTC, so behaviour is unchanged until the user picks a zone.
+ */
+export function getUserTimeZone(userId: string): string {
+  const row = db
+    .select({ timezone: userSettings.timezone })
+    .from(userSettings)
+    .where(eq(userSettings.userId, userId))
+    .get();
+  return row?.timezone ?? 'UTC';
+}
 
-  const startStr = start.toISOString();
-  const endStr = new Date(end.getTime() + 86399999).toISOString();
+export function getWeeklySummary(userId: string, week: string): WeeklySummary {
+  const timeZone = getUserTimeZone(userId);
+  const { start } = isoWeekBounds(week);
+  const weekStartKey = toDateString(start);
+  const dayKeys = Array.from({ length: 7 }, (_, index) => addDaysToDayKey(weekStartKey, index));
+
+  // The ISO week is Monday..Sunday as local calendar days, so the UTC window
+  // is the local Monday midnight through the local next-Monday midnight
+  // (half-open), which absorbs DST shifts.
+  const startStr = localDayBounds(dayKeys[0], timeZone).start.toISOString();
+  const endStr = localDayBounds(dayKeys[6], timeZone).endExclusive.toISOString();
 
   const entries = db
     .select({
@@ -47,7 +74,7 @@ export function getWeeklySummary(userId: string, week: string): WeeklySummary {
         eq(timeEntries.userId, userId),
         isNotNull(timeEntries.endTime),
         gte(timeEntries.startTime, startStr),
-        lte(timeEntries.startTime, endStr)
+        lt(timeEntries.startTime, endStr)
       )
     )
     .all();
@@ -57,16 +84,13 @@ export function getWeeklySummary(userId: string, week: string): WeeklySummary {
 
   const byDay = new Map<string, typeof entries>();
   for (const entry of entries) {
-    const dateStr = entry.startTime.slice(0, 10);
+    const dateStr = localDayKey(entry.startTime, timeZone);
     if (!byDay.has(dateStr)) byDay.set(dateStr, []);
     byDay.get(dateStr)!.push(entry);
   }
 
   const days: DaySummary[] = [];
-  for (let i = 0; i < 7; i++) {
-    const day = new Date(start);
-    day.setUTCDate(start.getUTCDate() + i);
-    const dateStr = toDateString(day);
+  for (const dateStr of dayKeys) {
     const dayEntries = byDay.get(dateStr) ?? [];
 
     const byCat = new Map<number, CategorySummary>();
@@ -101,16 +125,21 @@ export function getWeeklySummary(userId: string, week: string): WeeklySummary {
   return { week, totalMinutes, goalMinutes: weeklyGoalMinutes, days };
 }
 
-function getMonthBounds(monthYear: string) {
+function getMonthBounds(monthYear: string, timeZone: string) {
   const [yearStr, monthStr] = monthYear.split('-');
   const year = parseInt(yearStr, 10);
   const monthIndex = parseInt(monthStr, 10) - 1;
 
-  const start = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0, 0));
-  const end = new Date(Date.UTC(year, monthIndex + 1, 0, 23, 59, 59, 999));
+  // Month bounds are the local midnights on either side of the month, so a
+  // 00:30 local entry on the 1st belongs to this month (finding H-3).
+  const startKey = `${monthYear}-01`;
+  const nextMonthKey = toDateString(new Date(Date.UTC(year, monthIndex + 1, 1)));
   const daysInMonth = new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
 
-  return { start, end, year, monthIndex, daysInMonth };
+  const start = localDayBounds(startKey, timeZone).start;
+  const endExclusive = localDayBounds(nextMonthKey, timeZone).start;
+
+  return { start, endExclusive, year, monthIndex, daysInMonth };
 }
 
 function getMonthLabel(year: number, monthIndex: number) {
@@ -121,13 +150,13 @@ function getMonthLabel(year: number, monthIndex: number) {
   });
 }
 
-function getDaysElapsed(monthYear: string, daysInMonth: number) {
-  const now = new Date();
-  const currentMonthYear = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+function getDaysElapsed(monthYear: string, daysInMonth: number, timeZone: string) {
+  const currentDayKey = localDayKey(new Date().toISOString(), timeZone);
+  const currentMonthYear = currentDayKey.slice(0, 7);
 
   if (monthYear < currentMonthYear) return daysInMonth;
   if (monthYear > currentMonthYear) return 0;
-  return Math.min(now.getUTCDate(), daysInMonth);
+  return Math.min(Number(currentDayKey.slice(8, 10)), daysInMonth);
 }
 
 function computeMonthlyStatus(
@@ -196,6 +225,8 @@ export function buildMonthlySummaryData(input: {
     startTime: string;
     endTime: string;
   }>;
+  /** Local "today" month key, e.g. `2026-04`. Defaults to the UTC month. */
+  currentMonthYear?: string;
 }): MonthlySummary {
   const monthStartMs = new Date(input.monthStart).getTime();
   const monthEndMs = new Date(input.monthEnd).getTime();
@@ -296,7 +327,9 @@ export function buildMonthlySummaryData(input: {
     0
   );
   const nonBillableMinutes = totalActualMinutes - billableMinutes;
-  const currentMonthYear = `${new Date().getUTCFullYear()}-${String(new Date().getUTCMonth() + 1).padStart(2, '0')}`;
+  const currentMonthYear =
+    input.currentMonthYear ??
+    `${new Date().getUTCFullYear()}-${String(new Date().getUTCMonth() + 1).padStart(2, '0')}`;
 
   return {
     monthYear: input.monthYear,
@@ -314,8 +347,9 @@ export function buildMonthlySummaryData(input: {
 }
 
 export function getMonthlySummary(userId: string, monthYear: string): MonthlySummary {
-  const { start, end, year, monthIndex, daysInMonth } = getMonthBounds(monthYear);
-  const daysElapsed = getDaysElapsed(monthYear, daysInMonth);
+  const timeZone = getUserTimeZone(userId);
+  const { start, endExclusive, year, monthIndex, daysInMonth } = getMonthBounds(monthYear, timeZone);
+  const daysElapsed = getDaysElapsed(monthYear, daysInMonth, timeZone);
 
   const categoryRows = db
     .select({
@@ -340,7 +374,7 @@ export function getMonthlySummary(userId: string, monthYear: string): MonthlySum
     }
 
     const startMs = new Date(category.targetStartedAt).getTime();
-    if (!Number.isFinite(startMs) || startMs > end.getTime()) {
+    if (!Number.isFinite(startMs) || startMs > endExclusive.getTime()) {
       return earliest;
     }
 
@@ -359,7 +393,7 @@ export function getMonthlySummary(userId: string, monthYear: string): MonthlySum
         eq(timeEntries.userId, userId),
         isNotNull(timeEntries.endTime),
         gte(timeEntries.startTime, new Date(entryWindowStartMs).toISOString()),
-        lte(timeEntries.startTime, end.toISOString())
+        lt(timeEntries.startTime, endExclusive.toISOString())
       )
     )
     .all()
@@ -373,19 +407,23 @@ export function getMonthlySummary(userId: string, monthYear: string): MonthlySum
     monthYear,
     monthLabel: getMonthLabel(year, monthIndex),
     monthStart: start.toISOString(),
-    monthEnd: end.toISOString(),
+    monthEnd: new Date(endExclusive.getTime() - 1).toISOString(),
     daysElapsed,
     daysInMonth,
     categories: categoryRows,
     entries: entryRows,
+    currentMonthYear: localDayKey(new Date().toISOString(), timeZone).slice(0, 7),
   });
 }
 
 export function getWeekMinutesBefore(userId: string, date: string): number {
+  const timeZone = getUserTimeZone(userId);
   const week = toISOWeek(new Date(date));
-  const { start } = isoWeekBounds(week);
-  const startStr = start.toISOString();
-  const endStr = `${date}T00:00:00.000Z`;
+  const mondayKey = toDateString(isoWeekBounds(week).start);
+  const startStr = localDayBounds(mondayKey, timeZone).start.toISOString();
+  // Half-open: an entry at exactly this day's local midnight belongs to the
+  // day's own rounding bucket, not to "before" (finding L-4).
+  const endStr = localDayBounds(date, timeZone).start.toISOString();
 
   const result = db
     .select({ startTime: timeEntries.startTime, endTime: timeEntries.endTime })
@@ -395,7 +433,7 @@ export function getWeekMinutesBefore(userId: string, date: string): number {
         eq(timeEntries.userId, userId),
         isNotNull(timeEntries.endTime),
         gte(timeEntries.startTime, startStr),
-        lte(timeEntries.startTime, endStr)
+        lt(timeEntries.startTime, endStr)
       )
     )
     .all();
