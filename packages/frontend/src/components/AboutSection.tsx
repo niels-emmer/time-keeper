@@ -1,14 +1,30 @@
 import { ExternalLink } from 'lucide-react';
 import { useInfo } from '@/hooks/useInfo';
+import { QueryState } from '@/components/QueryState';
 import { useAppStatus } from '@/lib/appStatusContext';
 
 export function AboutSection() {
-  const { data, isLoading } = useInfo();
+  const { data, isLoading, isError, error, refetch } = useInfo();
   const { isOnline, updateAvailable, applyingUpdate, applyUpdate, lastConnectionChangeAt } = useAppStatus();
 
   const lastChangeLabel = lastConnectionChangeAt
     ? new Date(lastConnectionChangeAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
     : '—';
+
+  if (isError) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">About</h2>
+        <QueryState
+          isError
+          error={error}
+          errorTitle="Could not load app info"
+          onRetry={() => refetch()}
+          className="py-8"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

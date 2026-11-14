@@ -3,9 +3,11 @@ import { ChevronLeft, ChevronRight, Pencil, Plus, Trash2 } from 'lucide-react';
 import { formatDuration, elapsedMinutes, toDateString } from '@time-keeper/shared';
 import { useCategories } from '@/hooks/useCategories';
 import { useCreateEntry, useDeleteEntry, useEntries, useUpdateEntry } from '@/hooks/useEntries';
+import { QueryState } from '@/components/QueryState';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { getErrorMessage } from '@/lib/api';
 import type { TimeEntry } from '@time-keeper/shared';
 
 interface Props {
@@ -174,7 +176,7 @@ function EntryEditorDialog({
 }
 
 export function DailyLogDialog({ open, date, onOpenChange, onDateChange }: Props) {
-  const { data: entries = [], isLoading } = useEntries(date, open);
+  const { data: entries = [], isLoading, isError, error, refetch } = useEntries(date, open);
   const { data: categories = [] } = useCategories();
   const createEntry = useCreateEntry();
   const updateEntry = useUpdateEntry();
@@ -183,6 +185,7 @@ export function DailyLogDialog({ open, date, onOpenChange, onDateChange }: Props
   const [editorOpen, setEditorOpen] = useState(false);
   const [entryBeingEdited, setEntryBeingEdited] = useState<TimeEntry | null>(null);
   const [entryPendingDelete, setEntryPendingDelete] = useState<TimeEntry | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [form, setForm] = useState<EntryFormState>(() => buildDefaultForm(date));
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -254,10 +257,13 @@ export function DailyLogDialog({ open, date, onOpenChange, onDateChange }: Props
   async function handleDeleteEntry() {
     if (!entryPendingDelete) return;
     try {
+      setDeleteError(null);
       await deleteEntry.mutateAsync(entryPendingDelete.id);
       setEntryPendingDelete(null);
-    } catch {
-      // mutation error will surface through query/mutation tooling; keep dialog open state simple
+    } catch (error) {
+      // Keep the dialog open and say what happened instead of failing silently
+      // (finding M-3).
+      setDeleteError(getErrorMessage(error, 'Could not delete this entry. Try again.'));
     }
   }
 
@@ -329,11 +335,22 @@ export function DailyLogDialog({ open, date, onOpenChange, onDateChange }: Props
             </div>
 
             {isLoading ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">Loading…</p>
+              <QueryState isLoading loadingLabel="Loading entries…" className="py-8" />
+            ) : isError ? (
+              <QueryState
+                isError
+                error={error}
+                errorTitle="Could not load this day"
+                onRetry={() => refetch()}
+                className="py-8"
+              />
             ) : sortedEntries.length === 0 ? (
-              <div className="rounded-xl border border-dashed py-10 text-center text-sm text-muted-foreground">
-                No entries for this day yet. Add one to backfill missed work.
-              </div>
+              <QueryState
+                isEmpty
+                emptyTitle="No entries for this day yet"
+                emptyDescription="Add one to backfill missed work."
+                className="py-10"
+              />
             ) : (
               <div className="space-y-3">
                 {sortedEntries.map((entry) => {
@@ -374,7 +391,16 @@ export function DailyLogDialog({ open, date, onOpenChange, onDateChange }: Props
                             <Pencil className="mr-2 h-4 w-4" />
                             Edit
                           </Button>
-                          <Button type="button" size="sm" variant="outline" onClick={() => setEntryPendingDelete(entry)} disabled={isRunning}>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setDeleteError(null);
+                              setEntryPendingDelete(entry);
+                            }}
+                            disabled={isRunning}
+                          >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Delete
                           </Button>
@@ -401,7 +427,15 @@ export function DailyLogDialog({ open, date, onOpenChange, onDateChange }: Props
         onSave={handleSaveEntry}
       />
 
-      <Dialog open={entryPendingDelete !== null} onOpenChange={(nextOpen) => !nextOpen && setEntryPendingDelete(null)}>
+      <Dialog
+        open={entryPendingDelete !== null}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) {
+            setEntryPendingDelete(null);
+            setDeleteError(null);
+          }
+        }}
+      >
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>
             <DialogTitle>Delete entry?</DialogTitle>
@@ -409,6 +443,11 @@ export function DailyLogDialog({ open, date, onOpenChange, onDateChange }: Props
           <p className="text-sm text-muted-foreground">
             This removes the selected entry from the day log and all related weekly/monthly summaries.
           </p>
+          {deleteError && (
+            <p role="alert" className="text-sm text-destructive">
+              {deleteError}
+            </p>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={() => setEntryPendingDelete(null)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDeleteEntry} disabled={deleteEntry.isPending}>

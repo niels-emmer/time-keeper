@@ -3,6 +3,7 @@ import { Check, ChevronLeft, ChevronRight, Copy, Download, Plus, X } from 'lucid
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { DailyLogDialog } from '@/components/DailyLogDialog';
+import { QueryState, InlineError } from '@/components/QueryState';
 import { useWeeklySummary, useRoundWeek, useAdjustCell } from '@/hooks/useSummary';
 import { useCategories } from '@/hooks/useCategories';
 import {
@@ -12,17 +13,21 @@ import {
   setStoredWeeklyExportFormat,
   type WeeklyExportFormat,
 } from '@/lib/weeklyExport';
-import { toISOWeek } from '@time-keeper/shared';
+import { getErrorMessage } from '@/lib/api';
+import { isoWeekBounds, toISOWeek } from '@time-keeper/shared';
 
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-function getWeekOffset(baseWeek: string, offset: number): string {
-  const [yearStr, weekStr] = baseWeek.split('-W');
-  const year = parseInt(yearStr, 10);
-  const week = parseInt(weekStr, 10);
-  const date = new Date(Date.UTC(year, 0, 4));
-  date.setUTCDate(date.getUTCDate() - (date.getUTCDay() || 7) + 1 + (week - 1) * 7 + offset * 7);
-  return toISOWeek(date);
+/**
+ * Shift an ISO week by whole weeks while keeping the Monday–Sunday bounds.
+ * The shared `isoWeekBounds` helper is the single source of ISO-week math
+ * (finding L-10); this only applies the offset.
+ */
+function shiftWeek(week: string, offset: number): string {
+  const { start } = isoWeekBounds(week);
+  const shifted = new Date(start);
+  shifted.setUTCDate(start.getUTCDate() + offset * 7);
+  return toISOWeek(shifted);
 }
 
 function downloadExport(content: string, filename: string, mimeType: string) {
@@ -39,9 +44,10 @@ export function WeeklySummary() {
   const [week, setWeek] = useState(() => toISOWeek(new Date()));
   const [exportFormat, setExportFormat] = useState<WeeklyExportFormat>(() => getStoredWeeklyExportFormat());
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
-  const { data: summary, isLoading } = useWeeklySummary(week);
+  const { data: summary, isLoading, isError, error, refetch } = useWeeklySummary(week);
   const roundWeek = useRoundWeek();
   const adjustCell = useAdjustCell();
+  const [cellError, setCellError] = useState<string | null>(null);
 
   const [localOverrides, setLocalOverrides] = useState<Map<string, number>>(new Map());
   const [editingCell, setEditingCell] = useState<{ categoryId: number; date: string; value: string } | null>(null);
@@ -93,10 +99,29 @@ export function WeeklySummary() {
   );
 
   if (isLoading) {
-    return <div className="py-12 text-center text-muted-foreground">Loading…</div>;
+    return <QueryState isLoading loadingLabel="Loading weekly summary…" />;
   }
 
-  if (!summary || !exportArtifact) return null;
+  if (isError) {
+    return (
+      <QueryState
+        isError
+        error={error}
+        errorTitle="Could not load this week"
+        onRetry={() => refetch()}
+      />
+    );
+  }
+
+  if (!summary || !exportArtifact) {
+    return (
+      <QueryState
+        isEmpty
+        emptyTitle="No summary for this week"
+        emptyDescription="Log some time, or navigate to another week."
+      />
+    );
+  }
 
   const allCategories = new Map<number, { name: string; color: string; workdayCode: string | null }>();
   for (const day of summary.days) {
@@ -195,6 +220,7 @@ export function WeeklySummary() {
     const minutes = Math.round(hours * 60);
     const { categoryId, date } = editingCell;
     const key = `${categoryId}-${date}`;
+    setCellError(null);
     setLocalOverrides((previous) => new Map(previous).set(key, minutes));
     setEditingCell(null);
 
@@ -205,12 +231,15 @@ export function WeeklySummary() {
         next.delete(key);
         return next;
       });
-    } catch {
+    } catch (error) {
+      // Revert the optimistic edit and tell the user it was not saved instead
+      // of silently snapping back (finding M-3).
       setLocalOverrides((previous) => {
         const next = new Map(previous);
         next.delete(key);
         return next;
       });
+      setCellError(getErrorMessage(error, 'Could not save this cell. Your edit was not applied.'));
     }
   }
 
@@ -224,11 +253,20 @@ export function WeeklySummary() {
     setEditingCell(null);
   }
 
+  const roundWeekError = roundWeek.isError
+    ? getErrorMessage(roundWeek.error, 'Could not round this week. Try again.')
+    : null;
+
   return (
     <div className="space-y-4">
       {/* Navigation and week summary */}
       <div className="flex items-center justify-between">
-        <Button variant="ghost" size="icon" onClick={() => setWeek(getWeekOffset(week, -1))}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Previous week"
+          onClick={() => setWeek(shiftWeek(week, -1))}
+        >
           <ChevronLeft className="h-4 w-4" />
         </Button>
         <div className="text-center">
@@ -237,10 +275,20 @@ export function WeeklySummary() {
             {totalHours.toFixed(1)}h / {goalHours}h
           </p>
         </div>
-        <Button variant="ghost" size="icon" onClick={() => setWeek(getWeekOffset(week, 1))}>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Next week"
+          onClick={() => setWeek(shiftWeek(week, 1))}
+        >
           <ChevronRight className="h-4 w-4" />
         </Button>
       </div>
+
+      {cellError && <InlineError message={cellError} onDismiss={() => setCellError(null)} />}
+      {roundWeekError && (
+        <InlineError message={roundWeekError} onDismiss={() => roundWeek.reset?.()} />
+      )}
 
       {/* Weekly totals and day logs card moved to top */}
       <Card>

@@ -30,17 +30,42 @@ export interface SettingsPayload {
   timezone: string;
 }
 
+/**
+ * Human-readable text for any query or mutation failure. Surfaces the server's
+ * `error` message when there is one, and never leaves the caller to render a
+ * blank panel (finding M-3).
+ */
+export function getErrorMessage(
+  error: unknown,
+  fallback = 'Something went wrong. Please try again.'
+): string {
+  if (error instanceof AuthError) {
+    return 'Your session has expired. Reload the page to sign in again.';
+  }
+  if (error instanceof Error && error.message.trim()) {
+    return error.message;
+  }
+  return fallback;
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, {
-    headers: { 'Content-Type': 'application/json', ...init?.headers },
-    ...init,
-    // Manual redirect mode so we can detect when Authentik's forward-auth
-    // proxy issues a 302 → login redirect instead of passing the request
-    // through.  With the default 'follow' the browser chases the redirect
-    // chain to the Authentik login page (cross-origin), which either throws
-    // a CORS TypeError or returns 200 HTML — neither surfaces as an AuthError.
-    redirect: 'manual',
-  });
+  let res: Response;
+  try {
+    res = await fetch(`${BASE}${path}`, {
+      headers: { 'Content-Type': 'application/json', ...init?.headers },
+      ...init,
+      // Manual redirect mode so we can detect when Authentik's forward-auth
+      // proxy issues a 302 → login redirect instead of passing the request
+      // through.  With the default 'follow' the browser chases the redirect
+      // chain to the Authentik login page (cross-origin), which either throws
+      // a CORS TypeError or returns 200 HTML — neither surfaces as an AuthError.
+      redirect: 'manual',
+    });
+  } catch {
+    // fetch only rejects for network-level failures (offline, DNS, CORS).
+    // Normalise the browser-specific "Failed to fetch" into UI-ready copy.
+    throw new Error('Could not reach the server. Check your connection and try again.');
+  }
   if (res.type === 'opaqueredirect') {
     // NPM's error_page 401 returned a redirect to the Authentik login page.
     throw new AuthError(302);

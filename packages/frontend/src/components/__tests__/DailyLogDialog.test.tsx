@@ -90,6 +90,55 @@ describe('DailyLogDialog', () => {
     expect(screen.getByText('1h 30m')).not.toBeNull();
   });
 
+  // Finding M-3: a failed day query used to look like "no entries".
+  it('shows an error and a Retry that refetches when the day query fails', () => {
+    const refetch = vi.fn();
+    useEntriesMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('Entries failed'),
+      refetch,
+    });
+
+    render(
+      <DailyLogDialog
+        open
+        date="2026-05-14"
+        onOpenChange={() => undefined}
+        onDateChange={onDateChangeMock}
+      />
+    );
+
+    expect(screen.getByRole('alert').textContent).toContain('Entries failed');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  // Finding M-3 (DailyLogDialog.tsx:259-261): a failed delete used to do nothing.
+  it('surfaces a delete failure instead of failing silently', async () => {
+    deleteEntryMutateAsyncMock.mockRejectedValueOnce(new Error('Delete failed'));
+
+    render(
+      <DailyLogDialog
+        open
+        date="2026-05-14"
+        onOpenChange={() => undefined}
+        onDateChange={onDateChangeMock}
+      />
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'Delete' })[0]);
+    const confirmButtons = screen.getAllByRole('button', { name: 'Delete' });
+    fireEvent.click(confirmButtons[confirmButtons.length - 1]);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('Delete failed');
+    });
+  });
+
   it('creates a manual entry from the add-entry dialog', async () => {
     render(
       <DailyLogDialog

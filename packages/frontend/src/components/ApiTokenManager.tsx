@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Plus, Trash2, Copy, Check, KeyRound } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QueryState } from '@/components/QueryState';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
@@ -28,7 +29,7 @@ export function ApiTokenManager() {
   const [copied, setCopied] = useState(false);
   const [revokeId, setRevokeId] = useState<number | null>(null);
 
-  const { data: tokens = [], isLoading } = useQuery({
+  const { data: tokens = [], isLoading, isError, error, refetch } = useQuery({
     queryKey: ['tokens'],
     queryFn: () => api.tokens.list(),
   });
@@ -96,9 +97,22 @@ export function ApiTokenManager() {
           </Button>
 
           {isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
+            <QueryState isLoading loadingLabel="Loading tokens…" className="py-8" />
+          ) : isError ? (
+            <QueryState
+              isError
+              error={error}
+              errorTitle="Could not load tokens"
+              onRetry={() => refetch()}
+              className="py-8"
+            />
           ) : tokens.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No tokens yet.</p>
+            <QueryState
+              isEmpty
+              emptyTitle="No tokens yet"
+              emptyDescription="Create one to connect the macOS app."
+              className="py-8"
+            />
           ) : (
             <table className="w-full text-sm">
               <thead>

@@ -2,8 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { InlineError } from '@/components/QueryState';
 import { useQueryClient } from '@tanstack/react-query';
 import { useStopTimer } from '@/hooks/useTimer';
+import { getErrorMessage } from '@/lib/api';
 import { formatElapsed } from '@time-keeper/shared';
 import type { TimeEntry } from '@time-keeper/shared';
 import {
@@ -32,15 +34,22 @@ export function ActiveTimer({ entry, categoryName, categoryColor }: Props) {
   const stop = useStopTimer();
   const qc = useQueryClient();
   const [elapsed, setElapsed] = useState(() => computeElapsedSeconds(entry.startTime));
+  const [stopError, setStopError] = useState<string | null>(null);
   const workerRef = useRef<Worker | null>(null);
 
-  // ── Elapsed time: main-thread fallback plus worker when available ─────────
+  // ── Elapsed time: the worker is the single ticker ─────────────────────────
+  // The main-thread interval is only a fallback for environments where a
+  // worker cannot be constructed or fails at runtime (finding L-11).
   useEffect(() => {
     setElapsed(computeElapsedSeconds(entry.startTime));
 
-    const fallbackIntervalId = window.setInterval(() => {
-      setElapsed(computeElapsedSeconds(entry.startTime));
-    }, 1000);
+    let fallbackIntervalId: number | null = null;
+    const startFallback = () => {
+      if (fallbackIntervalId !== null) return;
+      fallbackIntervalId = window.setInterval(() => {
+        setElapsed(computeElapsedSeconds(entry.startTime));
+      }, 1000);
+    };
 
     try {
       const worker = new Worker(new URL('../workers/timer.worker.ts', import.meta.url), {
@@ -54,18 +63,24 @@ export function ActiveTimer({ entry, categoryName, categoryColor }: Props) {
       };
 
       worker.onerror = () => {
+        // The worker loaded but could not run — keep the display moving.
         worker.terminate();
         workerRef.current = null;
+        startFallback();
       };
 
       worker.postMessage({ type: 'start', startTime: entry.startTime });
       workerRef.current = worker;
     } catch {
+      // Worker unsupported or blocked — fall back to the main thread.
       workerRef.current = null;
+      startFallback();
     }
 
     return () => {
-      window.clearInterval(fallbackIntervalId);
+      if (fallbackIntervalId !== null) {
+        window.clearInterval(fallbackIntervalId);
+      }
       if (workerRef.current) {
         workerRef.current.postMessage({ type: 'stop' });
         workerRef.current.terminate();
@@ -110,8 +125,12 @@ export function ActiveTimer({ entry, categoryName, categoryColor }: Props) {
 
   // ── Stop handler (Stop button in the UI) ──────────────────────────────────
   const handleStop = () => {
+    setStopError(null);
     stopTimerNotification();
-    stop.mutate();
+    stop.mutate(undefined, {
+      onError: (error) =>
+        setStopError(getErrorMessage(error, 'Could not stop the timer. Try again.')),
+    });
   };
 
   return (
@@ -141,6 +160,11 @@ export function ActiveTimer({ entry, categoryName, categoryColor }: Props) {
           </Button>
         </div>
       </CardContent>
+      {stopError && (
+        <div className="px-4 pb-4">
+          <InlineError message={stopError} onDismiss={() => setStopError(null)} />
+        </div>
+      )}
     </Card>
   );
 }

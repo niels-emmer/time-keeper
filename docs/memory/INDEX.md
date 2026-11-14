@@ -33,6 +33,8 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `packages/backend/src/services/summaryService.ts` | Builds weekly summary; reads weekly goal + rounding increment from DB |
 | `packages/frontend/src/pages/Home.tsx` | Track tab shell — search input, recent/manual sections, pin state, and timer/category coordination |
 | `packages/frontend/src/components/CategoryGrid.tsx` | Primary Track UX surface — category cards with active state, pin toggles, and quick-start affordances |
+| `packages/frontend/src/components/QueryState.tsx` | Shared loading / error + Retry / empty boundary (`QueryState`) and dismissible mutation banner (`InlineError`) so a failed fetch never renders a blank panel |
+| `packages/frontend/public/theme-init.js` | Pre-paint theme bootstrap loaded synchronously from `<head>`; a same-origin file so the production CSP can stay `script-src 'self'` |
 | `packages/frontend/src/lib/track.ts` | Track screen utilities — local pin preferences, filtering, and ordering helpers for recent/manual category presentation |
 | `packages/frontend/src/hooks/useRecentCategories.ts` | Derives recent category ordering from the current + previous ISO week entry data |
 | `packages/frontend/src/pages/Monthly.tsx` | Monthly tab shell — month navigation plus the monthly overview, focus, and goal cards |

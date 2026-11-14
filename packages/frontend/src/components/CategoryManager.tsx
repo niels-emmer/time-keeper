@@ -18,6 +18,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Plus, Pencil, Trash2, GripVertical, ArrowDownAZ, ArrowUpZA } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { QueryState } from '@/components/QueryState';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import {
   useCategories,
@@ -187,7 +188,13 @@ function toFormState(category?: Category): FormState {
 }
 
 export function CategoryManager() {
-  const { data: categories = [] } = useCategories();
+  const {
+    data: categories = [],
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useCategories();
   const create = useCreateCategory();
   const update = useUpdateCategory();
   const del = useDeleteCategory();
@@ -335,26 +342,41 @@ export function CategoryManager() {
         </div>
       </div>
 
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={categories.map((c) => c.id)} strategy={verticalListSortingStrategy}>
-          <div className="space-y-2">
-            {categories.map((cat) => (
-              <SortableRow
-                key={cat.id}
-                cat={cat}
-                onEdit={openEdit}
-                onDelete={requestDelete}
-                deleteDisabled={del.isPending}
-              />
-            ))}
-            {categories.length === 0 && (
-              <p className="py-8 text-center text-sm text-muted-foreground">
-                No categories yet — add one to get started.
-              </p>
-            )}
-          </div>
-        </SortableContext>
-      </DndContext>
+      {isLoading ? (
+        <QueryState isLoading loadingLabel="Loading categories…" className="py-8" />
+      ) : isError ? (
+        <QueryState
+          isError
+          error={error}
+          errorTitle="Could not load categories"
+          onRetry={() => refetch()}
+          className="py-8"
+        />
+      ) : (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={categories.map((c) => c.id)} strategy={verticalListSortingStrategy}>
+            <div className="space-y-2">
+              {categories.map((cat) => (
+                <SortableRow
+                  key={cat.id}
+                  cat={cat}
+                  onEdit={openEdit}
+                  onDelete={requestDelete}
+                  deleteDisabled={del.isPending}
+                />
+              ))}
+              {categories.length === 0 && (
+                <QueryState
+                  isEmpty
+                  emptyTitle="No categories yet"
+                  emptyDescription="Add one to get started."
+                  className="py-8"
+                />
+              )}
+            </div>
+          </SortableContext>
+        </DndContext>
+      )}
 
       <Dialog open={dialog.open} onOpenChange={(open) => setDialog((current) => ({ ...current, open }))}>
         <DialogContent>

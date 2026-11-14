@@ -39,7 +39,7 @@ export function getSystemTheme(): 'light' | 'dark' {
 
 /**
  * Apply a theme to the document by toggling the `.dark` class on <html>.
- * Safe to call before React mounts (used in the inline <head> script too).
+ * Safe to call before React mounts (used by the <head> theme-init script too).
  */
 export function applyTheme(theme: Theme): void {
   const resolved = theme === 'system' ? getSystemTheme() : theme;

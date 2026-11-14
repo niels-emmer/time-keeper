@@ -1,11 +1,22 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 
+/** Poll cadence while a timer is running (keeps the overview chips fresh). */
+export const TIMER_POLL_INTERVAL_MS = 5000;
+
+/**
+ * Poll only while a timer is active. An idle tab has nothing to refresh, and
+ * polling it forever was one of the redundant "now" sources in finding L-11.
+ */
+export function getTimerRefetchInterval(active: boolean): number | false {
+  return active ? TIMER_POLL_INTERVAL_MS : false;
+}
+
 export function useTimer() {
   return useQuery({
     queryKey: ['timer'],
     queryFn: api.timer.status,
-    refetchInterval: 5000, // poll every 5s to keep elapsed time fresh
+    refetchInterval: (query) => getTimerRefetchInterval(query.state.data?.active === true),
   });
 }
 
