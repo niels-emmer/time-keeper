@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
-import { createEntrySchema } from './entryValidation.js';
+import { createEntrySchema, updateEntrySchema } from './entryValidation.js';
 import { errorHandler } from '../middleware/errorHandler.js';
 
 describe('entry schemas on zod 4', () => {
@@ -29,6 +29,14 @@ describe('entry schemas on zod 4', () => {
     expect(result.error.issues.map((issue) => issue.path.join('.'))).toEqual(
       expect.arrayContaining(['categoryId', 'startTime'])
     );
+  });
+
+  it('rejects endTime:null on update so a completed entry cannot be reopened (P2-1)', () => {
+    const result = updateEntrySchema.safeParse({ endTime: null });
+
+    expect(result.success).toBe(false);
+    if (result.success) return;
+    expect(result.error.issues.map((issue) => issue.path.join('.'))).toContain('endTime');
   });
 
   it('routes a ZodError to errorHandler as a 400 with path/message issues (P1-3)', () => {

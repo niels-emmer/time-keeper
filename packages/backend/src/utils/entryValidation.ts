@@ -11,7 +11,9 @@ export const createEntrySchema = z.object({
 export const updateEntrySchema = z.object({
   categoryId: z.number().int().positive().optional(),
   startTime: z.string().datetime().optional(),
-  endTime: z.string().datetime().nullable().optional(),
+  // Not nullable: reopening a completed entry would create a second running
+  // timer and break invariant I-003 (finding H-1).
+  endTime: z.string().datetime().optional(),
   notes: z.string().nullable().optional(),
 });
 

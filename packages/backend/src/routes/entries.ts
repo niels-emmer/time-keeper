@@ -2,9 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { eq, and, gte, lte, asc } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { categories, timeEntries } from '../db/schema.js';
+import { timeEntries } from '../db/schema.js';
 import { isoWeekBounds } from '@time-keeper/shared';
 import { createError } from '../middleware/errorHandler.js';
+import { assertOwnedCategory } from '../services/categoryService.js';
 import { createEntrySchema, updateEntrySchema, assertEntryRange } from '../utils/entryValidation.js';
 
 export const entriesRouter = Router();
@@ -15,18 +16,6 @@ export const entriesRouter = Router();
  * (finding L-2). Validate the shape first so garbage is a 400, not a 500.
  */
 const isoWeekSchema = z.string().regex(/^\d{4}-W\d{2}$/);
-
-function assertOwnedCategory(categoryId: number, userId: string) {
-  const row = db
-    .select({ id: categories.id })
-    .from(categories)
-    .where(and(eq(categories.id, categoryId), eq(categories.userId, userId)))
-    .get();
-
-  if (!row) {
-    throw createError('Category not found', 400);
-  }
-}
 
 entriesRouter.get('/', (req, res, next) => {
   try {
@@ -68,7 +57,7 @@ entriesRouter.get('/', (req, res, next) => {
 entriesRouter.post('/', (req, res, next) => {
   try {
     const body = createEntrySchema.parse(req.body);
-    assertOwnedCategory(body.categoryId, req.userId);
+    assertOwnedCategory(req.userId, body.categoryId);
     assertEntryRange(body.startTime, body.endTime);
 
     const now = new Date().toISOString();
@@ -109,7 +98,7 @@ entriesRouter.patch('/:id', (req, res, next) => {
     if (!existing) throw createError('Entry not found', 404);
 
     if (body.categoryId !== undefined) {
-      assertOwnedCategory(body.categoryId, req.userId);
+      assertOwnedCategory(req.userId, body.categoryId);
     }
 
     const nextStartTime = body.startTime ?? existing.startTime;
