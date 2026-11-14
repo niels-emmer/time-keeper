@@ -57,7 +57,7 @@ See [docs/integration/auth.md](../integration/auth.md) for the full walkthrough.
 ## Step 5: Configure Nginx Proxy Manager
 
 Add a proxy host:
-- **Forward to:** `192.168.x.x:38521` (your server's LAN IP — use `ip a` to find it; do **not** use `127.0.0.1` if NPM runs in Docker)
+- **Forward to:** `frontend:80` — the Docker service name on the external `proxy-net` network. Attach NPM to the same `proxy-net` network; do **not** publish the frontend port to the host (see [docs/integration/docker.md](../integration/docker.md#network-layout)).
 - **SSL:** enabled, force HTTPS
 - **Advanced tab:** paste the standard Authentik NPM forward auth template (same block you use for other protected apps)
 

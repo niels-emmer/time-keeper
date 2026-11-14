@@ -73,7 +73,7 @@ lib/
 The app connects directly to the backend (bypassing the Authentik proxy). You need:
 
 1. A new NPM proxy host: `api.timekeeper.yourdomain.com`
-2. Forward to your server's `127.0.0.1:38522` (or LAN IP if NPM is on a different host)
+2. Forward to `backend:3001` over the external `proxy-net` Docker network (NPM must be attached to that network; the backend publishes no host port)
 3. **No Authentik forward auth** — the backend validates the Bearer token itself
 4. Force HTTPS + HSTS
 

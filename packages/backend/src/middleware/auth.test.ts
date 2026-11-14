@@ -32,8 +32,10 @@ function makeRequest(overrides: Partial<Request> = {}): Request {
   return {
     headers: {},
     method: 'GET',
+    // Default to a private proxy peer so header-auth tests model the nginx hop.
+    socket: { remoteAddress: '127.0.0.1' },
     ...overrides,
-  } as Request;
+  } as unknown as Request;
 }
 
 function makeResponse() {
@@ -123,6 +125,47 @@ describe('authMiddleware', () => {
     expect(req.userId).toBe('alice@example.com');
     expect(req.authMethod).toBe('header');
     expect(res.statusCode).toBe(200);
+  });
+
+  it('rejects header auth in production when the peer is a public address', async () => {
+    const { authMiddleware } = await import('./auth.js');
+    process.env.INTERNAL_PROXY_SECRET = 'expected-secret';
+
+    const req = makeRequest({
+      headers: {
+        'x-authentik-email': 'alice@example.com',
+        'x-internal-token': 'expected-secret',
+      },
+      socket: { remoteAddress: '203.0.113.10' } as unknown as Request['socket'],
+    });
+    const res = makeResponse();
+    const next = makeNext();
+
+    authMiddleware(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(401);
+    expect(res.body).toEqual({ error: 'Unauthorized' });
+  });
+
+  it('treats an IPv4-mapped loopback peer as trusted', async () => {
+    const { authMiddleware } = await import('./auth.js');
+    process.env.INTERNAL_PROXY_SECRET = 'expected-secret';
+
+    const req = makeRequest({
+      headers: {
+        'x-authentik-email': 'alice@example.com',
+        'x-internal-token': 'expected-secret',
+      },
+      socket: { remoteAddress: '::ffff:127.0.0.1' } as unknown as Request['socket'],
+    });
+    const res = makeResponse();
+    const next = makeNext();
+
+    authMiddleware(req, res, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(req.userId).toBe('alice@example.com');
   });
 
   it('keeps DEV_USER_ID fallback available outside production', async () => {

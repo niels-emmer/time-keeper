@@ -49,7 +49,7 @@ This is a single-user (or small-team) personal productivity tool, not a public-f
 
 | Threat | Likelihood | Mitigation |
 |--------|-----------|------------|
-| Unauthorised access to your time data via browser | Low | Authentik auth blocks the app entirely before any request reaches it; production header auth is only trusted with a matching `X-Internal-Token` derived from `INTERNAL_PROXY_SECRET` |
+| Unauthorised access to your time data via browser | Low | Authentik auth blocks the app entirely before any request reaches it. Nothing is published to the host; production header auth is only trusted when the TCP peer is loopback/private (or in `TRUSTED_PROXY_CIDRS`) **and** the request carries a matching `X-Internal-Token` derived from `INTERNAL_PROXY_SECRET` |
 | Cross-site request forgery against browser-authenticated write endpoints | Low | Header-authenticated non-GET requests must now present a same-origin `Origin` or `Referer`; cross-site browser requests are rejected with 403 |
 | Unauthorised access via API token | Low | 256-bit tokens; HTTPS enforced on api.* subdomain; rate-limited; token never stored in plain text; tokens expire after one year |
 | API token brute-forced | Negligible | 2^256 keyspace; rate limit (120 req/min per IP) further constrains attempts |
@@ -67,22 +67,34 @@ This is a single-user (or small-team) personal productivity tool, not a public-f
 
 ## Authentication
 
-The application supports two auth paths:
+The application supports two auth paths.
+
+### Trust model (C-1)
+
+Nothing in this stack is published to the host. Both containers attach only to the external `proxy-net` Docker network; Nginx Proxy Manager (also attached to that network) reaches `frontend:80` and `backend:3001` by Docker service name. There is no host-port binding and no LAN exposure.
+
+The `X-authentik-email` header is trusted only when all of the following hold:
+
+1. **Trusted peer.** The TCP peer address (`req.socket.remoteAddress`, never the client-controlled `X-Forwarded-For`) is loopback, a private range (RFC 1918, IPv6 ULA/link-local), or inside the optional `TRUSTED_PROXY_CIDRS` allowlist. A public peer presenting the header is rejected with 401.
+2. **Internal token.** In production the request also carries `X-Internal-Token` equal to `INTERNAL_PROXY_SECRET`. nginx injects it server-side and overwrites any client-supplied value, so an outside caller cannot supply their own.
+3. **Same origin** for non-GET header-authenticated requests (see the CSRF row below).
+
+**Nginx must never be the only hop.** It forwards whatever `X-authentik-email` arrives and stamps the token on top, so publishing `frontend:80` would let anyone who can reach it authenticate as any email they choose. The peer allowlist is defence in depth; it is not permission to publish the port.
 
 ### Path 1 — Browser / PWA (Authentik forward auth)
 
 ```
-Internet → NPM (TLS + Authentik forward auth) → frontend nginx → backend
+Internet → NPM (TLS + Authentik forward auth; proxy-net) → frontend nginx:80 → backend:3001
 ```
 
-The backend reads the `X-authentik-email` header set by the Authentik outpost. In production it only trusts that header when the frontend nginx also sends a matching `X-Internal-Token` derived from `INTERNAL_PROXY_SECRET`; if the secret is missing or mismatched, the backend returns 401. Header-authenticated non-GET requests are also checked for a same-origin `Origin` or `Referer` before they reach mutating routes.
+The backend reads the `X-authentik-email` header set by the Authentik outpost. Under the trust model above, a header from a non-private peer is ignored (401), and in production the request must also carry a matching `X-Internal-Token` derived from `INTERNAL_PROXY_SECRET`; if the secret is missing or mismatched the backend returns 401. Header-authenticated non-GET requests are also checked for a same-origin `Origin` or `Referer` before they reach mutating routes.
 
 See [docs/integration/auth.md](docs/integration/auth.md).
 
 ### Path 2 — Native app (Bearer token via api.* subdomain)
 
 ```
-Internet → NPM (TLS only, no forward auth) → backend:38522 → Bearer token check
+Internet → NPM (TLS only, no forward auth; proxy-net) → backend:3001 → Bearer token check
 ```
 
 Added to support the macOS status bar app. The `api.*` subdomain bypasses Authentik but the backend validates the `Authorization: Bearer <token>` header itself:
@@ -93,7 +105,8 @@ Added to support the macOS status bar app. The `api.*` subdomain bypasses Authen
 - Tokens are revocable from the web app (Settings → Personal Access Tokens)
 - Tokens expire one year after creation; expired tokens are rejected server-side
 - Token management endpoints require Authentik-header auth — a Bearer token cannot create or list tokens
-- The backend port (38522) is bound to `127.0.0.1` — not reachable from other LAN devices
+- The backend publishes no host port; NPM reaches `backend:3001` over `proxy-net`
+- The Bearer path is unaffected by the peer allowlist — a valid token is accepted from any peer
 - HTTPS is enforced by NPM on the api.* subdomain
 
 See [docs/integration/api-subdomain.md](docs/integration/api-subdomain.md).

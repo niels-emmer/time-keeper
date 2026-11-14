@@ -6,12 +6,14 @@
 Browser
   └── Nginx Proxy Manager (SSL termination + forward auth)
         └── Authentik embedded outpost (auth check)
-        └── (authenticated) → frontend nginx:38521
+        └── (authenticated) → frontend nginx:80 (proxy-net)
                                    └── /api/* → backend:3001
                                                    └── reads X-authentik-email header
 ```
 
-Auth is handled entirely outside the application code. NPM's forward auth integration with Authentik's embedded outpost validates sessions and injects identity headers. The app itself contains no auth logic — it only reads a header.
+Auth is handled entirely outside the application code. NPM's forward auth integration with Authentik's embedded outpost validates sessions and injects identity headers. The app itself contains no JWT/OIDC logic — it only reads a header.
+
+**Trust boundary (C-1):** nothing is published to the host. NPM reaches `frontend:80` over the external `proxy-net` Docker network. Nginx must never be the only hop in front of the backend: it forwards `X-authentik-email` as-is and stamps `X-Internal-Token`, so anyone who can reach nginx directly could mint an identity. As defence in depth, the backend independently rejects the header path unless the TCP peer is loopback/private or in `TRUSTED_PROXY_CIDRS`. See [docs/integration/docker.md](docker.md#network-layout).
 
 No client ID, client secret, or OIDC configuration is needed in this codebase.
 
@@ -25,7 +27,12 @@ Authentik's embedded outpost sets these headers on authenticated requests (as fo
 | `X-authentik-username` | Username | Passed through, not used |
 | `X-authentik-uid` | OIDC `sub` (UUID) | Passed through, not used |
 
-The backend auth middleware (`packages/backend/src/middleware/auth.ts`) reads `X-authentik-email`. In production it only trusts that header when the frontend nginx also sends a matching `X-Internal-Token` derived from `INTERNAL_PROXY_SECRET`. All database queries filter by the resulting user ID.
+The backend auth middleware (`packages/backend/src/middleware/auth.ts`) reads `X-authentik-email`. In production it only trusts that header when **both** hold:
+
+1. the TCP peer is loopback/private or inside `TRUSTED_PROXY_CIDRS` (so a public client cannot present the header even with a valid token), and
+2. the frontend nginx also sends a matching `X-Internal-Token` derived from `INTERNAL_PROXY_SECRET`.
+
+All database queries filter by the resulting user ID.
 
 ## Using a different identity provider
 
@@ -96,8 +103,8 @@ const user = req.headers['x-authentik-email'] as string | undefined;
 2. **Details tab:**
    - Domain: `timekeeper.yourdomain.com`
    - Scheme: `http`
-   - Forward Hostname/IP: your server's LAN IP (e.g. `192.168.x.x`) — **not** `127.0.0.1` if NPM runs in Docker (see INC-006)
-   - Forward Port: `38521`
+   - Forward Hostname/IP: `frontend` (the Docker service name — NPM must be attached to the same `proxy-net` network)
+   - Forward Port: `80`
    - Websockets Support: on
 3. **SSL tab:** select or request your certificate, force SSL on
 4. **Advanced tab:** paste the Authentik NPM template (see below)

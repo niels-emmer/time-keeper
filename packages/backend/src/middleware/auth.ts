@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { BlockList, isIP } from 'net';
 import type { Request, Response, NextFunction } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
@@ -34,6 +35,14 @@ declare global {
  * Returns 401 if none of the above yield a user in production.
  */
 export function isTrustedProxyRequest(req: Request): boolean {
+  // Layer 1 (C-1): identity headers may only arrive from a proxy network we
+  // control. A public peer can present any header it likes, including a stolen
+  // or guessed X-Internal-Token, so the peer check comes first and applies in
+  // every environment.
+  if (!isTrustedProxyPeer(req)) {
+    return false;
+  }
+
   if (process.env.NODE_ENV !== 'production') {
     return true;
   }
@@ -44,6 +53,103 @@ export function isTrustedProxyRequest(req: Request): boolean {
   }
 
   return req.headers['x-internal-token'] === proxySecret;
+}
+
+/**
+ * Ranges that are never publicly routable. A request whose TCP peer is in one
+ * of these ranges is assumed to have arrived from the proxy chain (nginx on
+ * the private Docker network, or NPM itself).
+ */
+const DEFAULT_TRUSTED_PROXY_CIDRS: readonly string[] = [
+  '127.0.0.0/8',
+  '10.0.0.0/8',
+  '172.16.0.0/12',
+  '192.168.0.0/16',
+  '169.254.0.0/16',
+  '::1/128',
+  'fc00::/7',
+  'fe80::/10',
+];
+
+function addCidr(list: BlockList, cidr: string): void {
+  const [address, prefixPart] = cidr.split('/');
+  if (!address) {
+    return;
+  }
+
+  const family = isIP(address);
+  if (family === 0) {
+    return;
+  }
+
+  const maxPrefix = family === 4 ? 32 : 128;
+  const prefix = prefixPart === undefined ? maxPrefix : Number(prefixPart);
+  if (!Number.isInteger(prefix) || prefix < 0 || prefix > maxPrefix) {
+    return;
+  }
+
+  try {
+    list.addSubnet(address, prefix, family === 4 ? 'ipv4' : 'ipv6');
+  } catch {
+    // Ignore malformed entries; the built-in defaults still apply.
+  }
+}
+
+/**
+ * `TRUSTED_PROXY_CIDRS` extends the built-in loopback/private ranges rather
+ * than replacing them, so the safe default stays in force when the variable is
+ * unset or blank.
+ */
+function buildTrustedProxyBlockList(extra: string | undefined): BlockList {
+  const list = new BlockList();
+
+  for (const cidr of DEFAULT_TRUSTED_PROXY_CIDRS) {
+    addCidr(list, cidr);
+  }
+
+  const configured = extra
+    ?.split(',')
+    .map((entry) => entry.trim())
+    .filter(Boolean) ?? [];
+
+  for (const cidr of configured) {
+    addCidr(list, cidr);
+  }
+
+  return list;
+}
+
+/**
+ * True when the TCP peer is loopback, a private range, or inside an explicit
+ * `TRUSTED_PROXY_CIDRS` entry.
+ *
+ * This reads `req.socket.remoteAddress`, never `req.ip`. Express derives
+ * `req.ip` from `X-Forwarded-For`, which any client can set; the socket peer
+ * address cannot be chosen by the request.
+ */
+export function isTrustedProxyPeer(req: Request): boolean {
+  const remoteAddress = req.socket?.remoteAddress;
+  if (!remoteAddress) {
+    return false;
+  }
+
+  // Normalise IPv4-mapped IPv6 (::ffff:127.0.0.1) and zone-scoped link-local
+  // addresses (fe80::1%eth0) to a form `isIP` understands.
+  const withoutZone = remoteAddress.split('%')[0];
+  const normalized =
+    withoutZone.startsWith('::ffff:') && isIP(withoutZone.slice(7)) === 4
+      ? withoutZone.slice(7)
+      : withoutZone;
+
+  const family = isIP(normalized);
+  if (family === 0) {
+    return false;
+  }
+
+  return buildTrustedProxyBlockList(process.env.TRUSTED_PROXY_CIDRS).check(
+    normalized,
+    family === 4 ? 'ipv4' : 'ipv6'
+  );
 }
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
@@ -89,15 +195,26 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   }
 
   // --- Path 2: Authentik header ---
-  // Only trusted when the request carries the internal proxy secret — a shared
-  // secret set by the frontend nginx on every proxied request (nginx.conf:
-  // proxy_set_header X-Internal-Token "<secret>"). This ensures that even if
-  // the api.* NPM proxy host is misconfigured and fails to strip Authentik
-  // headers, an external caller still cannot forge X-authentik-email to bypass
-  // token auth. The secret is set via the INTERNAL_PROXY_SECRET env var.
+  // Only trusted when BOTH of these hold:
   //
-  // In production, the header path is fail-closed: if INTERNAL_PROXY_SECRET
-  // is missing or mismatched, X-authentik-email is ignored.
+  //   1. The TCP peer is a proxy network we control (loopback/private or an
+  //      explicit TRUSTED_PROXY_CIDRS entry). This blocks the direct-to-backend
+  //      half of C-1: without it, a caller that reaches the backend from a
+  //      public address can mint an identity by sending X-authentik-email. (The
+  //      other half — a published frontend nginx — is fixed by not publishing
+  //      :80 at all, because the backend would then see nginx's private address
+  //      as the peer.)
+  //   2. The request carries the internal proxy secret — a shared secret set
+  //      by the frontend nginx on every proxied request (nginx.conf:
+  //      proxy_set_header X-Internal-Token "<secret>"). This ensures that even
+  //      if the api.* NPM proxy host is misconfigured and fails to strip
+  //      Authentik headers, an external caller still cannot forge
+  //      X-authentik-email to bypass token auth. The secret is set via the
+  //      INTERNAL_PROXY_SECRET env var.
+  //
+  // In production, the header path is fail-closed: if the peer is not trusted,
+  // or INTERNAL_PROXY_SECRET is missing/mismatched, X-authentik-email is
+  // ignored.
   const headerUser = req.headers['x-authentik-email'] as string | undefined;
   if (headerUser && isTrustedProxyRequest(req)) {
     req.userId = headerUser;
