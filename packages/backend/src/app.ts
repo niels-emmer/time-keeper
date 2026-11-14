@@ -16,18 +16,32 @@ export function createApp() {
 
   app.disable('x-powered-by');
 
-  // Trust the reverse proxy chain (nginx → NPM → Authentik outpost)
-  // Required for express-rate-limit to correctly read X-Forwarded-For
-  app.set('trust proxy', 1);
+  // Trust exactly two reverse-proxy hops (finding M-4): Nginx Proxy Manager on
+  // the host, then the frontend nginx container (packages/frontend/nginx.conf),
+  // before a request reaches this backend. Both hops append to
+  // X-Forwarded-For (`$proxy_add_x_forwarded_for`), so a real request arrives as
+  //
+  //   X-Forwarded-For: <client>, <NPM>
+  //   socket peer:     <frontend nginx>
+  //
+  // `trust proxy` counts hops outward from the socket, so 2 resolves `req.ip`
+  // to <client> and gives express-rate-limit a genuine per-client key. The
+  // exact count also means a leading, client-supplied X-Forwarded-For entry is
+  // ignored: it sits further left than the two trusted hops and never becomes
+  // req.ip.
+  //
+  // Do not raise this to `true` or to a larger number — that trusts arbitrary
+  // client-supplied entries and lets a caller rotate their rate-limit identity
+  // by spoofing the header.
+  app.set('trust proxy', 2);
 
   app.use(express.json());
 
-  // Health check — no auth required (used by Docker healthcheck and manual verification)
-  app.get('/api/health', (_req, res) => {
-    res.json({ status: 'ok', version: '0.1.0' });
-  });
-
-  // Rate limiting
+  // Rate limiting (finding M-4). Mounted before the health route on purpose
+  // (P1-5): the unauthenticated health endpoint is reachable without auth, so
+  // it must not be a free amplifier. The Docker healthcheck runs once every
+  // 30 s (2 req/min) — two orders of magnitude below the 120/min budget — so
+  // putting it under the limiter does not break the container healthcheck.
   const limiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
     max: 120,
@@ -35,6 +49,14 @@ export function createApp() {
     legacyHeaders: false,
   });
   app.use('/api', limiter);
+
+  // Health check — no auth required (used by Docker healthcheck and manual
+  // verification). Reports the same build version as GET /api/info: the
+  // docker-entrypoint exports APP_VERSION from /app/VERSION, with `dev` as the
+  // fallback outside a built image (finding L-1).
+  app.get('/api/health', (_req, res) => {
+    res.json({ status: 'ok', version: process.env.APP_VERSION ?? 'dev' });
+  });
 
   // All other API routes require auth
   app.use('/api', authMiddleware);

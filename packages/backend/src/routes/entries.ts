@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { eq, and, gte, lte, asc } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { categories, timeEntries } from '../db/schema.js';
@@ -7,6 +8,13 @@ import { createError } from '../middleware/errorHandler.js';
 import { createEntrySchema, updateEntrySchema, assertEntryRange } from '../utils/entryValidation.js';
 
 export const entriesRouter = Router();
+
+/**
+ * ISO-8601 week key, e.g. `2026-W07`. `isoWeekBounds()` parses the two halves
+ * with `parseInt`, so an unvalidated `?week=` can reach it as `NaN` and throw
+ * (finding L-2). Validate the shape first so garbage is a 400, not a 500.
+ */
+const isoWeekSchema = z.string().regex(/^\d{4}-W\d{2}$/);
 
 function assertOwnedCategory(categoryId: number, userId: string) {
   const row = db
@@ -22,12 +30,13 @@ function assertOwnedCategory(categoryId: number, userId: string) {
 
 entriesRouter.get('/', (req, res, next) => {
   try {
-    const { date, week } = req.query;
+    const { date } = req.query;
+    const week = z.object({ week: isoWeekSchema.optional() }).parse(req.query).week;
 
     let startStr: string;
     let endStr: string;
 
-    if (week && typeof week === 'string') {
+    if (week) {
       const bounds = isoWeekBounds(week);
       startStr = bounds.start.toISOString();
       endStr = new Date(bounds.end.getTime() + 86_399_999).toISOString();
