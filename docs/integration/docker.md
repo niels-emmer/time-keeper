@@ -4,24 +4,28 @@
 
 | Service | Image | Port (internal) | Port (host) | Role |
 |---------|-------|-----------------|-------------|------|
-| `frontend` | Built from `packages/frontend/Dockerfile` | 80 | `0.0.0.0:38521` | Serves React SPA, proxies `/api/*` to backend |
-| `backend` | Built from `packages/backend/Dockerfile` | 3001 | — (internal only) | Express API + SQLite |
+| `frontend` | Built from `packages/frontend/Dockerfile` | 80 | — (none; `frontend:80` on `proxy-net`) | Serves React SPA, proxies `/api/*` to backend |
+| `backend` | Built from `packages/backend/Dockerfile` | 3001 | — (none; `backend:3001` on `proxy-net`) | Express API + SQLite |
 
 Auth is not a Docker service — it is handled by Authentik's embedded outpost running inside your existing Authentik stack, integrated via NPM forward auth. In production, set `INTERNAL_PROXY_SECRET` in `.env` before starting the stack or the backend will refuse to trust browser-auth headers.
 
 ## Network layout
 
-Both services are on the `app` bridge network. The frontend exposes port `38521` on all interfaces (`0.0.0.0`) so NPM can reach it via the server's LAN IP. NPM proxies to this port after the Authentik auth check passes.
+Both services attach to the external `proxy-net` Docker network and publish **no host ports**. NPM must be attached to the same `proxy-net` network; it reaches the frontend as `frontend:80` and the backend as `backend:3001` by Docker service name. Nothing on the host, the LAN, or the internet can connect to either container port directly.
 
 ```
-Internet → NPM (SSL, LAN IP:38521) → Authentik outpost (auth check) → 192.168.x.x:38521 (frontend)
+Internet
+  └── NPM (TLS + Authentik forward auth; attached to proxy-net)
+        ├── frontend:80 (nginx)
+        │     └── /api/* → backend:3001 (Express)
+        └── api.* host (TLS only) → backend:3001 (Bearer token check)
 
-Docker network (app):
+Docker network (proxy-net):
   frontend:80 (nginx)
       └── /api/* → backend:3001 (Express)
 ```
 
-> **Note:** Do not use `127.0.0.1:38521` in NPM if NPM itself runs in Docker — it will resolve to NPM's own loopback, not the host. Use the server's LAN IP instead.
+> **Security (C-1): do not add a `ports:` mapping for either service.** The frontend nginx blindly forwards `X-authentik-email` to the backend and stamps `X-Internal-Token` onto whatever request arrives. If `:80` were published, anyone who can connect to it could authenticate as any email they choose. Nginx must never be the only hop in front of the backend. As defence in depth, the backend also rejects the header path unless the TCP peer is loopback/private or in `TRUSTED_PROXY_CIDRS`.
 
 ## Volumes
 
@@ -41,6 +45,7 @@ Both Dockerfiles use the **repo root** as the build context (`.`). This is requi
 |----------|--------|---------|
 | `APP_VERSION` | Build arg (`--build-arg APP_VERSION=...`) | Optional explicit version override; served by `GET /api/info` and shown in Settings → About. Falls back to the latest git tag in the clone, then `packages/backend/package.json`. |
 | `INTERNAL_PROXY_SECRET` | `.env` / deployment secret | Shared secret between frontend nginx and backend. Required in production so the backend only trusts `X-authentik-email` when the proxied request also carries a matching `X-Internal-Token`. |
+| `TRUSTED_PROXY_CIDRS` | `.env` / deployment secret (optional) | Comma-separated CIDRs that **extend** the backend's built-in loopback/RFC 1918 allowlist for the `X-authentik-email` peer check. Leave unset for the default single-host topology, where nginx and the backend share `proxy-net`. |
 | `DEV_USER_ID` | Shell env (dev only) | Email address to use as the user identity in dev mode (bypasses auth) |
 
 Pass `APP_VERSION` at build time:
@@ -83,21 +88,24 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 | `POST /api/summary/round` | Yes | Apply end-of-day rounding with `{ date }`; cap = user's weekly goal |
 | `POST /api/summary/round-week` | Yes | Apply rounding to all days of an ISO week `{ week: 'YYYY-WNN' }`; idempotent |
 
-Manual verification:
+Manual verification (nothing is published to the host, so run these inside the Docker network):
+
 ```bash
-# Health (no auth needed)
+# Health (no auth needed; run inside the backend container)
 docker compose exec backend wget -qO- http://localhost:3001/api/health
 
-# Info (requires auth header)
-docker compose exec backend wget -qO- http://localhost:3001/api/info \
-  --header="X-authentik-email: you@example.com"
+# Authentik-header path through nginx. The frontend container is already on
+# proxy-net, and nginx stamps X-Internal-Token itself.
+docker compose exec frontend sh -c \
+  'wget -qO- --header="X-authentik-email: you@example.com" http://localhost/api/info'
 
-# Get weekly goal setting
-curl -s http://localhost:38521/api/settings \
-  -H "X-authentik-email: you@example.com"
+# Get weekly goal setting (same path)
+docker compose exec frontend sh -c \
+  'wget -qO- --header="X-authentik-email: you@example.com" http://localhost/api/settings'
 
-# Test category reorder (from host)
-curl -s -X PATCH http://localhost:38521/api/categories/reorder \
+# Test category reorder from a container attached to proxy-net
+docker run --rm --network proxy-net curlimages/curl -s -X PATCH \
+  http://frontend/api/categories/reorder \
   -H "Content-Type: application/json" \
   -H "X-authentik-email: you@example.com" \
   -d '[{"id":1,"sortOrder":0},{"id":2,"sortOrder":1}]'

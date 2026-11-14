@@ -3,6 +3,12 @@ services:
   # Frontend: React SPA served by nginx, proxies /api/* to backend
   # Auth is handled upstream by Authentik's proxy outpost via NPM forward auth.
   # Authentik sets X-authentik-email on authenticated requests; nginx passes it to the backend.
+  #
+  # SECURITY (C-1): this service deliberately publishes NO host ports. Publishing
+  # :80 would let anyone who can reach the host send X-authentik-email and be
+  # authenticated as that user, because nginx stamps the internal token onto
+  # whatever identity header arrives. NPM must instead reach it as
+  # `frontend:80` over the external `proxy-net` network below.
   frontend:
     build:
       context: .
@@ -22,6 +28,10 @@ services:
         condition: service_healthy
 
   # Backend: Express API with SQLite
+  #
+  # SECURITY (C-1): no host ports either. NPM reaches it as `backend:3001` over
+  # `proxy-net` for the api.* Bearer-token subdomain. The backend additionally
+  # rejects X-authentik-email from a non-private peer (TRUSTED_PROXY_CIDRS).
   backend:
     build:
       context: .

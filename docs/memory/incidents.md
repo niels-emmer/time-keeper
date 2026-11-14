@@ -97,3 +97,5 @@ Symptom: App returned 502 after rebuild. `curl http://127.0.0.1:38521/api/health
 Root cause: `docker-compose.yml` bound the frontend port to `127.0.0.1:38521` (loopback only). NPM runs in Docker and reaches services via the server's LAN IP (192.168.101.252), not loopback — so it could never connect.
 Fix: Changed port binding from `"127.0.0.1:38521:80"` to `"38521:80"` in `docker-compose.yml`. Updated NPM proxy host to use `192.168.101.252:38521`.
 Learning: When NPM (or any Docker-based reverse proxy) accesses services by LAN IP, the target port must be bound to `0.0.0.0` (all interfaces), not `127.0.0.1`. Use `"PORT:PORT"` not `"127.0.0.1:PORT:PORT"` in docker-compose.yml for services that NPM needs to reach.
+
+> **Superseded (2026-11-14, C-1 / DEC-1):** this record is historical. The stack no longer publishes any host port. NPM is attached to the external `proxy-net` network and reaches `frontend:80` (and, for the api.* subdomain, `backend:3001`) by Docker service name. Publishing `38521` would reopen C-1, so the INC-006 workaround must not be reapplied. The current topology is documented in `docs/integration/docker.md`.

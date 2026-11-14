@@ -86,7 +86,7 @@ The short version:
 4. Use `./refresh-vps.sh` for later pull-and-rebuild updates
 5. Create a **Proxy Provider** in Authentik (forward auth mode, external host = your domain)
 6. Add it to your existing proxy outpost
-7. Add a proxy host in NPM pointing to `192.168.x.x:38521` (your server's LAN IP) with the standard Authentik forward auth Advanced config
+7. Add a proxy host in NPM forwarding to `frontend:80` over the external `proxy-net` Docker network (nothing is published to the host), with the standard Authentik forward auth Advanced config
 
 ## Documentation
 

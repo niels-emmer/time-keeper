@@ -59,7 +59,7 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `packages/frontend/src/workers/timer.worker.ts` | Off-thread 1 s tick — keeps elapsed time accurate when tab is hidden |
 | `packages/frontend/src/sw.ts` | Custom service worker (Workbox + persistent timer notification) |
 | `packages/frontend/vite.config.ts` | Vite + VitePWA config (injectManifest strategy); must stay in sync with sw.ts |
-| `docker-compose.yml` | Service wiring; nginx must pass `X-authentik-email`; backend also exposes `127.0.0.1:38522` for api.* subdomain |
+| `docker-compose.yml` | Service wiring; nginx must pass `X-authentik-email`; publishes no host ports — NPM reaches `frontend:80` and `backend:3001` over `proxy-net` |
 | `packages/backend/drizzle/` | Migration SQL files — committed, run on startup |
 | `packages/shared/src/utils/rounding.test.ts` | Unit tests for the rounding algorithm (Vitest) |
 | `packages/backend/src/routes/settings.test.ts` | Unit tests for the settings route (Vitest) |
