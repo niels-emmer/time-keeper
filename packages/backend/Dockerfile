@@ -8,6 +8,12 @@ ARG APP_VERSION
 # Enable Yarn 4
 RUN corepack enable
 
+# npm ships inside the Node image, and its bundled dependencies (brace-expansion,
+# ip-address, pacote, picomatch, sigstore) carry HIGH advisories that the app
+# cannot fix through yarn.lock. npm is a build tool here, not an app dependency,
+# so replace it with a pinned release instead of floating on :latest.
+RUN npm install -g npm@12.2.2
+
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/backend/package.json ./packages/backend/
@@ -43,6 +49,9 @@ FROM node:22-alpine AS runtime
 WORKDIR /app
 
 RUN corepack enable
+
+# Same pinned npm as the build stage: the image scan sees this copy too.
+RUN npm install -g npm@12.2.2
 
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY packages/shared/package.json ./packages/shared/

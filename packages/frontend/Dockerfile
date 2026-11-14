@@ -23,6 +23,10 @@ RUN yarn workspace @time-keeper/frontend build
 # ---- Runtime stage ----
 FROM nginx:alpine AS runtime
 
+# The Alpine 3.24 base image ships libxslt 1.1.43-r3, which carries three HIGH
+# CVEs; the fixed revision (-r4) is published in the same Alpine branch.
+RUN apk upgrade --no-cache libxslt
+
 COPY --from=builder /app/packages/frontend/dist /usr/share/nginx/html
 
 # Place config in /etc/nginx/templates/ — the official nginx image's entrypoint
