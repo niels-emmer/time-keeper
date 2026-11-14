@@ -124,6 +124,15 @@ See [docs/integration/api-subdomain.md](docs/integration/api-subdomain.md).
 
 ---
 
+## Container privileges
+
+The two containers do **not** share the same privilege model, and the difference is intentional (finding L-12):
+
+- **Frontend nginx runs its master process as root.** It starts from the official `nginx:alpine` image and binds privileged port 80, which requires root; nginx then drops its worker processes to the unprivileged `nginx` user. nginx only serves the pre-built static bundle and reverse-proxies `/api/`, so it executes no user-supplied code and never writes to the data volume. Combined with the fact that the container publishes no host port (see the trust model above), running the stock image as root on `:80` is acceptable here. A non-root image on an unprivileged port is possible but not required for this deployment.
+- **Backend runs as the non-root `node` user**, as described under Data storage above.
+
+---
+
 ## Dependency audit
 
 Audited with `yarn npm audit --all --recursive --severity high` on **2026-11-14**. The audit is **not** clean: pre-existing high/critical advisories remain in transitive dependencies (a mix of runtime, build-time, and dev-only packages). Triage is tracked in the remediation plan's Phase 4; until then the CI `audit` job runs the command above and fails on findings rather than hiding them behind `continue-on-error`.
