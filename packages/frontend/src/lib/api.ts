@@ -13,15 +13,48 @@ import type {
 const BASE = '/api';
 
 /**
- * Thrown when the server returns 401 or 403 — signals that the Authentik
- * session has expired and the user must re-authenticate.
+ * Thrown when the server returns 401 — the session is gone, and the AuthGate
+ * must show the sign-in surface. Keep this distinct from `ForbiddenError`:
+ * a 403 is a permission/CSRF answer, not an expiry.
  */
 export class AuthError extends Error {
-  constructor(status: number) {
+  constructor(status = 401) {
     super(`Session expired (HTTP ${status})`);
     this.name = 'AuthError';
   }
 }
+
+/** Thrown when the server returns 403: authenticated, but not allowed. */
+export class ForbiddenError extends Error {
+  constructor(message = 'You do not have permission to do that.') {
+    super(message);
+    this.name = 'ForbiddenError';
+  }
+}
+
+export type AuthMode = 'local' | 'proxy' | 'hybrid';
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  username: string;
+  displayName: string | null;
+  role: 'user' | 'admin';
+  mfaEnabled: boolean;
+  mustSetPassword: boolean;
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
+export interface AuthStatus {
+  authenticated: boolean;
+  mode: AuthMode;
+  user?: AuthUser;
+}
+
+export type LoginResponse =
+  | { status: 'ok'; user: AuthUser; csrfToken: string }
+  | { status: 'mfa_required' };
 
 export interface SettingsPayload {
   weeklyGoalHours: number;
@@ -29,6 +62,29 @@ export interface SettingsPayload {
   /** IANA zone used for local-day bucketing (DEC-2); defaults to UTC. */
   timezone: string;
 }
+
+/**
+ * Read the non-httpOnly `tk_csrf` cookie. The double-submit pattern is
+ * cookie + header, so the browser-visible half is the source of truth after a
+ * reload as well as immediately after login.
+ */
+function readCsrfToken(): string | undefined {
+  if (typeof document === 'undefined') {
+    return undefined;
+  }
+
+  for (const part of document.cookie.split(';')) {
+    const separator = part.indexOf('=');
+    if (separator === -1) continue;
+    if (part.slice(0, separator).trim() === 'tk_csrf') {
+      return decodeURIComponent(part.slice(separator + 1).trim());
+    }
+  }
+
+  return undefined;
+}
+
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 /**
  * Human-readable text for any query or mutation failure. Surfaces the server's
@@ -49,11 +105,21 @@ export function getErrorMessage(
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? 'GET').toUpperCase();
+  const csrfToken = SAFE_METHODS.has(method) ? undefined : readCsrfToken();
+
   let res: Response;
   try {
     res = await fetch(`${BASE}${path}`, {
-      headers: { 'Content-Type': 'application/json', ...init?.headers },
+      headers: {
+        'Content-Type': 'application/json',
+        ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {}),
+        ...init?.headers,
+      },
       ...init,
+      // Session cookies are same-origin; send them explicitly so a deployment
+      // that ever moves the API to a sibling origin does not silently drop them.
+      credentials: 'same-origin',
       // Manual redirect mode so we can detect when Authentik's forward-auth
       // proxy issues a 302 → login redirect instead of passing the request
       // through.  With the default 'follow' the browser chases the redirect
@@ -71,8 +137,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new AuthError(302);
   }
   if (!res.ok) {
-    if (res.status === 401 || res.status === 403) {
+    if (res.status === 401) {
       throw new AuthError(res.status);
+    }
+    if (res.status === 403) {
+      const body = await res.json().catch(() => ({}));
+      throw new ForbiddenError((body as { error?: string }).error);
     }
     const body = await res.json().catch(() => ({}));
     throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
@@ -83,6 +153,18 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 // Categories
 export const api = {
+  auth: {
+    status: () => request<AuthStatus>('/auth/status'),
+    login: (identifier: string, password: string) =>
+      request<LoginResponse>('/auth/login', {
+        method: 'POST',
+        body: JSON.stringify({ identifier, password }),
+      }),
+    logout: () => request<void>('/auth/logout', { method: 'POST' }),
+    logoutAll: () => request<void>('/auth/logout-all', { method: 'POST' }),
+    me: () => request<{ user: AuthUser }>('/auth/me'),
+  },
+
   categories: {
     list: () => request<Category[]>('/categories'),
     create: (dto: CreateCategoryDTO) =>

@@ -8,21 +8,22 @@
 import type { Express } from 'express';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp, seedUser } from '../test/harness.js';
+import { authHeaders, createTestApp, seedUser } from '../test/harness.js';
 import { timeEntries } from '../db/schema.js';
 import type { AppDatabase } from '../db/client.js';
+
+let db: AppDatabase;
 
 function headers(user: string) {
   return {
     Host: 'week-before.test',
     Origin: 'http://week-before.test',
-    'X-authentik-email': user,
+    ...authHeaders(db, user),
   };
 }
 
 describe('getWeekMinutesBefore half-open interval (P2-6)', () => {
   let app: Express;
-  let db: AppDatabase;
   let getWeekMinutesBefore: (userId: string, date: string) => number;
 
   beforeAll(async () => {

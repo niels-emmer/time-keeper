@@ -10,21 +10,27 @@
 import type { Express } from 'express';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp } from '../test/harness.js';
+import type { AppDatabase } from '../db/client.js';
+import { authHeaders, createTestApp } from '../test/harness.js';
 
 const USER = 'query-validation@example.com';
 
 describe('query validation (P1-4)', () => {
   let app: Express;
+  let db: AppDatabase;
 
   beforeAll(async () => {
-    ({ app } = await createTestApp());
+    ({ app, db } = await createTestApp());
   });
+
+  function headers() {
+    return authHeaders(db, USER);
+  }
 
   it('rejects ?week=garbage on GET /api/entries with 400', async () => {
     const res = await request(app)
       .get('/api/entries?week=garbage')
-      .set('X-authentik-email', USER);
+      .set(headers());
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Validation failed');
@@ -34,7 +40,7 @@ describe('query validation (P1-4)', () => {
   it('still accepts a valid ISO week on GET /api/entries', async () => {
     const res = await request(app)
       .get('/api/entries?week=2026-W07')
-      .set('X-authentik-email', USER);
+      .set(headers());
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual([]);
@@ -43,7 +49,7 @@ describe('query validation (P1-4)', () => {
   it('rejects ?week=garbage on GET /api/summary/weekly with 400', async () => {
     const res = await request(app)
       .get('/api/summary/weekly?week=garbage')
-      .set('X-authentik-email', USER);
+      .set(headers());
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Validation failed');
@@ -53,7 +59,7 @@ describe('query validation (P1-4)', () => {
   it('still accepts a valid ISO week on GET /api/summary/weekly', async () => {
     const res = await request(app)
       .get('/api/summary/weekly?week=2026-W07')
-      .set('X-authentik-email', USER);
+      .set(headers());
 
     expect(res.status).toBe(200);
   });
@@ -61,7 +67,7 @@ describe('query validation (P1-4)', () => {
   it('rejects ?month=2026-13 on GET /api/summary/monthly with 400', async () => {
     const res = await request(app)
       .get('/api/summary/monthly?month=2026-13')
-      .set('X-authentik-email', USER);
+      .set(headers());
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBe('Validation failed');
@@ -71,7 +77,7 @@ describe('query validation (P1-4)', () => {
   it('rejects ?month=2026-00 on GET /api/summary/monthly with 400', async () => {
     const res = await request(app)
       .get('/api/summary/monthly?month=2026-00')
-      .set('X-authentik-email', USER);
+      .set(headers());
 
     expect(res.status).toBe(400);
     expect(res.body.issues).toEqual([expect.objectContaining({ path: 'month' })]);
@@ -80,7 +86,7 @@ describe('query validation (P1-4)', () => {
   it('still accepts a valid month on GET /api/summary/monthly', async () => {
     const res = await request(app)
       .get('/api/summary/monthly?month=2026-12')
-      .set('X-authentik-email', USER);
+      .set(headers());
 
     expect(res.status).toBe(200);
   });

@@ -10,17 +10,19 @@
 import type { Express } from 'express';
 import request from 'supertest';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createTestApp, seedUser } from '../test/harness.js';
+import { authHeaders, createTestApp, seedUser } from '../test/harness.js';
 import { timeEntries } from '../db/schema.js';
 import type { AppDatabase } from '../db/client.js';
 
 const AMS = 'Europe/Amsterdam';
 
+let db: AppDatabase;
+
 function headers(user: string) {
   return {
     Host: 'bucketing.test',
     Origin: 'http://bucketing.test',
-    'X-authentik-email': user,
+    ...authHeaders(db, user),
   };
 }
 
@@ -51,7 +53,6 @@ function addEntry(
 
 describe('local-day bucketing (P2-3)', () => {
   let app: Express;
-  let db: AppDatabase;
 
   beforeAll(async () => {
     ({ app, db } = await createTestApp());

@@ -100,6 +100,27 @@ export const invites = sqliteTable(
 );
 
 /**
+ * Persisted authentication-attempt counters (Q23, Phase B).
+ *
+ * Lockout must survive a restart: an in-memory limiter resets the moment the
+ * process does, which is exactly what an attacker wants. Every counter is a
+ * row here, keyed by scope (`ip:<addr>` or `acct:<normalised identifier>`).
+ *
+ * The account key is written for identifiers that match no user as well, so a
+ * locked unknown identifier and a locked real account answer identically and
+ * the response cannot be used to enumerate accounts.
+ */
+export const authAttempts = sqliteTable('auth_attempts', {
+  attemptKey: text('attempt_key').primaryKey(),
+  failureCount: integer('failure_count').notNull().default(0),
+  /** Start of the current per-minute IP window; unused for account rows. */
+  windowStartedAt: text('window_started_at').notNull(),
+  /** When set and in the future, attempts for this key are refused. */
+  lockedUntil: text('locked_until'),
+  updatedAt: text('updated_at').notNull(),
+});
+
+/**
  * Audit trail (Q12, 90-day retention). `user_id` is deliberately NOT a foreign
  * key: audit rows must survive the account they describe, and a failed login
  * has no user at all.
@@ -241,3 +262,4 @@ export type SessionRow = typeof sessions.$inferSelect;
 export type RecoveryCodeRow = typeof recoveryCodes.$inferSelect;
 export type InviteRow = typeof invites.$inferSelect;
 export type AuthEventRow = typeof authEvents.$inferSelect;
+export type AuthAttemptRow = typeof authAttempts.$inferSelect;

@@ -1,8 +1,7 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
-import { SessionExpiredOverlay } from '@/components/SessionExpiredOverlay';
-import { useAuthContext } from '@/lib/authContext';
+import { AuthGate } from '@/components/AuthGate';
 
 const Home = lazy(() => import('@/pages/Home').then((module) => ({ default: module.Home })));
 const Weekly = lazy(() => import('@/pages/Weekly').then((module) => ({ default: module.Weekly })));
@@ -18,19 +17,18 @@ function LazyRoute({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
-  const { sessionExpired } = useAuthContext();
-
   return (
     <BrowserRouter>
-      {sessionExpired && <SessionExpiredOverlay />}
-      <Routes>
-        <Route element={<Layout />}>
-          <Route index element={<LazyRoute><Home /></LazyRoute>} />
-          <Route path="weekly" element={<LazyRoute><Weekly /></LazyRoute>} />
-          <Route path="monthly" element={<LazyRoute><Monthly /></LazyRoute>} />
-          <Route path="settings" element={<LazyRoute><Settings /></LazyRoute>} />
-        </Route>
-      </Routes>
+      <AuthGate>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route index element={<LazyRoute><Home /></LazyRoute>} />
+            <Route path="weekly" element={<LazyRoute><Weekly /></LazyRoute>} />
+            <Route path="monthly" element={<LazyRoute><Monthly /></LazyRoute>} />
+            <Route path="settings" element={<LazyRoute><Settings /></LazyRoute>} />
+          </Route>
+        </Routes>
+      </AuthGate>
     </BrowserRouter>
   );
 }

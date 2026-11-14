@@ -6,13 +6,16 @@
 import type { Express } from 'express';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp } from '../test/harness.js';
+import type { AppDatabase } from '../db/client.js';
+import { authHeaders, createTestApp } from '../test/harness.js';
+
+let db: AppDatabase;
 
 function headers(user: string) {
   return {
     Host: 'category-deletion.test',
     Origin: 'http://category-deletion.test',
-    'X-authentik-email': user,
+    ...authHeaders(db, user),
   };
 }
 
@@ -26,7 +29,7 @@ describe('category deletion semantics (P2-4)', () => {
   let app: Express;
 
   beforeAll(async () => {
-    ({ app } = await createTestApp());
+    ({ app, db } = await createTestApp());
   });
 
   it('returns 409 with the entry count and keeps a used category', async () => {

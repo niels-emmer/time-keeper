@@ -5,13 +5,17 @@ import { z } from 'zod';
 import { db } from '../db/client.js';
 import { apiTokens } from '../db/schema.js';
 import { createTokenExpiryTimestamp } from '../lib/apiTokenExpiry.js';
-import { requireHeaderAuth } from '../middleware/auth.js';
+import { requireTokenManagementAuth } from '../middleware/auth.js';
 
 export const tokensRouter = Router();
 
-// All token management endpoints require interactive (Authentik header) auth.
-// A Bearer token cannot create, list, or revoke tokens — prevents privilege escalation.
-tokensRouter.use(requireHeaderAuth);
+// Token management is interactive only (Q9 / I-009):
+//   * a Bearer token cannot create, list, or revoke tokens — prevents a
+//     compromised machine credential from minting more;
+//   * a session is accepted in local/hybrid mode, but only with a credential
+//     check in the last five minutes (Q17);
+//   * the Authentik header remains the interactive path in proxy mode.
+tokensRouter.use(requireTokenManagementAuth);
 
 const createSchema = z.object({
   label: z.string().min(1).max(64).trim(),

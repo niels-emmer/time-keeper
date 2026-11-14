@@ -22,7 +22,13 @@ import { migrateWithRebuildSafety } from '../db/migrationRunner.js';
  */
 
 export const DRIZZLE_DIR = path.join(import.meta.dirname, '..', '..', 'drizzle');
-export const HEAD_MIGRATION_TAG = '0011_amusing_blue_marvel';
+
+/**
+ * The last migration the legacy fixture represents. It must stay pinned: the
+ * fixture builds a *pre-Phase-A* database, and every migration after this one
+ * (0011, 0012, …) is what the upgrade under test applies.
+ */
+export const LEGACY_HEAD_TAG = '0010_marvelous_lifeguard';
 
 export interface JournalEntry {
   idx: number;
@@ -35,9 +41,16 @@ export function readJournal(drizzleDir: string = DRIZZLE_DIR): JournalEntry[] {
   return (JSON.parse(raw) as { entries: JournalEntry[] }).entries;
 }
 
-/** Tags that exist before Phase A's migration. */
+/** Tags that exist before Phase A's migration (0000 through 0010 inclusive). */
 export function legacyTags(drizzleDir: string = DRIZZLE_DIR): JournalEntry[] {
-  return readJournal(drizzleDir).filter((entry) => entry.tag !== HEAD_MIGRATION_TAG);
+  const entries = readJournal(drizzleDir);
+  const headIndex = entries.findIndex((entry) => entry.tag === LEGACY_HEAD_TAG);
+
+  if (headIndex === -1) {
+    throw new Error(`Legacy fixture head migration ${LEGACY_HEAD_TAG} was not found in the journal`);
+  }
+
+  return entries.slice(0, headIndex + 1);
 }
 
 function readMigrationSql(tag: string, drizzleDir: string = DRIZZLE_DIR): string {
