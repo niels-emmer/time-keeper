@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useSettings, useUpdateSettings } from '@/hooks/useSettings';
+import { QueryState } from '@/components/QueryState';
 
 function getTimeZoneOptions(current: string): string[] {
   const intl = Intl as typeof Intl & { supportedValuesOf?: (key: 'timeZone') => string[] };
@@ -12,7 +13,7 @@ function getTimeZoneOptions(current: string): string[] {
 }
 
 export function WeeklyGoalSetting() {
-  const { data, isLoading } = useSettings();
+  const { data, isLoading, isError, error, refetch } = useSettings();
   const update = useUpdateSettings();
   const [value, setValue] = useState<number>(40);
   const [increment, setIncrement] = useState<30 | 60>(60);
@@ -56,6 +57,30 @@ export function WeeklyGoalSetting() {
   }
 
   const timeZoneOptions = getTimeZoneOptions(timeZone);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Work week</h2>
+        <QueryState isLoading loadingLabel="Loading work-week settings…" className="py-8" />
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <div className="space-y-4">
+        <h2 className="text-lg font-semibold">Work week</h2>
+        <QueryState
+          isError
+          error={error}
+          errorTitle="Could not load work-week settings"
+          onRetry={() => refetch()}
+          className="py-8"
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

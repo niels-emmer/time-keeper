@@ -1,4 +1,5 @@
 import { Pin } from 'lucide-react';
+import { QueryState } from '@/components/QueryState';
 import { useStartTimer } from '@/hooks/useTimer';
 import type { Category, TimeEntry } from '@time-keeper/shared';
 
@@ -36,12 +37,7 @@ export function CategoryGrid({
   const pinnedSet = new Set(pinnedCategoryIds);
 
   if (categories.length === 0) {
-    return (
-      <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed py-12 text-center text-muted-foreground">
-        <p className="text-lg">{emptyTitle}</p>
-        <p className="mt-1 text-sm">{emptyDescription}</p>
-      </div>
-    );
+    return <QueryState isEmpty emptyTitle={emptyTitle} emptyDescription={emptyDescription} />;
   }
 
   return (

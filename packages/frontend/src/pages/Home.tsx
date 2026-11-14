@@ -5,8 +5,10 @@ import { useCategories } from '@/hooks/useCategories';
 import { useRecentCategoryIds } from '@/hooks/useRecentCategories';
 import { ActiveTimer } from '@/components/ActiveTimer';
 import { CategoryGrid } from '@/components/CategoryGrid';
+import { QueryState, InlineError } from '@/components/QueryState';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { getErrorMessage } from '@/lib/api';
 import {
   filterTrackCategories,
   getStoredPinnedCategoryIds,
@@ -37,8 +39,20 @@ function Section({
 }
 
 export function Home() {
-  const { data: timerStatus } = useTimer();
-  const { data: categories = [], isFetched: hasFetchedCategories } = useCategories();
+  const {
+    data: timerStatus,
+    isError: timerError,
+    error: timerErrorValue,
+    refetch: refetchTimer,
+  } = useTimer();
+  const {
+    data: categories = [],
+    isFetched: hasFetchedCategories,
+    isLoading: categoriesLoading,
+    isError: categoriesError,
+    error: categoriesErrorValue,
+    refetch: refetchCategories,
+  } = useCategories();
   const activeEntry = timerStatus?.active ? timerStatus.entry : undefined;
   const activeCategory = activeEntry
     ? categories.find((category) => category.id === activeEntry.categoryId)
@@ -112,6 +126,13 @@ export function Home() {
         />
       )}
 
+      {timerError && (
+        <InlineError
+          message={`Timer status unavailable: ${getErrorMessage(timerErrorValue)}`}
+          onRetry={() => refetchTimer()}
+        />
+      )}
+
       <Card>
         <CardContent className="space-y-4 p-4">
           <div className="space-y-1">
@@ -153,7 +174,16 @@ export function Home() {
         </CardContent>
       </Card>
 
-      {hasSearch ? (
+      {categoriesLoading ? (
+        <QueryState isLoading loadingLabel="Loading categories…" />
+      ) : categoriesError ? (
+        <QueryState
+          isError
+          error={categoriesErrorValue}
+          errorTitle="Could not load categories"
+          onRetry={() => refetchCategories()}
+        />
+      ) : hasSearch ? (
         <Section
           title={`Results (${searchResults.length})`}
           description="Search results follow your saved manual category order, with pinned categories first."

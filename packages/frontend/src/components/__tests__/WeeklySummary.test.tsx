@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { isoWeekBounds } from '@time-keeper/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WeeklySummary } from '../WeeklySummary';
 
@@ -116,6 +117,65 @@ describe('WeeklySummary', () => {
 
     await waitFor(() => {
       expect(clipboardWriteTextMock).toHaveBeenCalledWith(expect.stringContaining('"Category"'));
+    });
+  });
+
+  // Finding M-3: a failed query used to render a blank Weekly tab.
+  it('shows the error and a Retry that refetches when the weekly query fails', () => {
+    const refetch = vi.fn();
+    useWeeklySummaryMock.mockReturnValue({
+      data: undefined,
+      isLoading: false,
+      isError: true,
+      error: new Error('Summary unavailable'),
+      refetch,
+    });
+
+    renderWithClient(<WeeklySummary />);
+
+    expect(screen.getByRole('alert').textContent).toContain('Summary unavailable');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  // Finding L-10: navigation must use the shared ISO-week math and stay Mon–Sun.
+  it('navigates one week at a time and keeps Monday–Sunday bounds', () => {
+    renderWithClient(<WeeklySummary />);
+
+    const initialWeek = screen.getByText(/^\d{4}-W\d{2}$/).textContent!;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Next week' }));
+
+    const nextWeek = screen.getByText(/^\d{4}-W\d{2}$/).textContent!;
+
+    expect(nextWeek).not.toBe(initialWeek);
+    expect(useWeeklySummaryMock).toHaveBeenLastCalledWith(nextWeek);
+
+    const initialBounds = isoWeekBounds(initialWeek);
+    const nextBounds = isoWeekBounds(nextWeek);
+
+    expect(initialBounds.start.getUTCDay()).toBe(1);
+    expect(initialBounds.end.getUTCDay()).toBe(0);
+    expect(nextBounds.start.getUTCDay()).toBe(1);
+    expect(nextBounds.end.getUTCDay()).toBe(0);
+    expect((nextBounds.start.getTime() - initialBounds.start.getTime()) / 86_400_000).toBe(7);
+  });
+
+  // Finding M-3: a failed cell save must not silently revert the optimistic edit.
+  it('surfaces a cell-save error instead of silently reverting', async () => {
+    adjustCellMutateAsyncMock.mockRejectedValueOnce(new Error('Adjust failed'));
+
+    renderWithClient(<WeeklySummary />);
+
+    fireEvent.click(screen.getAllByText('2.0h')[0]);
+    const input = screen.getByRole('spinbutton');
+    fireEvent.change(input, { target: { value: '3' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain('Adjust failed');
     });
   });
 });

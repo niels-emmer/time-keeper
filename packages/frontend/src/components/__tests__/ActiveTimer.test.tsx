@@ -78,4 +78,56 @@ describe('ActiveTimer', () => {
 
     expect(screen.getByText('0:00:12')).not.toBeNull();
   });
+
+  // Finding L-11: the worker must be the single ticker; no fallback interval
+  // may run alongside it.
+  it('uses the worker as the only ticker when it starts successfully', () => {
+    const workers: Array<{
+      onmessage: ((event: MessageEvent) => void) | null;
+      onerror: (() => void) | null;
+      postMessage: () => void;
+      terminate: () => void;
+    }> = [];
+
+    class WorkingWorker {
+      onmessage: ((event: MessageEvent) => void) | null = null;
+      onerror: (() => void) | null = null;
+      postMessage = vi.fn();
+      terminate = vi.fn();
+
+      constructor() {
+        workers.push(this);
+      }
+    }
+
+    vi.stubGlobal('Worker', WorkingWorker);
+    const intervalSpy = vi.spyOn(window, 'setInterval');
+
+    renderWithClient(
+      <ActiveTimer
+        entry={{
+          id: 1,
+          userId: 'alice@example.com',
+          categoryId: 1,
+          startTime: '2026-05-13T12:00:00.000Z',
+          endTime: null,
+          notes: null,
+          rounded: false,
+          createdAt: '2026-05-13T12:00:00.000Z',
+          updatedAt: '2026-05-13T12:00:00.000Z',
+        }}
+        categoryName="Project Alpha"
+        categoryColor="#3366ff"
+      />
+    );
+
+    expect(workers).toHaveLength(1);
+    expect(intervalSpy.mock.calls.some(([, delay]) => delay === 1000)).toBe(false);
+
+    act(() => {
+      workers[0].onmessage?.({ data: { type: 'tick', elapsed: 42 } } as MessageEvent);
+    });
+
+    expect(screen.getByText('0:00:42')).not.toBeNull();
+  });
 });

@@ -51,9 +51,14 @@ registerRoute(
 // ── Constants ──────────────────────────────────────────────────────────────
 const NOTIFICATION_TAG = 'time-keeper-timer';
 const POLL_INTERVAL_MS = 60_000; // best-effort timer-state recheck every 60 s
+// Bound the background poll loop (finding L-11). Every START_TRACKING message
+// from the page resets the budget, so an open app keeps the notification in
+// sync; a closed app stops polling after an hour instead of forever.
+const MAX_POLL_ATTEMPTS = 60;
 
 // ── State ──────────────────────────────────────────────────────────────────
 let pollTimerId: ReturnType<typeof setTimeout> | null = null;
+let pollAttempts = 0;
 let currentCategoryName: string | null = null;
 let currentStartTime: string | null = null;
 
@@ -86,12 +91,16 @@ function stopPolling(): void {
     clearTimeout(pollTimerId);
     pollTimerId = null;
   }
+  pollAttempts = 0;
   currentCategoryName = null;
   currentStartTime = null;
 }
 
 function schedulePoll(): void {
+  if (pollAttempts >= MAX_POLL_ATTEMPTS) return;
+
   pollTimerId = setTimeout(async () => {
+    pollAttempts += 1;
     // Re-verify the timer is still running by polling the API
     try {
       const res = await fetch('/api/timer', { credentials: 'same-origin' });
