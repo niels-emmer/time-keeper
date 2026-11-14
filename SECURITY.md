@@ -160,6 +160,17 @@ Two independent scans now run on every pull request and fail the build rather th
 - the `audit` job in `.github/workflows/security.yml` runs the command above;
 - the `trivy` job scans the filesystem and both container images for HIGH/CRITICAL advisories, including fixed base-image findings (see "Base images and pinned build tooling" above).
 
+**Scope of "clean".** That verdict is scoped to what `yarn npm audit` reports at high severity. GitHub's Dependabot reports **7 open advisories** on the default branch below that line, which this command does not surface because the two use different advisory sources and severity floors:
+
+| Package | Severity | Path |
+|---|---|---|
+| `qs` (×4) | medium | runtime — Express 4 parses query strings with it (`express@4.22.1` resolves a nested `qs@6.14.2`) |
+| `minimatch` | medium | build/test tooling |
+| `glob` | medium | build/test tooling |
+| `deepmerge` | low | build/test tooling |
+
+None of these are triaged yet. They are deliberately **not** fixed in this document's remediation pass, which was scoped to the audit's own findings; deciding whether each is reachable, and then fixing or dismissing it, is a separate change. The `qs` group is the one worth doing first — it is the only runtime-reachable path in the set.
+
 The dependency graph was refreshed during the remediation pass: app/runtime deps resolve to `@tanstack/react-query` 5.100.x and `react-router-dom` 7.18.x; the frontend build/test toolchain to `vite` 6.4.x, `vite-plugin-pwa` 1.3.0 and `vitest` 4.1.x; backend tooling to `drizzle-kit` 0.31.10. The root `resolutions` block pins transitive versions for packages such as `@babel/plugin-transform-modules-systemjs`, `esbuild`, `fast-uri`, `ip-address`, `path-to-regexp`, `postcss`, `rollup`, `serialize-javascript`, `tar` and `ws`; those pins exist because the transitive dependency was flagged, so re-check them rather than dropping them on an unrelated upgrade.
 
 `vitest`, `jsdom`, `vite-plugin-pwa`, `postcss`, and `tailwindcss` are build/test-only dependencies (not shipped in the production Docker image). They are omitted from the runtime table below.
@@ -207,6 +218,7 @@ To be explicit about what a proper security review would include and this projec
 - **`X-authentik-email` is used verbatim.** It is trusted only under the peer + token conditions above, but the value is not trimmed, lowercased, length-capped, or checked for duplicate headers — Node joins repeated headers into one string, so a malformed or duplicated header produces a malformed `user_id` rather than a 401
 - **Container images are not pinned by digest**; they track the `node:22-alpine` and `nginx:alpine` tags, so a rebuild can pick up a different base image. The Trivy job catches fixed advisories on each PR, but an unreviewed upstream change is possible
 - The legacy `monthly_project_goals` table is retained for migration/backward-compatibility, but no automated cleanup/removal migration has been added yet
+- No triage has been recorded for Dependabot's 7 open medium/low advisories (four `qs`, plus `minimatch`, `glob`, `deepmerge`); see "Dependency audit" above. `yarn npm audit` is clean at high severity, and CI enforces that
 
 ---
 
