@@ -24,11 +24,28 @@ For production/VPS refreshes, use the root helper script `./refresh-vps.sh` desc
 
 ### Node version
 
-- **Node 26** is the canonical development runtime (see `.node-version` and the `engines.node` field in `package.json`).
+- **Node 26** is the canonical development runtime (`.node-version` pins `26`; `package.json` allows `engines.node >= 22`).
 - **Node 22** is the floor and is what the container images run (`node:22-alpine`).
 - Anything `>=22` is supported. CI runs the full suite on **both 22 and 26** so a change cannot silently work in only one of them.
 
-`better-sqlite3` is pinned to `^13` for exactly this reason: 13.x installs on Node 22 and Node 26, where 11.x failed to compile on Node 26.
+`better-sqlite3` is pinned to `^13` for exactly this reason: 13.x ships prebuilt binaries for every supported platform, where 11.x failed to compile against Node 26.
+
+### Docker-based verification
+
+A normal `yarn install` works on the host for Node 22 and 26 on macOS and Linux, because `better-sqlite3` 13 ships the compiled `.node` binaries inside the package and the root `package.json` disables its build scripts — nothing is compiled at install time. The old "works in Docker, broken on the host" split came from `better-sqlite3` 11, which had to compile C++ and could not do so on Node 26.
+
+Run the backend suite in a container when you want to verify against the **production runtime**, or when your platform has no prebuild (install then fails loudly instead of falling back to node-gyp):
+
+```bash
+docker run --rm -v "$PWD":/src:ro -w /app node:22-bookworm-slim sh -c '
+  cp -a /src/. /app/ && rm -rf node_modules &&
+  npm install --global corepack@latest >/dev/null 2>&1 && corepack enable &&
+  yarn install --immutable &&
+  yarn workspace @time-keeper/shared build &&
+  yarn workspace @time-keeper/backend test'
+```
+
+Expected tail: `Test Files 19 passed (19)` / `Tests 102 passed (102)`. The backend suite runs against an in-memory SQLite database, so the container needs no volume and leaves nothing behind.
 
 Quick start:
 
@@ -53,7 +70,7 @@ yarn workspace @time-keeper/backend test
 yarn workspace @time-keeper/frontend test
 ```
 
-Each backend/frontend `test` script builds `@time-keeper/shared` first, so a clean checkout works without a separate build step (Yarn 4 does not run `pretest` hooks, so the build is chained explicitly rather than declared as `pretest`). The backend suite runs against an in-memory SQLite database and never touches `./dev-data/`.
+Each backend/frontend `test` **and `dev`** script builds `@time-keeper/shared` first, so a clean checkout works without a separate build step (Yarn 4 does not run `pretest`/`predev` hooks, so the build is chained explicitly inside the script rather than declared as a lifecycle hook). The backend suite runs against an in-memory SQLite database and never touches `./dev-data/`.
 
 CI (`.github/workflows/ci.yml`) runs install, build, and all three suites on Node 22 and 26, and fails on any red step.
 

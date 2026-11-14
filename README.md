@@ -73,6 +73,8 @@ yarn workspace @time-keeper/frontend dev
 
 Open http://localhost:5173. Auth is bypassed in dev mode — all data is stored under the `DEV_USER_ID` value.
 
+The backend listens on `http://localhost:3001`. If that port is already taken (the Orchestrator desktop app's daemon uses it), move the backend with `PORT` **and** point the frontend at it with `VITE_API_URL` — setting only one leaves the UI calling a dead port. See [local dev → Ports](docs/operations/local-dev.md#ports-read-this-if-the-backend-will-not-start).
+
 ## Deployment
 
 See [docs/operations/deployment.md](docs/operations/deployment.md) for the full guide, including:

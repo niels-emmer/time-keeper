@@ -48,6 +48,8 @@ Benefits over oauth2-proxy sidecar:
 - Reuses the same NPM proxy template already protecting other apps on the VPS
 - The nginx `proxy_set_header` pattern is identical to all other Authentik-protected apps
 
+**Superseded (2026-11-14):** the trust assumption in this entry no longer holds, and the sentence "NPM proxies to `localhost:38521` (frontend)" is obsolete. Nginx stamped `X-Internal-Token` onto whatever `X-authentik-email` arrived, so the token proved *"this request passed through nginx"* rather than *"Authentik authenticated this request"* — anyone who could open a connection to the published port could authenticate as any email they chose (finding C-1). No host port is published any more; NPM reaches `frontend:80` over the external `proxy-net` network by service name, and the backend independently enforces a trusted-peer check. See **D-018**. The Authentik-outpost-over-NPM arrangement described above is still what runs.
+
 ## D-004: user_id denormalized into all tables
 
 **Date:** 2026-02
@@ -59,12 +61,16 @@ Every row in `categories` and `time_entries` has a `user_id TEXT` column. There 
 - No JOIN needed to enforce data ownership
 - If a user is removed from Authentik, their data stays in DB but is inaccessible
 
+**Superseded by D-022** once the real-accounts work lands: the app will own identity and every data table will reference `users.id`. Until that migration ships, the text above describes the running system.
+
 ## D-005: Active timer = entry with null end_time
 
 **Date:** 2026-02
-**Status:** Accepted
+**Status:** Accepted (enforcement amended — see D-020)
 
 A running timer is represented as a `time_entries` row where `end_time IS NULL`. There is no separate `timers` table or state field. Stopping a timer = setting `end_time`. The single-timer invariant (I-003) is enforced by the service layer, not the DB schema.
+
+**Amendment (2026-11-14):** "not the DB schema" is no longer true. The schema now carries a partial unique index, and `end_time` is no longer nullable in the update schema, because relying on the service layer alone left an API path that created a second open timer. See **D-020**.
 
 ## D-006: @tanstack/react-query for server state
 
@@ -207,6 +213,17 @@ Why localStorage rather than the `user_settings` table (used for weekly goal and
 - No server round-trip needed; the preference is applied synchronously on first paint
 - Storing it server-side would require a `GET /api/settings` response before the correct theme could be applied, causing a flash
 
+**Amendment (2026-11-14) — CSP and the theme bootstrap:** the inline `<script>` described above was blocked in production, because `nginx.conf` ships `script-src 'self'` with no `'unsafe-inline'` and no hash (finding M-1). The flash-of-wrong-theme fix had therefore been dead in production while still working in dev, where Vite sends no CSP.
+
+Decision: **move the snippet out of `index.html` into a same-origin file, `packages/frontend/public/theme-init.js`, loaded by a synchronous `<script src="/theme-init.js">` in `<head>`.** `script-src 'self'` covers it unchanged.
+
+Why a same-origin file rather than adding `'sha256-…'` to the policy:
+- A hash has to be recomputed every time the snippet changes, and minification can alter it — a silent regression the browser reports only in the console
+- A nonce requires templating the served HTML, which this static nginx setup does not do
+- `'self'` stays strict; no `'unsafe-inline'` is ever added, so an injected inline script still cannot run
+
+The script must stay synchronous and in `<head>` — it has to run before first paint or the flash returns. `default-src 'self'`, `object-src 'none'`, `base-uri 'self'` and `frame-ancestors 'none'` are unchanged.
+
 ## D-015: Bearer token auth for native clients (api.* subdomain)
 
 **Date:** 2026-04-07
@@ -235,6 +252,8 @@ Added a second authentication path alongside the existing Authentik header auth,
 - Token management is Authentik-only — a leaked token cannot bootstrap more tokens
 
 **No new npm dependencies:** Node.js built-in `crypto` module used for SHA-256 and `randomBytes`.
+
+**Superseded (2026-11-14):** the two bullets that describe the backend as "exposed on port `127.0.0.1:38522`" are obsolete — no host port is published at all. NPM reaches `backend:3001` over the external `proxy-net` Docker network by service name, and publishing a port would reopen finding C-1. See **D-018**. Everything above about token generation, hashing, expiry and `requireHeaderAuth` still holds.
 
 ## D-016: Editable cells in the weekly summary table
 
@@ -285,3 +304,145 @@ Monthly summary behaviour now derives an effective month target from the categor
 - `one_time` → compare the fixed budget against cumulative spend since `target_started_at`
 
 Migration note: existing `monthly_project_goals` rows are backfilled into category targets as `monthly` targets. The legacy table remains in the schema for now, but it is no longer the canonical source for the Monthly tab.
+
+## D-018: The auth trust boundary is enforced in the backend, not by nginx
+
+**Date:** 2026-11-14
+**Status:** Accepted — supersedes the trust model in D-007; amends I-001 and I-007
+
+**The problem (finding C-1).** `packages/frontend/nginx.conf` stamped `X-Internal-Token` onto whatever `X-authentik-email` header arrived. The shared secret therefore proved *"this request passed through nginx"*, not *"Authentik authenticated this request"*. Anyone who could open a connection to the published frontend port could send `X-authentik-email: victim@example.com` and be authenticated as that user. The secret was on the wrong side of the trust boundary: it defended the backend against direct access while the browser path's trust anchor (nginx) was itself reachable.
+
+**Decision — three layers, all required:**
+
+1. **Publish no host port.** `docker-compose.yml` binds nothing. Both containers attach only to the external `proxy-net` network, and NPM (also on that network) reaches `frontend:80` and `backend:3001` by Docker service name. Every document that told operators to publish `38521`/`38522` was wrong and has been corrected.
+2. **Reject untrusted peers in the backend.** `X-authentik-email` is honoured only when `req.socket.remoteAddress` — never `req.ip`, which Express derives from the client-controlled `X-Forwarded-For` — is loopback, a private range, or inside the optional `TRUSTED_PROXY_CIDRS` allowlist. A public peer presenting the header gets 401. `TRUSTED_PROXY_CIDRS` extends the built-in ranges rather than replacing them, so the safe default survives an unset or blank variable.
+3. **Keep the internal token as fail-closed defence in depth.** In production the request must also carry a matching `X-Internal-Token`; missing `INTERNAL_PROXY_SECRET` refuses to boot.
+
+**Consequences:**
+- The peer allowlist, not the shared secret, is what makes the header path safe. It is a property of code, so it is unit-tested (`isTrustedProxyPeer`, `isTrustedProxyRequest`) instead of being a firewall promise.
+- **Publishing a port reopens C-1.** The allowlist does not save you there: the backend would see nginx's private address as the peer, which is exactly a trusted peer. This is why layer 1 is not optional.
+- The Bearer path is deliberately unaffected: a valid token is accepted from any peer, because the token is the credential.
+- C-1 cannot be *closed* from inside the repository — the deployed topology is operator state. It is mitigated in code and stays open until someone runs the off-host `curl` regression check.
+
+**Not chosen:** replacing the header with an HMAC-signed assertion (`user|ts` signed with a server-side key), which would make safety independent of network topology. It needs a signer on the NPM/Authentik side, so it is out-of-repo work and remains a future option. Identity-header normalisation (trim/lowercase/length cap, duplicate-header rejection) is also not implemented; both are recorded in `SECURITY.md` under "What has not been done".
+
+## D-019: Bucket entries by the user's local day; keep UTC storage
+
+**Date:** 2026-11-14
+**Status:** Accepted — amends how I-004 is applied
+
+**The problem (finding H-3).** Storage was UTC (correct, per I-004) but *bucketing* was also UTC, while entry creation converted a **local** `datetime-local` value. In Europe/Amsterdam, work logged between 00:00 and 02:00 local was stamped with the previous UTC date: an entry added at 00:30 on 15 November appeared under 14 November and vanished from the day log that had just been used to create it. Weekly columns, rounding windows and month boundaries all inherited the shift. The bug was a *definition* split — "what is a day?" had two answers — not a DST problem.
+
+**Decision:** keep UTC storage, bucket by a **per-user local day**.
+
+- `user_settings.timezone` (migration `0010`) stores an IANA zone name such as `Europe/Amsterdam`, default `UTC`.
+- `localDayKey(isoUtc, timeZone)` / `localDayBounds(dayKey, timeZone)` live in `@time-keeper/shared` and are implemented on `Intl.DateTimeFormat`, so DST transitions come from the timezone database rather than fixed offsets.
+- The four bucketing sites route through those helpers: the day read in `routes/entries.ts`, weekly grouping and month bounds in `summaryService.ts`, and the rounding day window in `roundingService.ts`.
+- Settings exposes a timezone selector.
+
+**How this amends I-004:** I-004 governs *storage* and is unchanged — timestamps are still UTC ISO 8601. What changed is that "a day" is now the user's local day, not a UTC slice. Do not "fix" bucketing back to UTC string slicing; that reintroduces H-3. A user who never picks a zone keeps the old UTC behaviour, because the default is `UTC` — which is what makes the change reversible and preserves an untouched install.
+
+Tests pin the interesting cases: 00:30 and 23:30 local, a spring-forward and a fall-back day (23 and 25 hours, still summing correctly), and a month boundary at 00:30 local.
+
+## D-020: The database enforces one open timer per user
+
+**Date:** 2026-11-14
+**Status:** Accepted — amends D-005
+
+**The problem (finding H-1).** D-005 said the single-timer invariant was enforced by the service layer. It was not enforced anywhere: `updateEntrySchema.endTime` was `.nullable()`, and `assertEntryRange` returned early on `null`, so `PATCH /api/entries/:id {"endTime": null}` converted any completed entry into a *second* running entry. `getActiveTimer` then returned an arbitrary one of them, and the summaries exclude open entries, so hours silently disappeared while the Track screen showed an unrelated timer.
+
+**Decision:** enforce it in the schema, not by convention.
+- `updateEntrySchema.endTime` is no longer nullable — a completed entry cannot be reopened into a running one.
+- Migration `0009` adds a partial unique index: `idx_entries_one_open_per_user ON time_entries (user_id) WHERE end_time IS NULL`. No code path — including a future one, or a direct `INSERT` — can create a second open row.
+- `startTimer()` still auto-stops the current timer before inserting, so the normal flow remains a single row transition.
+
+**Consequence:** the service-layer behaviour described in D-005 is now a convenience, and the database is the guarantee. A second open row fails at write time rather than being tolerated.
+
+## D-021: Rounding caps the bonus and never discards real work
+
+**Date:** 2026-11-14
+**Status:** Accepted — amends I-006
+
+**The problem (finding M-6).** I-006 claimed the rounded total could never exceed the weekly goal. The implementation only caps the *rounding bonus*: with a 2400-minute goal, 2000 minutes already logged, and a 600-minute raw day, the result is 600 and the week reaches 2600. The invariant and the code disagreed, and the tests encode the code's behaviour.
+
+**Decision:** the code is right and the invariant was wrong — you cannot un-work time.
+- Rounding may add a bonus only up to the remaining weekly headroom.
+- It never reduces a category below its **raw** minutes; only bonus can be removed.
+- When the raw day alone overruns the headroom the bonus is zero and the result reports `weekWouldExceed: true`. The API surfaces the overrun instead of clamping real work.
+
+**I-006 is restated** in those terms, and the docstring was aligned ("largest-first" removal, matching the sort). **No logic changed** — the rounding algorithm is explicitly out of scope for these fixes.
+
+**Consequence for readers:** a week can legitimately show more than the goal. That is the user's real time, and it is reported, not hidden.
+
+## D-022: The app owns identity — real accounts, `users` table with UUID keys
+
+**Date:** 2026-11-14
+**Status:** Accepted (implementation in progress) — supersedes the "no users table" invariant (I-008) and D-004
+
+Identity moves into the application. A `users` table with a UUID primary key becomes the owner of every record: every data table (`categories`, `time_entries`, `user_settings`, `api_tokens`, …) gets a foreign key to `users.id` instead of the denormalised `user_id TEXT` email column.
+
+Why this reverses the earlier "Authentik owns user creation/deletion" position:
+- Sessions, password change, MFA enrolment and recovery, invites, and destructive account actions cannot be expressed while another system owns the identity record
+- A foreign key to a real row makes "data belongs to a user that exists" a database guarantee rather than a convention
+- Deleting an account becomes a schema-level operation (see D-028) instead of an orphaned-data problem
+
+This supersedes I-008 in `docs/memory/invariants.md`; the invariant must be rewritten in the same change that lands the migration, not before.
+
+## D-023: Authentik coexistence via `AUTH_MODE=local|proxy|hybrid`
+
+**Date:** 2026-11-14
+**Status:** Accepted (implementation in progress)
+
+`AUTH_MODE` selects how requests are authenticated:
+- `local` — the app's own sessions (D-024). Becomes the **default at cutover**.
+- `proxy` — the existing Authentik forward-auth header path (D-007 / D-018), unchanged and fully supported.
+- `hybrid` — both are accepted, for a staged migration window.
+
+Proxy header auth is retained as a supported mode rather than deleted, so rolling back the cutover is a configuration change, not a code revert. The trust rules in D-018 continue to apply whenever the proxy mode is active: no published port, trusted peer, internal token.
+
+## D-024: Session authentication with server-side sessions
+
+**Date:** 2026-11-14
+**Status:** Accepted (implementation in progress)
+
+Local auth uses **server-side sessions**: an opaque session identifier is held in an `httpOnly`, `Secure`, `SameSite=Lax` cookie, with the session record in SQLite (consistent with I-005 — no new stateful store).
+
+Cross-site request forgery is handled with a **CSRF double-submit token**: a per-session token is issued to the client and must be echoed in a request header, and the two are compared server-side.
+
+**Accepted risk:** this **reintroduces a CSRF surface that the header-only design did not have** — ambient cookie credentials are sent automatically by browsers, which is exactly what `protectBrowserMutations` (`Origin`/`Referer` checking) was able to sidestep. The double-submit token plus the existing same-origin check are the mitigations, and the resulting CSRF threat **must be added to `SECURITY.md`'s threat model** as part of the implementing change. It is not a reason to avoid sessions; it is a cost of the decision, recorded here so it is not rediscovered later.
+
+## D-025: Password storage — Node `crypto.scrypt`, versioned hash prefix
+
+**Date:** 2026-11-14
+**Status:** Accepted (implementation in progress)
+
+Passwords are hashed with `crypto.scrypt` from Node's built-in `crypto` module. **No new dependency** is added — no bcrypt, no argon2 native addon, consistent with the project's preference for the standard library and its aversion to extra native code.
+
+Stored hashes carry a **versioned prefix** so parameters can change without invalidating existing accounts: the prefix identifies the algorithm and cost parameters used, and a successful login with an older prefix is the opportunity to re-hash transparently.
+
+## D-026: MFA — TOTP plus recovery codes, mandatory for admins
+
+**Date:** 2026-11-14
+**Status:** Accepted (implementation in progress)
+
+Second factor is **TOTP** (RFC 6238) with a set of **single-use recovery codes** for device loss.
+
+- **Mandatory for admin accounts.** An admin without a second factor cannot exist.
+- The TOTP shared secret is **encrypted at rest with AES-256-GCM**, so a database copy does not hand over every second factor. The key is deployment configuration, not stored beside the ciphertext.
+
+## D-027: Registration is invite-only
+
+**Date:** 2026-11-14
+**Status:** Accepted (implementation in progress)
+
+There is **no public registration endpoint**, and none will be built. Accounts are created by an admin-issued invite. This keeps the instance closed by default and avoids the account-enumeration and abuse surface that a public signup form brings to a self-hosted tool.
+
+## D-028: Destructive account actions
+
+**Date:** 2026-11-14
+**Status:** Accepted (implementation in progress)
+
+- **Self-delete cascades.** A user deleting their own account removes their data via the foreign keys from D-022; no orphaned rows are left behind.
+- **Admin-delete chooses the disposition.** An admin deleting another account picks either **cascade** (delete the data) or **reassign** (move it to another user). Data is never silently destroyed or silently orphaned.
+- **Last-admin guards.** The final admin account cannot be deleted or demoted, so the instance cannot be locked out of administration.
+- **5-minute re-auth freshness** for sensitive actions (password change, MFA changes, account deletion). A sensitive action requires a credential check within the last five minutes, so a stolen session cannot be escalated into a permanent takeover.

@@ -6,6 +6,31 @@
 - Corepack enabled: `corepack enable` (gives you Yarn 4)
 - Docker (optional, for full-stack test with containers)
 
+## Ports (read this if the backend will not start)
+
+Defaults: backend **3001**, frontend **5173**.
+
+**`3001` is frequently taken on a development machine.** In particular, the Orchestrator desktop app's daemon listens on `3001`, so on a machine running it the backend either fails to bind with `EADDRINUSE` or your browser silently reaches the daemon instead of this API — which looks like a broken app rather than a port conflict. Check before blaming the code:
+
+```bash
+lsof -nP -iTCP:3001 -sTCP:LISTEN
+```
+
+Move the backend with `PORT` and tell the frontend where it went with `VITE_API_URL`. **Set both or neither** — the pair is the contract:
+
+```bash
+# Terminal 1 — backend on any free port (3101 used here purely as an example)
+PORT=3101 DEV_USER_ID=you@example.com yarn workspace @time-keeper/backend dev
+
+# Terminal 2 — frontend, pointed at that port
+VITE_API_URL=http://localhost:3101 yarn workspace @time-keeper/frontend dev
+```
+
+- `PORT` is read by `packages/backend/src/index.ts` (default `3001`).
+- `VITE_API_URL` is the Vite dev-server proxy target in `packages/frontend/vite.config.ts` (default `http://localhost:3001`).
+
+If you set only one of them, the UI keeps calling the old port and you get a stream of 404s/502s in the browser console instead of a startup error. There is deliberately no committed non-default port: the default stays `3001`, and the override is per-shell so it does not surprise anyone else on the project.
+
 ## Option A: Run directly (fastest)
 
 ```bash
@@ -14,14 +39,16 @@ yarn install
 
 # 2. Start the backend (Terminal 1)
 DEV_USER_ID=you@example.com yarn workspace @time-keeper/backend dev
-# API runs on http://localhost:3001
+# API runs on http://localhost:3001  — see "Ports" above if that is taken
 
 # 3. Start the frontend (Terminal 2)
 yarn workspace @time-keeper/frontend dev
 # UI runs on http://localhost:5173
 ```
 
-The frontend Vite dev server proxies `/api/*` to `http://localhost:3001` automatically (configured in `vite.config.ts`).
+Both `dev` scripts build `@time-keeper/shared` first, so this works from a clean checkout with no extra step. Yarn 4 does not run `pre`/`post` lifecycle hooks for arbitrary scripts, so the build is chained explicitly in the script rather than declared as a `predev` hook.
+
+The frontend Vite dev server proxies `/api/*` to `VITE_API_URL` (default `http://localhost:3001`) automatically — see `packages/frontend/vite.config.ts`.
 
 No OAuth2 / Authentik needed. The backend uses `DEV_USER_ID` as the user identity.
 
