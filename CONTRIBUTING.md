@@ -22,6 +22,14 @@ See [docs/operations/local-dev.md](docs/operations/local-dev.md) for the full lo
 
 For production/VPS refreshes, use the root helper script `./refresh-vps.sh` described in [docs/operations/deployment.md](docs/operations/deployment.md); it wraps `git pull`, sets `APP_VERSION` from the latest git tag, and rebuilds the frontend and backend containers.
 
+### Node version
+
+- **Node 26** is the canonical development runtime (see `.node-version` and the `engines.node` field in `package.json`).
+- **Node 22** is the floor and is what the container images run (`node:22-alpine`).
+- Anything `>=22` is supported. CI runs the full suite on **both 22 and 26** so a change cannot silently work in only one of them.
+
+`better-sqlite3` is pinned to `^13` for exactly this reason: 13.x installs on Node 22 and Node 26, where 11.x failed to compile on Node 26.
+
 Quick start:
 
 ```bash
@@ -44,6 +52,10 @@ yarn workspace @time-keeper/shared test
 yarn workspace @time-keeper/backend test
 yarn workspace @time-keeper/frontend test
 ```
+
+Each backend/frontend `test` script builds `@time-keeper/shared` first, so a clean checkout works without a separate build step (Yarn 4 does not run `pretest` hooks, so the build is chained explicitly rather than declared as `pretest`). The backend suite runs against an in-memory SQLite database and never touches `./dev-data/`.
+
+CI (`.github/workflows/ci.yml`) runs install, build, and all three suites on Node 22 and 26, and fails on any red step.
 
 ## Code style
 

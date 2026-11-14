@@ -9,12 +9,12 @@
     "start": "node dist/index.js",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
-    "test": "vitest run",
+    "test": "yarn workspace @time-keeper/shared build && vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
     "@time-keeper/shared": "workspace:*",
-    "better-sqlite3": "^11.0.0",
+    "better-sqlite3": "^13.2.0",
     "drizzle-orm": "^0.45.2",
     "express": "^4.21.0",
     "express-rate-limit": "^7.4.0",
@@ -24,7 +24,9 @@
     "@types/better-sqlite3": "^7.6.11",
     "@types/express": "^5.0.0",
     "@types/node": "^22.0.0",
+    "@types/supertest": "^7.2.1",
     "drizzle-kit": "^0.31.10",
+    "supertest": "^7.3.2",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^4.1.6"

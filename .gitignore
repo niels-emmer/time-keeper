@@ -15,6 +15,16 @@ node_modules
 dist
 build
 
+# TypeScript incremental build info (emitted by `tsc -b`)
+*.tsbuildinfo
+
+# Emitted copies of the Vite config. These shadow vite.config.ts: Vite resolves
+# vite.config.js before vite.config.ts, so a stale JS copy must never exist.
+packages/frontend/vite.config.js
+packages/frontend/vite.config.js.map
+packages/frontend/vite.config.d.ts
+packages/frontend/vite.config.d.ts.map
+
 # Environment
 .env
 *.env.local

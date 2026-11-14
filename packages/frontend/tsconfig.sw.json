@@ -6,7 +6,9 @@
     "module": "ESNext",
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
-    "noEmit": true
+    "noEmit": true,
+    // Keep `tsc -b` bookkeeping out of the source tree.
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.sw.tsbuildinfo"
   },
   "include": ["src/sw.ts", "src/workers"]
 }

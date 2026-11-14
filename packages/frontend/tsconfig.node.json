@@ -4,7 +4,10 @@
     "target": "ES2022",
     "lib": ["ES2023"],
     "module": "ESNext",
-    "moduleResolution": "bundler"
+    "moduleResolution": "bundler",
+    // Never emit next to the sources: `tsc -b` used to rewrite vite.config.js
+    // into the package root, where Vite would load it instead of the .ts file.
+    "outDir": "./node_modules/.cache/tsconfig.node"
   },
   "include": ["vite.config.ts"]
 }

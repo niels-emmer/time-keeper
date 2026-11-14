@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { WeeklySummary } from '../WeeklySummary';
 
@@ -74,6 +75,16 @@ const summary = {
 };
 
 describe('WeeklySummary', () => {
+  // WeeklySummary now reads categories from React Query (the "Add category"
+  // picker), so it needs a provider even though these two tests never open it.
+  function renderWithClient(ui: React.ReactElement) {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  }
+
   beforeEach(() => {
     vi.clearAllMocks();
     window.localStorage.clear();
@@ -86,7 +97,7 @@ describe('WeeklySummary', () => {
   });
 
   it('renders export preview and lets the user switch formats', async () => {
-    render(<WeeklySummary />);
+    renderWithClient(<WeeklySummary />);
 
     expect(screen.getByText('Review this week before you submit')).not.toBeNull();
     expect((screen.getByLabelText('Weekly export preview') as HTMLTextAreaElement).value).toContain('"Category"');
@@ -99,7 +110,7 @@ describe('WeeklySummary', () => {
   });
 
   it('copies the selected export preview', async () => {
-    render(<WeeklySummary />);
+    renderWithClient(<WeeklySummary />);
 
     fireEvent.click(screen.getByRole('button', { name: /copy csv/i }));
 
