@@ -7,3 +7,11 @@ updates:
     groups:
       dev-deps:
         dependency-type: "development"
+        # Minor and patch bumps arrive as one reviewable PR. Majors do not:
+        # without this filter a single group PR once carried nine updates, five
+        # of them majors, which is not a reviewable unit and hides the breaking
+        # ones. Majors come through individually so each gets its own PR and CI
+        # run (see AGENTS.md guardrail: one major per PR).
+        update-types:
+          - "minor"
+          - "patch"
