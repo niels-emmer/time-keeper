@@ -40,4 +40,27 @@ describe('HTTP harness', () => {
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ weeklyGoalHours: 40, roundingIncrementMinutes: 60 });
   });
+
+  it('gives each call its own database, even within one test file', async () => {
+    const first = await createTestApp();
+    await request(first.app)
+      .put('/api/settings')
+      .set('Host', 'harness.test')
+      .set('Origin', 'http://harness.test')
+      .set('X-authentik-email', 'isolation@example.com')
+      .send({ weeklyGoalHours: 12, roundingIncrementMinutes: 30 })
+      .expect(200);
+
+    const second = await createTestApp();
+    const res = await request(second.app)
+      .get('/api/settings')
+      .set('Host', 'harness.test')
+      .set('Origin', 'http://harness.test')
+      .set('X-authentik-email', 'isolation@example.com');
+
+    // If the second call had reused the first call's module-level db, this
+    // would return the 12 h / 30 min row the first app wrote.
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ weeklyGoalHours: 40, roundingIncrementMinutes: 60 });
+  });
 });
