@@ -18,7 +18,10 @@ The `DEV_USER_ID` fallback is only active when `NODE_ENV !== 'production'`.
 
 ## I-003: One active timer per user
 
-At any given moment, a user can have at most one running timer (a `time_entries` row with `end_time IS NULL`). The `timerService.startTimer()` function auto-stops any running timer before creating a new one.
+At any given moment, a user can have at most one running timer (a `time_entries` row with `end_time IS NULL`). This is enforced in two places:
+
+- `timerService.startTimer()` auto-stops any running timer before creating a new one.
+- The database has a partial unique index `idx_entries_one_open_per_user ON time_entries (user_id) WHERE end_time IS NULL` (migration `0009`), so no code path can insert a second open row. `PATCH /api/entries/:id` rejects `endTime: null`.
 
 ## I-004: All times stored in UTC ISO 8601
 
@@ -28,9 +31,15 @@ At any given moment, a user can have at most one running timer (a `time_entries`
 
 The entire application state lives in a single SQLite file at `DATABASE_PATH` (default `/data/time-keeper.db` in production). Backups = copying this file. There is no cache, no session store, no other persistence.
 
-## I-006: Rounding never exceeds the user's weekly goal
+## I-006: Rounding never adds beyond weekly headroom, and never discards raw minutes
 
-The `computeRounding()` function in `packages/shared/src/utils/rounding.ts` must never produce a result where `weekMinutesSoFar + dayRoundedTotal > weeklyGoalMinutes`. The cap is the user's configured weekly goal (stored in `user_settings.weekly_goal_hours`, default 40 h = 2400 min). The service layer reads this from the DB and passes it to `computeRounding()`; do not bypass it or hardcode 2400.
+`computeRounding()` in `packages/shared/src/utils/rounding.ts` follows these rules:
+
+- Rounding may add a **bonus** only up to the remaining weekly headroom.
+- It **never reduces a category below its raw minutes** — the bonus can be removed, real work cannot.
+- If the day's raw minutes alone exceed the remaining headroom, the bonus is zero and the result reports `weekWouldExceed: true`. The API surfaces that overrun instead of clamping real work.
+
+The cap is the user's configured weekly goal (stored in `user_settings.weekly_goal_hours`, default 40 h = 2400 min). The service layer reads this from the DB and passes it to `computeRounding()`; do not bypass it or hardcode 2400.
 
 The rounding increment (30 or 60 min, stored in `user_settings.rounding_increment_minutes`, default 60) is also read from the DB and passed to `computeRounding()` as its fourth argument. Do not hardcode 60.
 

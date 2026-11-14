@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { eq, and, asc, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '../db/client.js';
-import { categories } from '../db/schema.js';
+import { categories, timeEntries } from '../db/schema.js';
 import { createError } from '../middleware/errorHandler.js';
 
 export const categoriesRouter = Router();
@@ -234,13 +234,43 @@ categoriesRouter.delete('/:id', (req, res, next) => {
     const id = parseInt(req.params.id, 10);
     if (isNaN(id)) throw createError('Invalid id', 400);
 
-    const result = db
-      .delete(categories)
-      .where(and(eq(categories.id, id), eq(categories.userId, req.userId)))
-      .returning()
-      .get();
+    const outcome = db.transaction(() => {
+      const existing = db
+        .select({ id: categories.id })
+        .from(categories)
+        .where(and(eq(categories.id, id), eq(categories.userId, req.userId)))
+        .get();
 
-    if (!result) throw createError('Category not found', 404);
+      if (!existing) return { status: 'missing' as const };
+
+      const used = db
+        .select({ count: sql<number>`COUNT(*)` })
+        .from(timeEntries)
+        .where(eq(timeEntries.categoryId, id))
+        .get();
+      const entries = used?.count ?? 0;
+
+      // A used category has an FK relationship to its entries; deleting it
+      // would be a constraint violation. Surface that as 409 with the count
+      // instead of a 500 (finding M-2).
+      if (entries > 0) return { status: 'in-use' as const, entries };
+
+      db.delete(categories)
+        .where(and(eq(categories.id, id), eq(categories.userId, req.userId)))
+        .run();
+
+      return { status: 'deleted' as const };
+    });
+
+    if (outcome.status === 'missing') throw createError('Category not found', 404);
+    if (outcome.status === 'in-use') {
+      res.status(409).json({
+        error: `Category is used by ${outcome.entries} ${outcome.entries === 1 ? 'entry' : 'entries'}. Reassign or delete them first.`,
+        entries: outcome.entries,
+      });
+      return;
+    }
+
     res.status(204).end();
   } catch (err) {
     next(err);

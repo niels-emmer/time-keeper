@@ -8,8 +8,15 @@ import type { RoundingResult } from '@time-keeper/shared';
 /**
  * Apply end-of-day rounding for a specific date.
  * Idempotent: already-rounded entries are excluded from rounding input.
+ *
+ * All reads and writes for the day run in one SQLite transaction, so a throw
+ * mid-loop leaves the day untouched rather than half-rounded (finding M-9).
  */
 export function applyRounding(userId: string, date: string): RoundingResult {
+  return db.transaction(() => applyRoundingForDay(userId, date));
+}
+
+function applyRoundingForDay(userId: string, date: string): RoundingResult {
   const timeZone = getUserTimeZone(userId);
   // Half-open local-day window, so DST days are 23/25 h without special cases.
   const bounds = localDayBounds(date, timeZone);

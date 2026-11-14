@@ -160,6 +160,7 @@ function SortableRow({ cat, onEdit, onDelete, deleteDisabled }: SortableRowProps
         size="icon"
         onClick={() => onDelete(cat.id)}
         disabled={deleteDisabled}
+        aria-label={`Delete ${cat.name}`}
       >
         <Trash2 className="h-4 w-4 text-destructive" />
       </Button>
@@ -196,6 +197,26 @@ export function CategoryManager() {
   const [dialog, setDialog] = useState<{ open: boolean; editing?: Category }>({ open: false });
   const [form, setForm] = useState<FormState>(defaultForm);
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Category | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  function requestDelete(id: number) {
+    setDeleteError(null);
+    setDeleteTarget(categories.find((category) => category.id === id) ?? null);
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    setDeleteError(null);
+    try {
+      await del.mutateAsync(deleteTarget.id);
+      setDeleteTarget(null);
+    } catch (error) {
+      // A used category returns 409 with a message; surface it instead of
+      // silently doing nothing (finding M-2).
+      setDeleteError(error instanceof Error ? error.message : 'Unable to delete category.');
+    }
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
@@ -322,7 +343,7 @@ export function CategoryManager() {
                 key={cat.id}
                 cat={cat}
                 onEdit={openEdit}
-                onDelete={(id) => del.mutate(id)}
+                onDelete={requestDelete}
                 deleteDisabled={del.isPending}
               />
             ))}
@@ -474,6 +495,47 @@ export function CategoryManager() {
             </Button>
             <Button onClick={handleSave} disabled={!form.name.trim() || !hasValidTarget || isPending}>
               {dialog.editing ? 'Save' : 'Create'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteTarget(null);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete category?</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 text-sm">
+            <p>
+              <span className="font-medium">{deleteTarget?.name}</span> will be removed. Categories with
+              tracked entries cannot be deleted.
+            </p>
+            {deleteError && (
+              <p role="alert" className="text-destructive">
+                {deleteError}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setDeleteTarget(null);
+                setDeleteError(null);
+              }}
+            >
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={confirmDelete} disabled={del.isPending}>
+              Delete
             </Button>
           </DialogFooter>
         </DialogContent>
