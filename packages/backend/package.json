@@ -10,7 +10,8 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/migrate.ts",
     "test": "yarn workspace @time-keeper/shared build && vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "verify:migration": "tsx scripts/verify-phase-a-migration.ts"
   },
   "dependencies": {
     "@time-keeper/shared": "workspace:*",

@@ -1,39 +1,34 @@
 import { createHash } from 'crypto';
-import { BlockList, isIP } from 'net';
 import type { Request, Response, NextFunction } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
 import { apiTokens } from '../db/schema.js';
 import { isTokenExpired } from '../lib/apiTokenExpiry.js';
+import {
+  getAuthMode,
+  modeAllowsProxyHeaders,
+  modeAllowsSessions,
+} from '../lib/config.js';
+import { isTrustedProxyPeer } from '../lib/proxyTrust.js';
+import { readSessionCookie, verifySession } from '../lib/session.js';
+import { ensureProxyUser, findUserById } from '../services/userService.js';
+
+export { isSecureRequest, isTrustedProxyPeer } from '../lib/proxyTrust.js';
 
 declare global {
   namespace Express {
     interface Request {
+      /** `users.id` — never the email. Every user-scoped table keys on this. */
       userId: string;
-      /** How the request was authenticated. 'header' = Authentik proxy header; 'token' = Bearer API token. */
-      authMethod: 'header' | 'token';
+      /** The account's email, for display surfaces such as `GET /api/info`. */
+      userEmail: string;
+      userRole: 'user' | 'admin';
+      /** How the request was authenticated. */
+      authMethod: 'header' | 'token' | 'session';
     }
   }
 }
 
-/**
- * Extract the authenticated user from the request.
- *
- * Auth is checked in this order:
- *
- * 1. Bearer token (Authorization: Bearer <token>)
- *    - SHA-256 hash of the token is looked up in api_tokens.
- *    - Used by the native macOS app via the api.* subdomain (no Authentik in the path).
- *    - Token management endpoints require authMethod === 'header' — a token cannot create tokens.
- *
- * 2. X-authentik-email header (set by Authentik's embedded outpost via NPM forward auth)
- *    - Primary auth path for the PWA.
- *
- * 3. DEV_USER_ID env var (only when NODE_ENV !== 'production')
- *    - Development convenience — never active in production.
- *
- * Returns 401 if none of the above yield a user in production.
- */
 export function isTrustedProxyRequest(req: Request): boolean {
   // Layer 1 (C-1): identity headers may only arrive from a proxy network we
   // control. A public peer can present any header it likes, including a stolen
@@ -55,104 +50,42 @@ export function isTrustedProxyRequest(req: Request): boolean {
   return req.headers['x-internal-token'] === proxySecret;
 }
 
-/**
- * Ranges that are never publicly routable. A request whose TCP peer is in one
- * of these ranges is assumed to have arrived from the proxy chain (nginx on
- * the private Docker network, or NPM itself).
- */
-const DEFAULT_TRUSTED_PROXY_CIDRS: readonly string[] = [
-  '127.0.0.0/8',
-  '10.0.0.0/8',
-  '172.16.0.0/12',
-  '192.168.0.0/16',
-  '169.254.0.0/16',
-  '::1/128',
-  'fc00::/7',
-  'fe80::/10',
-];
-
-function addCidr(list: BlockList, cidr: string): void {
-  const [address, prefixPart] = cidr.split('/');
-  if (!address) {
-    return;
-  }
-
-  const family = isIP(address);
-  if (family === 0) {
-    return;
-  }
-
-  const maxPrefix = family === 4 ? 32 : 128;
-  const prefix = prefixPart === undefined ? maxPrefix : Number(prefixPart);
-  if (!Number.isInteger(prefix) || prefix < 0 || prefix > maxPrefix) {
-    return;
-  }
-
-  try {
-    list.addSubnet(address, prefix, family === 4 ? 'ipv4' : 'ipv6');
-  } catch {
-    // Ignore malformed entries; the built-in defaults still apply.
-  }
+function attachUser(req: Request, user: { id: string; email: string; role: 'user' | 'admin' }): void {
+  req.userId = user.id;
+  req.userEmail = user.email;
+  req.userRole = user.role === 'admin' ? 'admin' : 'user';
 }
 
 /**
- * `TRUSTED_PROXY_CIDRS` extends the built-in loopback/private ranges rather
- * than replacing them, so the safe default stays in force when the variable is
- * unset or blank.
- */
-function buildTrustedProxyBlockList(extra: string | undefined): BlockList {
-  const list = new BlockList();
-
-  for (const cidr of DEFAULT_TRUSTED_PROXY_CIDRS) {
-    addCidr(list, cidr);
-  }
-
-  const configured = extra
-    ?.split(',')
-    .map((entry) => entry.trim())
-    .filter(Boolean) ?? [];
-
-  for (const cidr of configured) {
-    addCidr(list, cidr);
-  }
-
-  return list;
-}
-
-/**
- * True when the TCP peer is loopback, a private range, or inside an explicit
- * `TRUSTED_PROXY_CIDRS` entry.
+ * Authenticate the request and attach `req.userId` (a `users.id`), `req.userEmail`
+ * and `req.userRole`.
  *
- * This reads `req.socket.remoteAddress`, never `req.ip`. Express derives
- * `req.ip` from `X-Forwarded-For`, which any client can set; the socket peer
- * address cannot be chosen by the request.
+ * Paths, in order (plan A4):
+ *
+ * 1. `Authorization: Bearer <token>` — looked up by SHA-256 in `api_tokens`,
+ *    which migration 0011 has already remapped onto `users.id` (Q25). Used by
+ *    the macOS app on the api.* subdomain. An invalid bearer token is rejected
+ *    outright and never falls through to another path, so a header cannot be
+ *    used to rescue a bad token.
+ *
+ * 2. Session cookie (`tk_session`) — only when `AUTH_MODE` includes local
+ *    sessions (`local` | `hybrid`). Server-side and revocable.
+ *
+ * 3. `X-authentik-email` — only when `AUTH_MODE` includes the proxy path
+ *    (`proxy` | `hybrid`), and only from a trusted peer carrying the internal
+ *    proxy secret in production. The email is resolved to `users.id`; an email
+ *    with no account yet is provisioned on first sight, which is how accounts
+ *    appeared before Phase A.
+ *
+ * 4. `DEV_USER_ID` — development only, and only in `AUTH_MODE=proxy` (Q21). In
+ *    `local` mode local development uses the real login flow instead.
+ *
+ * Behaviour for existing proxy users is unchanged: the same header
+ * authenticates the same person, against the same rows.
  */
-export function isTrustedProxyPeer(req: Request): boolean {
-  const remoteAddress = req.socket?.remoteAddress;
-  if (!remoteAddress) {
-    return false;
-  }
+export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+  const mode = getAuthMode();
 
-  // Normalise IPv4-mapped IPv6 (::ffff:127.0.0.1) and zone-scoped link-local
-  // addresses (fe80::1%eth0) to a form `isIP` understands.
-  const withoutZone = remoteAddress.split('%')[0];
-  const normalized =
-    withoutZone.startsWith('::ffff:') && isIP(withoutZone.slice(7)) === 4
-      ? withoutZone.slice(7)
-      : withoutZone;
-
-  const family = isIP(normalized);
-  if (family === 0) {
-    return false;
-  }
-
-  return buildTrustedProxyBlockList(process.env.TRUSTED_PROXY_CIDRS).check(
-    normalized,
-    family === 4 ? 'ipv4' : 'ipv6'
-  );
-}
-
-export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
   // --- Path 1: Bearer token ---
   const authHeader = req.headers['authorization'];
   if (authHeader?.startsWith('Bearer ')) {
@@ -171,7 +104,13 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
           return;
         }
 
-        req.userId = row.userId;
+        const user = findUserById(row.userId);
+        if (!user || user.disabled) {
+          res.status(401).json({ error: 'Unauthorized' });
+          return;
+        }
+
+        attachUser(req, user);
         req.authMethod = 'token';
         // Update last_used_at asynchronously — don't block the request
         setImmediate(() => {
@@ -194,7 +133,26 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
     }
   }
 
-  // --- Path 2: Authentik header ---
+  // --- Path 2: session cookie ---
+  if (modeAllowsSessions(mode)) {
+    const rawSessionId = readSessionCookie(req);
+    if (rawSessionId) {
+      const verified = verifySession(rawSessionId);
+      if (verified) {
+        attachUser(req, verified.user);
+        req.authMethod = 'session';
+        next();
+        return;
+      }
+
+      // A present-but-invalid session cookie is not an error on its own: in
+      // hybrid mode the proxy header may still authenticate the request. It is
+      // cleared rather than reported so an expired session does not wedge the
+      // browser. In local mode there is no fallback and the 401 below applies.
+    }
+  }
+
+  // --- Path 3: Authentik header ---
   // Only trusted when BOTH of these hold:
   //
   //   1. The TCP peer is a proxy network we control (loopback/private or an
@@ -216,16 +174,23 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   // or INTERNAL_PROXY_SECRET is missing/mismatched, X-authentik-email is
   // ignored.
   const headerUser = req.headers['x-authentik-email'] as string | undefined;
-  if (headerUser && isTrustedProxyRequest(req)) {
-    req.userId = headerUser;
+  if (headerUser && modeAllowsProxyHeaders(mode) && isTrustedProxyRequest(req)) {
+    const { user } = ensureProxyUser(headerUser);
+    if (user.disabled) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    attachUser(req, user);
     req.authMethod = 'header';
     next();
     return;
   }
 
-  // --- Path 3: Dev fallback (non-production only) ---
-  if (process.env.NODE_ENV !== 'production' && process.env.DEV_USER_ID) {
-    req.userId = process.env.DEV_USER_ID;
+  // --- Path 4: Dev fallback (non-production, AUTH_MODE=proxy only) ---
+  if (process.env.NODE_ENV !== 'production' && mode === 'proxy' && process.env.DEV_USER_ID) {
+    const { user } = ensureProxyUser(process.env.DEV_USER_ID);
+    attachUser(req, user);
     req.authMethod = 'header';
     next();
     return;
@@ -235,13 +200,38 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
 }
 
 /**
- * Middleware that restricts an endpoint to Authentik-header-authenticated requests only.
+ * Backwards-compatible name. `authMiddleware` was the pre-Phase-A entry point;
+ * every route and test that imported it keeps working against `requireAuth`.
+ */
+export const authMiddleware = requireAuth;
+
+/**
+ * Restrict a route to administrators.
+ *
+ * Non-admins get **404**, not 403 (plan §5): a 403 confirms that an admin
+ * surface exists at that path, which is exactly the discovery signal a
+ * non-admin should not get.
+ */
+export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
+  if (req.userRole !== 'admin') {
+    res.status(404).json({ error: 'Not Found' });
+    return;
+  }
+
+  next();
+}
+
+/**
+ * Middleware that restricts an endpoint to interactive-authenticated requests only.
  * Bearer-token callers receive 403 — a token cannot manage tokens.
  *
- * Apply after authMiddleware on any route that manages api_tokens.
+ * `header` and `session` are both interactive (a human drove the browser); only
+ * `token` is a machine credential.
+ *
+ * Apply after requireAuth on any route that manages api_tokens.
  */
 export function requireHeaderAuth(req: Request, res: Response, next: NextFunction): void {
-  if (req.authMethod !== 'header') {
+  if (req.authMethod === 'token') {
     res.status(403).json({ error: 'Token management requires interactive (browser) authentication' });
     return;
   }

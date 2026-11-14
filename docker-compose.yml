@@ -50,6 +50,22 @@ services:
       # carry a matching X-Internal-Token header — preventing header injection
       # via the api.* subdomain even if NPM is misconfigured.
       INTERNAL_PROXY_SECRET: ${INTERNAL_PROXY_SECRET}
+      # Phase A auth configuration. The backend refuses to boot in production
+      # without SESSION_SECRET, MFA_ENCRYPTION_KEY and a resolvable
+      # ADMIN_EMAIL, so these are passed through and validated there rather
+      # than duplicated as compose-time requirements.
+      #
+      # AUTH_MODE: proxy keeps today's Authentik header path authoritative.
+      # Phase F flips the default to `local`.
+      AUTH_MODE: ${AUTH_MODE:-proxy}
+      # The existing account promoted to role='admin' at boot (Q2). Must match
+      # a pre-existing email in a migrated database.
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      # Session and MFA key material. Generate with:
+      #   SESSION_SECRET:     openssl rand -base64 48
+      #   MFA_ENCRYPTION_KEY: openssl rand -base64 32
+      SESSION_SECRET: ${SESSION_SECRET:-}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
     volumes:
       - db-data:/data
     healthcheck:
