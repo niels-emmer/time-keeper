@@ -1,22 +1,23 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App.tsx';
-import { AuthContext } from './lib/authContext.ts';
-import { AuthError } from './lib/api.ts';
+import { AuthProvider, useAuthContext } from './lib/authContext';
+import { AuthError } from './lib/api';
 import { ThemeProvider } from './context/ThemeContext.tsx';
-import { AppStatusContext } from './lib/appStatusContext.tsx';
+import { AppStatusContext, useAppStatus } from './lib/appStatusContext.tsx';
 import { useOnlineStatus } from './hooks/useOnlineStatus.ts';
 import { useServiceWorkerUpdate } from './hooks/useServiceWorkerUpdate.ts';
 import './index.css';
 
-function Root() {
-  const [sessionExpired, setSessionExpired] = useState(false);
-
-  const markSessionExpired = useCallback(() => setSessionExpired(true), []);
-
-  const { updateAvailable, applyingUpdate, applyUpdate, dismissUpdate } = useServiceWorkerUpdate();
-  const { isOnline, recentlyReconnected, lastConnectionChangeAt } = useOnlineStatus();
+/**
+ * Query client lives inside the auth provider so a 401 can mark the session
+ * expired through the same context the AuthGate reads. A 403 is deliberately
+ * not an auth error: it is a permission/CSRF answer, surfaced to the caller.
+ */
+function QueryLayer() {
+  const { markSessionExpired } = useAuthContext();
+  const { isOnline, recentlyReconnected } = useAppStatus();
 
   const [queryClient] = useState(
     () =>
@@ -25,7 +26,7 @@ function Root() {
           queries: {
             staleTime: 10_000,
             retry: (failureCount, error) => {
-              // Never retry auth failures — the session is gone
+              // Never retry auth failures — the session is gone.
               if (error instanceof AuthError) return false;
               return failureCount < 1;
             },
@@ -36,11 +37,9 @@ function Root() {
             },
           },
         },
-        queryCache: undefined,
       })
   );
 
-  // Attach a global query-level observer for auth errors
   React.useEffect(() => {
     return queryClient.getQueryCache().subscribe((event) => {
       if (
@@ -60,8 +59,19 @@ function Root() {
   }, [isOnline, recentlyReconnected, queryClient]);
 
   return (
+    <QueryClientProvider client={queryClient}>
+      <App />
+    </QueryClientProvider>
+  );
+}
+
+function Root() {
+  const { updateAvailable, applyingUpdate, applyUpdate, dismissUpdate } = useServiceWorkerUpdate();
+  const { isOnline, recentlyReconnected, lastConnectionChangeAt } = useOnlineStatus();
+
+  return (
     <ThemeProvider>
-      <AuthContext.Provider value={{ sessionExpired, markSessionExpired }}>
+      <AuthProvider>
         <AppStatusContext.Provider
           value={{
             isOnline,
@@ -73,11 +83,9 @@ function Root() {
             dismissUpdate,
           }}
         >
-          <QueryClientProvider client={queryClient}>
-            <App />
-          </QueryClientProvider>
+          <QueryLayer />
         </AppStatusContext.Provider>
-      </AuthContext.Provider>
+      </AuthProvider>
     </ThemeProvider>
   );
 }

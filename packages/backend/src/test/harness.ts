@@ -4,7 +4,10 @@ import type { Express } from 'express';
 import { vi } from 'vitest';
 import type { AppDatabase } from '../db/client.js';
 import { users } from '../db/schema.js';
+import { getAuthMode, modeAllowsSessions } from '../lib/config.js';
+import { CSRF_COOKIE, generateCsrfToken } from '../lib/csrf.js';
 import { createUnusablePasswordHash } from '../lib/password.js';
+import { createSession, SESSION_COOKIE } from '../lib/session.js';
 
 /**
  * Insert (or find) the `users` row for an email and return its id.
@@ -53,7 +56,35 @@ export function seedUser(
 }
 
 /**
- * Boot the real Express app against a fresh in-memory SQLite database.
+ * Request headers that authenticate `email` the way the active `AUTH_MODE`
+ * requires.
+ *
+ * Existing HTTP tests were written against `X-authentik-email`. The suite runs
+ * under both `AUTH_MODE=proxy` (header) and `AUTH_MODE=local` (session) so the
+ * two paths cannot drift: in proxy mode this returns the header; in
+ * local/hybrid mode it creates a real session and a matching CSRF pair, which
+ * is exactly what a browser would present.
+ *
+ * Synchronous on purpose: `seedUser` and `createSession` are synchronous, so a
+ * test can call this while building a request chain.
+ */
+export function authHeaders(database: AppDatabase, email: string): Record<string, string> {
+  if (!modeAllowsSessions(getAuthMode())) {
+    return { 'X-authentik-email': email };
+  }
+
+  const userId = seedUser(database, email);
+  const session = createSession({ userId }, database);
+  const csrfToken = generateCsrfToken();
+
+  return {
+    Cookie: `${SESSION_COOKIE}=${session.id}; ${CSRF_COOKIE}=${csrfToken}`,
+    'X-CSRF-Token': csrfToken,
+  };
+}
+
+/**
+ * Boot the real Express app against a fresh SQLite database.
  *
  * `db/client.ts` resolves `DATABASE_PATH` once, at import time, and every
  * route imports the module-level `db`. So the environment has to be set
@@ -66,6 +97,9 @@ export function seedUser(
  * modules to be re-evaluated, which is what makes the "fresh database"
  * guarantee below true for every call, not just the first one in a file.
  *
+ * Pass `databasePath` to use a file instead of `:memory:` — the lockout
+ * persistence test reopens the same file to simulate a process restart.
+ *
  * Call this from a test file that does not otherwise import the app.
  *
  * Usage:
@@ -73,8 +107,10 @@ export function seedUser(
  *   const { app, db } = await createTestApp();
  *   await request(app).get('/api/health');
  */
-export async function createTestApp(): Promise<{ app: Express; db: AppDatabase }> {
-  process.env.DATABASE_PATH = ':memory:';
+export async function createTestApp(
+  options: { databasePath?: string } = {}
+): Promise<{ app: Express; db: AppDatabase }> {
+  process.env.DATABASE_PATH = options.databasePath ?? ':memory:';
   process.env.NODE_ENV = 'test';
   // Keep the dev fallback out of the way so auth behaviour under test is real.
   delete process.env.DEV_USER_ID;

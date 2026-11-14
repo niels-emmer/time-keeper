@@ -82,6 +82,9 @@ function makeNext(): ReturnType<typeof vi.fn> & NextFunction {
 describe('authMiddleware', () => {
   beforeEach(() => {
     process.env = { ...originalEnv };
+    // This unit suite exercises the Authentik header path only; pin the mode so
+    // it behaves the same when the whole suite runs under AUTH_MODE=local.
+    process.env.AUTH_MODE = 'proxy';
     delete process.env.INTERNAL_PROXY_SECRET;
     delete process.env.DEV_USER_ID;
     process.env.NODE_ENV = 'production';

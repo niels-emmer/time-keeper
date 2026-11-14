@@ -12,15 +12,17 @@ import type { Express } from 'express';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { and, eq, isNull } from 'drizzle-orm';
-import { createTestApp, seedUser } from '../test/harness.js';
+import { authHeaders, createTestApp, seedUser } from '../test/harness.js';
 import { timeEntries } from '../db/schema.js';
 import type { AppDatabase } from '../db/client.js';
+
+let db: AppDatabase;
 
 function headers(user: string) {
   return {
     Host: 'entry-invariants.test',
     Origin: 'http://entry-invariants.test',
-    'X-authentik-email': user,
+    ...authHeaders(db, user),
   };
 }
 
@@ -51,7 +53,6 @@ async function createCompletedEntry(
 
 describe('one-active-timer invariant (P2-1)', () => {
   let app: Express;
-  let db: AppDatabase;
 
   beforeAll(async () => {
     ({ app, db } = await createTestApp());

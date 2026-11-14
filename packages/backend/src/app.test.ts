@@ -6,7 +6,7 @@
 import type { Express } from 'express';
 import request from 'supertest';
 import { afterEach, describe, expect, it } from 'vitest';
-import { createTestApp } from './test/harness.js';
+import { authHeaders, createTestApp } from './test/harness.js';
 
 afterEach(() => {
   delete process.env.APP_VERSION;
@@ -15,7 +15,7 @@ afterEach(() => {
 describe('P1-5: /api/health under the limiter', () => {
   it('reports the same version as /api/info', async () => {
     process.env.APP_VERSION = '9.9.9-test';
-    const { app } = await createTestApp();
+    const { app, db } = await createTestApp();
 
     const health = await request(app).get('/api/health');
     expect(health.status).toBe(200);
@@ -23,7 +23,7 @@ describe('P1-5: /api/health under the limiter', () => {
 
     const info = await request(app)
       .get('/api/info')
-      .set('X-authentik-email', 'p1-5@example.com');
+      .set(authHeaders(db, 'p1-5@example.com'));
     expect(info.status).toBe(200);
     expect(info.body.version).toBe('9.9.9-test');
   });

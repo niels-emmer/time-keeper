@@ -5,6 +5,7 @@ import { db as defaultDb, type AppDatabase } from '../db/client.js';
 import { sessions, users } from '../db/schema.js';
 import type { UserRow } from '../db/schema.js';
 import { isSecureRequest } from './proxyTrust.js';
+import { readCookie } from './cookies.js';
 
 /**
  * Server-side sessions (plan D4, A3).
@@ -21,6 +22,9 @@ import { isSecureRequest } from './proxyTrust.js';
 export const SESSION_COOKIE = 'tk_session';
 export const SESSION_IDLE_MS = 14 * 24 * 60 * 60 * 1000;
 export const SESSION_ABSOLUTE_MS = 90 * 24 * 60 * 60 * 1000;
+
+/** Q17: sensitive actions require a credential check within five minutes. */
+export const SENSITIVE_ACTION_FRESHNESS_MS = 5 * 60 * 1000;
 
 export interface SessionCookieOptions {
   httpOnly: true;
@@ -76,33 +80,9 @@ export function clearSessionCookie(res: Response, req: Request): void {
   res.clearCookie(SESSION_COOKIE, options);
 }
 
-/**
- * Read the raw session id from the request cookie, if present.
- *
- * Parsed by hand rather than with `cookie-parser`: this is one name/value pair
- * out of a header we already control, and it avoids adding a dependency for it.
- */
+/** Read the raw session id from the request cookie, if present. */
 export function readSessionCookie(req: Request): string | undefined {
-  const header = req.headers.cookie;
-  if (!header) {
-    return undefined;
-  }
-
-  for (const part of header.split(';')) {
-    const separator = part.indexOf('=');
-    if (separator === -1) {
-      continue;
-    }
-
-    if (part.slice(0, separator).trim() !== SESSION_COOKIE) {
-      continue;
-    }
-
-    const value = part.slice(separator + 1).trim();
-    return value.length > 0 ? value : undefined;
-  }
-
-  return undefined;
+  return readCookie(req, SESSION_COOKIE);
 }
 
 export interface CreateSessionInput {
@@ -220,6 +200,25 @@ export function rotateSession(
 
 export function revokeSession(rawId: string, database: AppDatabase = defaultDb): void {
   database.delete(sessions).where(eq(sessions.idHash, hashSessionId(rawId))).run();
+}
+
+/**
+ * True when the session was established within the last five minutes (Q17).
+ *
+ * Phase B has no re-authentication prompt yet, so "authenticated at" is the
+ * session's creation time. Phase C's password-confirmation flow will refresh
+ * this anchor; until then a sensitive action taken later requires a fresh
+ * login rather than silently trusting an old session.
+ */
+export function isSessionFresh(
+  session: typeof sessions.$inferSelect,
+  now: Date = new Date()
+): boolean {
+  const createdAtMs = new Date(session.createdAt).getTime();
+  if (!Number.isFinite(createdAtMs)) {
+    return false;
+  }
+  return now.getTime() - createdAtMs <= SENSITIVE_ACTION_FRESHNESS_MS;
 }
 
 /** Revoke every session for a user, optionally sparing the caller's own. */

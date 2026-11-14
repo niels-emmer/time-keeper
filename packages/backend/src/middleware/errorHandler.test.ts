@@ -11,7 +11,8 @@
 import type { Express } from 'express';
 import request from 'supertest';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
-import { createTestApp } from '../test/harness.js';
+import type { AppDatabase } from '../db/client.js';
+import { authHeaders, createTestApp } from '../test/harness.js';
 
 function captureConsole(): string[] {
   const lines: string[] = [];
@@ -26,9 +27,10 @@ function captureConsole(): string[] {
 
 describe('errorHandler (P1-3)', () => {
   let app: Express;
+  let db: AppDatabase;
 
   beforeAll(async () => {
-    ({ app } = await createTestApp());
+    ({ app, db } = await createTestApp());
   });
 
   afterEach(() => {
@@ -42,7 +44,7 @@ describe('errorHandler (P1-3)', () => {
       .post('/api/timer/start')
       .set('Host', 'p1-3.test')
       .set('Origin', 'http://p1-3.test')
-      .set('X-authentik-email', 'p1-3@example.com')
+      .set(authHeaders(db, 'p1-3@example.com'))
       .send({});
 
     expect(res.status).toBe(400);
@@ -67,7 +69,7 @@ describe('errorHandler (P1-3)', () => {
       .post('/api/timer/start')
       .set('Host', 'p1-3.test')
       .set('Origin', 'http://p1-3.test')
-      .set('X-authentik-email', 'p1-3@example.com')
+      .set(authHeaders(db, 'p1-3@example.com'))
       .send({ categoryId: 'not-a-number', secret: marker });
 
     expect(res.status).toBe(400);

@@ -2,7 +2,7 @@ import { createHash } from 'crypto';
 import type { Request, Response, NextFunction } from 'express';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/client.js';
-import { apiTokens } from '../db/schema.js';
+import { apiTokens, type SessionRow, type UserRow } from '../db/schema.js';
 import { isTokenExpired } from '../lib/apiTokenExpiry.js';
 import {
   getAuthMode,
@@ -10,7 +10,7 @@ import {
   modeAllowsSessions,
 } from '../lib/config.js';
 import { isTrustedProxyPeer } from '../lib/proxyTrust.js';
-import { readSessionCookie, verifySession } from '../lib/session.js';
+import { isSessionFresh, readSessionCookie, verifySession } from '../lib/session.js';
 import { ensureProxyUser, findUserById } from '../services/userService.js';
 
 export { isSecureRequest, isTrustedProxyPeer } from '../lib/proxyTrust.js';
@@ -25,8 +25,20 @@ declare global {
       userRole: 'user' | 'admin';
       /** How the request was authenticated. */
       authMethod: 'header' | 'token' | 'session';
+      /** Present only when `authMethod === 'session'`. */
+      authSession?: SessionRow;
     }
   }
+}
+
+export interface AuthContext {
+  userId: string;
+  userEmail: string;
+  userRole: 'user' | 'admin';
+  authMethod: 'header' | 'token' | 'session';
+  session?: SessionRow;
+  /** The resolved account row, so callers need not look it up again. */
+  user: UserRow;
 }
 
 export function isTrustedProxyRequest(req: Request): boolean {
@@ -50,15 +62,31 @@ export function isTrustedProxyRequest(req: Request): boolean {
   return req.headers['x-internal-token'] === proxySecret;
 }
 
-function attachUser(req: Request, user: { id: string; email: string; role: 'user' | 'admin' }): void {
-  req.userId = user.id;
-  req.userEmail = user.email;
-  req.userRole = user.role === 'admin' ? 'admin' : 'user';
+function contextFor(user: {
+  id: string;
+  email: string;
+  role: 'user' | 'admin';
+}): Pick<AuthContext, 'userId' | 'userEmail' | 'userRole'> {
+  return {
+    userId: user.id,
+    userEmail: user.email,
+    userRole: user.role === 'admin' ? 'admin' : 'user',
+  };
+}
+
+function attachUser(req: Request, context: AuthContext): void {
+  req.userId = context.userId;
+  req.userEmail = context.userEmail;
+  req.userRole = context.userRole;
+  req.authMethod = context.authMethod;
+  req.authSession = context.session;
 }
 
 /**
- * Authenticate the request and attach `req.userId` (a `users.id`), `req.userEmail`
- * and `req.userRole`.
+ * Resolve the identity behind a request, or `null`.
+ *
+ * Shared by `requireAuth` and the public `GET /api/auth/status` endpoint so the
+ * two can never disagree about who is signed in. It never writes a response.
  *
  * Paths, in order (plan A4):
  *
@@ -83,7 +111,7 @@ function attachUser(req: Request, user: { id: string; email: string; role: 'user
  * Behaviour for existing proxy users is unchanged: the same header
  * authenticates the same person, against the same rows.
  */
-export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+export function authenticateRequest(req: Request): AuthContext | null {
   const mode = getAuthMode();
 
   // --- Path 1: Bearer token ---
@@ -98,38 +126,28 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
         .where(eq(apiTokens.tokenHash, tokenHash))
         .get();
 
-      if (row) {
-        if (isTokenExpired(row.expiresAt)) {
-          res.status(401).json({ error: 'Unauthorized' });
-          return;
-        }
-
-        const user = findUserById(row.userId);
-        if (!user || user.disabled) {
-          res.status(401).json({ error: 'Unauthorized' });
-          return;
-        }
-
-        attachUser(req, user);
-        req.authMethod = 'token';
-        // Update last_used_at asynchronously — don't block the request
-        setImmediate(() => {
-          try {
-            db.update(apiTokens)
-              .set({ lastUsedAt: new Date().toISOString() })
-              .where(eq(apiTokens.id, row.id))
-              .run();
-          } catch {
-            // Non-critical; silently ignore update failures
-          }
-        });
-        next();
-        return;
+      if (!row || isTokenExpired(row.expiresAt)) {
+        return null;
       }
 
-      // Token provided but not found — reject immediately (don't fall through to header auth)
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
+      const user = findUserById(row.userId);
+      if (!user || user.disabled) {
+        return null;
+      }
+
+      // Update last_used_at asynchronously — don't block the request
+      setImmediate(() => {
+        try {
+          db.update(apiTokens)
+            .set({ lastUsedAt: new Date().toISOString() })
+            .where(eq(apiTokens.id, row.id))
+            .run();
+        } catch {
+          // Non-critical; silently ignore update failures
+        }
+      });
+
+      return { ...contextFor(user), authMethod: 'token', user };
     }
   }
 
@@ -139,10 +157,12 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
     if (rawSessionId) {
       const verified = verifySession(rawSessionId);
       if (verified) {
-        attachUser(req, verified.user);
-        req.authMethod = 'session';
-        next();
-        return;
+        return {
+          ...contextFor(verified.user),
+          authMethod: 'session',
+          session: verified.session,
+          user: verified.user,
+        };
       }
 
       // A present-but-invalid session cookie is not an error on its own: in
@@ -177,26 +197,30 @@ export function requireAuth(req: Request, res: Response, next: NextFunction): vo
   if (headerUser && modeAllowsProxyHeaders(mode) && isTrustedProxyRequest(req)) {
     const { user } = ensureProxyUser(headerUser);
     if (user.disabled) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
+      return null;
     }
 
-    attachUser(req, user);
-    req.authMethod = 'header';
-    next();
-    return;
+    return { ...contextFor(user), authMethod: 'header', user };
   }
 
   // --- Path 4: Dev fallback (non-production, AUTH_MODE=proxy only) ---
   if (process.env.NODE_ENV !== 'production' && mode === 'proxy' && process.env.DEV_USER_ID) {
     const { user } = ensureProxyUser(process.env.DEV_USER_ID);
-    attachUser(req, user);
-    req.authMethod = 'header';
-    next();
+    return { ...contextFor(user), authMethod: 'header', user };
+  }
+
+  return null;
+}
+
+export function requireAuth(req: Request, res: Response, next: NextFunction): void {
+  const context = authenticateRequest(req);
+  if (!context) {
+    res.status(401).json({ error: 'Unauthorized' });
     return;
   }
 
-  res.status(401).json({ error: 'Unauthorized' });
+  attachUser(req, context);
+  next();
 }
 
 /**
@@ -222,18 +246,54 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
 }
 
 /**
- * Middleware that restricts an endpoint to interactive-authenticated requests only.
- * Bearer-token callers receive 403 — a token cannot manage tokens.
+ * Gate for API-token management (Q9, I-009).
  *
- * `header` and `session` are both interactive (a human drove the browser); only
- * `token` is a machine credential.
+ * Phase B makes token management work under local auth, where there is no
+ * Authentik header. The rule is:
  *
- * Apply after requireAuth on any route that manages api_tokens.
+ *   * Bearer token → **403**. A machine credential must never mint, list or
+ *     revoke tokens (privilege escalation / lockout).
+ *   * Proxy identity header → allowed. This is today's interactive browser
+ *     path and keeps working in `proxy` and `hybrid` modes.
+ *   * Session → allowed only when the session was established within the last
+ *     five minutes (Q17). A stale session gets a 403 with
+ *     `code: 'reauthentication_required'`; Phase C adds the re-auth prompt that
+ *     refreshes it.
  */
-export function requireHeaderAuth(req: Request, res: Response, next: NextFunction): void {
+export function requireTokenManagementAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
   if (req.authMethod === 'token') {
     res.status(403).json({ error: 'Token management requires interactive (browser) authentication' });
     return;
   }
-  next();
+
+  if (req.authMethod === 'header') {
+    next();
+    return;
+  }
+
+  if (req.authMethod === 'session') {
+    if (!req.authSession || !isSessionFresh(req.authSession)) {
+      res.status(403).json({
+        error: 'Re-authentication required',
+        code: 'reauthentication_required',
+      });
+      return;
+    }
+
+    next();
+    return;
+  }
+
+  res.status(403).json({ error: 'Token management requires interactive (browser) authentication' });
 }
+
+/**
+ * Deprecated alias retained for importers that still expect the Phase A name.
+ * Behaviour is identical to `requireTokenManagementAuth` for header and token
+ * callers; the session path is new in Phase B.
+ */
+export const requireHeaderAuth = requireTokenManagementAuth;

@@ -10,13 +10,15 @@
 import type { Express } from 'express';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { createTestApp } from './harness.js';
+import { authHeaders, createTestApp } from './harness.js';
+import type { AppDatabase } from '../db/client.js';
 
 describe('HTTP harness', () => {
   let app: Express;
+  let db: AppDatabase;
 
   beforeAll(async () => {
-    ({ app } = await createTestApp());
+    ({ app, db } = await createTestApp());
   });
 
   it('serves /api/health without authentication', async () => {
@@ -35,7 +37,7 @@ describe('HTTP harness', () => {
   it('serves an authenticated route for the Authentik-header user', async () => {
     const res = await request(app)
       .get('/api/settings')
-      .set('X-authentik-email', 'harness@example.com');
+      .set(authHeaders(db, 'harness@example.com'));
 
     expect(res.status).toBe(200);
     expect(res.body).toEqual({ weeklyGoalHours: 40, roundingIncrementMinutes: 60, timezone: 'UTC' });
@@ -47,7 +49,7 @@ describe('HTTP harness', () => {
       .put('/api/settings')
       .set('Host', 'harness.test')
       .set('Origin', 'http://harness.test')
-      .set('X-authentik-email', 'isolation@example.com')
+      .set(authHeaders(first.db, 'isolation@example.com'))
       .send({ weeklyGoalHours: 12, roundingIncrementMinutes: 30 })
       .expect(200);
 
@@ -56,7 +58,7 @@ describe('HTTP harness', () => {
       .get('/api/settings')
       .set('Host', 'harness.test')
       .set('Origin', 'http://harness.test')
-      .set('X-authentik-email', 'isolation@example.com');
+      .set(authHeaders(second.db, 'isolation@example.com'));
 
     // If the second call had reused the first call's module-level db, this
     // would return the 12 h / 30 min row the first app wrote.

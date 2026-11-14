@@ -53,6 +53,11 @@ jobs:
       - name: Test backend
         run: yarn workspace @time-keeper/backend test
 
+      # The same suite under the other auth mode: proxy (above, the default)
+      # and local (below). Proxy-only suites declare their skip explicitly.
+      - name: Test backend (AUTH_MODE=local)
+        run: yarn workspace @time-keeper/backend test:local
+
       - name: Build frontend
         run: yarn workspace @time-keeper/frontend build
 

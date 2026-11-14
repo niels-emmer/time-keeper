@@ -11,15 +11,17 @@ import type { Express } from 'express';
 import request from 'supertest';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { and, eq, isNull } from 'drizzle-orm';
-import { createTestApp, seedUser } from '../test/harness.js';
+import { authHeaders, createTestApp, seedUser } from '../test/harness.js';
 import { timeEntries } from '../db/schema.js';
 import type { AppDatabase } from '../db/client.js';
+
+let db: AppDatabase;
 
 function headers(user: string) {
   return {
     Host: 'timer.test',
     Origin: 'http://timer.test',
-    'X-authentik-email': user,
+    ...authHeaders(db, user),
   };
 }
 
@@ -31,7 +33,6 @@ async function createCategory(app: Express, user: string, name: string): Promise
 
 describe('timer start ownership (P2-2)', () => {
   let app: Express;
-  let db: AppDatabase;
 
   beforeAll(async () => {
     ({ app, db } = await createTestApp());

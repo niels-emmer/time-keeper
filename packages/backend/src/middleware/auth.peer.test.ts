@@ -71,7 +71,15 @@ afterAll(() => {
   process.env = { ...originalEnv };
 });
 
-describe('auth peer allowlist (C-1)', () => {
+/**
+ * PROXY-ONLY SUITE. These tests exercise the `X-authentik-email` trust boundary
+ * (C-1) and its trusted-peer rule, which only exists when `AUTH_MODE` allows
+ * proxy headers. Under `AUTH_MODE=local` the header is ignored by design, so
+ * this file is skipped rather than pretending the behaviour exists.
+ */
+const proxyModeSuite = process.env.AUTH_MODE === 'local' ? describe.skip : describe;
+
+proxyModeSuite('auth peer allowlist (C-1)', () => {
   it('rejects X-authentik-email from a public peer even with a valid internal token', async () => {
     const res = await asHeaderUser(
       request(withPeer(app, '203.0.113.10')).get('/api/info')

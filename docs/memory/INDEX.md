@@ -28,7 +28,12 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `.pi/agents/local-reviewer.md` | Project-local Ollama-backed reviewer for bounded, low-context reviews |
 | `packages/backend/src/db/schema.ts` | All data types flow from here (`categories` now carries target cadence/minutes/start fields; `time_entries`, `user_settings`, and legacy `monthly_project_goals`) |
 | `packages/shared/src/utils/rounding.ts` | Core business logic — the rounding algorithm |
-| `packages/backend/src/middleware/auth.ts` | Auth boundary — validates Bearer tokens, trusts `X-authentik-email` only with a matching `X-Internal-Token` in production |
+| `packages/backend/src/middleware/auth.ts` | Auth boundary — Bearer tokens, server-side session cookies (`local`/`hybrid`), and `X-authentik-email` only with a trusted peer + matching `X-Internal-Token` in production; also gates token management |
+| `packages/backend/src/routes/auth.ts` | Phase B auth surface — `POST /login`, `GET /status` (public); `POST /logout`, `POST /logout-all`, `GET /me` (session-scoped) |
+| `packages/backend/src/lib/csrf.ts` | CSRF double-submit (`tk_csrf` cookie + `X-CSRF-Token`), constant-time compare, mounted centrally on `/api` |
+| `packages/backend/src/lib/session.ts` | Server-side session core — create/verify/rotate/revoke, cookie flags, 5-minute freshness for sensitive actions |
+| `packages/backend/src/services/authService.ts` | Local login (username or email), dummy-hash timing parity, explicit `PublicUser` serialiser, typed MFA-required state |
+| `packages/backend/src/services/authLockout.ts` | Persisted per-IP (10/min) and per-account exponential backoff (5 failures → 1 min … 15 min cap) |
 | `packages/backend/src/routes/settings.ts` | GET/PUT `/api/settings` — weekly goal hours + rounding increment |
 | `packages/backend/src/services/summaryService.ts` | Builds weekly summary; reads weekly goal + rounding increment from DB |
 | `packages/frontend/src/pages/Home.tsx` | Track tab shell — search input, recent/manual sections, pin state, and timer/category coordination |
@@ -50,12 +55,14 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `packages/frontend/src/lib/weeklyExport.ts` | Weekly export utilities — format selection persistence plus CSV/plain-text/compact output builders |
 | `packages/frontend/src/components/CategoryManager.tsx` | Category CRUD + drag-to-reorder + A-Z sort; billable flag and target editor in the settings dialog |
 | `packages/frontend/src/components/WeeklyGoalSetting.tsx` | Settings UI for weekly goal (number input + slider) + rounding increment toggle |
-| `packages/frontend/src/components/SessionExpiredOverlay.tsx` | Full-screen overlay shown on 401/403; prompts user to log in again |
+| `packages/frontend/src/components/SessionExpiredOverlay.tsx` | Proxy-mode reload overlay, rendered by `AuthGate` when `AUTH_MODE=proxy` and no identity is present |
+| `packages/frontend/src/components/AuthGate.tsx` | Session gate around the routes; renders the app, the local `Login` page, or the proxy reload overlay |
+| `packages/frontend/src/pages/Login.tsx` | Local sign-in — username **or** email + password in one step, generic error copy, explicit MFA-required notice |
 | `packages/frontend/src/lib/theme.ts` | Pure theme utilities — `getStoredTheme`, `setStoredTheme`, `applyTheme`, `resolveTheme` |
 | `packages/frontend/src/context/ThemeContext.tsx` | `ThemeProvider` + `useTheme` hook — manages light/dark/system preference and applies `.dark` class |
-| `packages/frontend/src/lib/authContext.ts` | React context carrying `sessionExpired` flag; set by global React Query error handler |
+| `packages/frontend/src/lib/authContext.tsx` | Real session state — current user, role, MFA status, active mode, `refresh()`, and login/logout operations |
 | `packages/frontend/src/lib/appStatusContext.tsx` | App-wide online/update state shared between the layout banners and Settings → About |
-| `packages/frontend/src/lib/api.ts` | Base fetch wrapper; throws `AuthError` on 401/403 |
+| `packages/frontend/src/lib/api.ts` | Base fetch wrapper — attaches `X-CSRF-Token`, throws `AuthError` on 401 and `ForbiddenError` on 403 |
 | `packages/frontend/src/hooks/useOnlineStatus.ts` | Tracks online/offline transitions and recent reconnect state for in-app status banners |
 | `packages/frontend/src/hooks/useServiceWorkerUpdate.ts` | Detects newer service workers, exposes update-ready state, and applies updates on demand |
 | `packages/frontend/src/workers/timer.worker.ts` | Off-thread 1 s tick — keeps elapsed time accurate when tab is hidden |
@@ -94,7 +101,7 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | Change monthly projections / billable charts | `packages/frontend/src/components/MonthlyOverviewCard.tsx` |
 | Change billable eligibility per category | `packages/frontend/src/components/CategoryManager.tsx` (checkbox in edit dialog) |
 | Debug auth issues | `docs/integration/auth.md`, `packages/backend/src/middleware/auth.ts` |
-| Debug session-expiry UX | `packages/frontend/src/lib/api.ts` (`AuthError`), `src/lib/authContext.ts`, `src/components/SessionExpiredOverlay.tsx` |
+| Debug session-expiry UX | `packages/frontend/src/lib/api.ts` (`AuthError` / `ForbiddenError`), `src/lib/authContext.tsx`, `src/components/AuthGate.tsx` |
 | Debug timer accuracy / background tab | `packages/frontend/src/workers/timer.worker.ts`, `src/components/ActiveTimer.tsx` |
 | Debug PWA / service worker / notifications | `packages/frontend/src/sw.ts`, `src/lib/notifications.ts`, `vite.config.ts` |
 | Regenerate screenshot mockups | `docs/screenshots/` — see Screenshot conventions section below |
@@ -109,6 +116,11 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | Route | Auth | Notes |
 |-------|------|-------|
 | `GET /api/health` | No | Docker healthcheck; also used by macOS app to verify connectivity |
+| `POST /api/auth/login` | No | Username **or** email + password; session + CSRF cookies on success; `mfa_required` is a typed Phase D hole; 429 on lockout |
+| `GET /api/auth/status` | No | Public session probe — `{ authenticated, mode, user? }`; used by the frontend AuthGate |
+| `POST /api/auth/logout` | Session | Revokes the presented session and clears both cookies (CSRF required) |
+| `POST /api/auth/logout-all` | Session | Revokes every session for the account (CSRF required) |
+| `GET /api/auth/me` | Session | Allowlisted account summary; never includes password/MFA secrets |
 | `GET /api/info` | Yes | Version, repo URL, current user — drives Settings → About |
 | `GET /api/settings` | Yes | Returns `{ weeklyGoalHours, roundingIncrementMinutes }` |
 | `PUT /api/settings` | Yes | Update `{ weeklyGoalHours, roundingIncrementMinutes }` (increment: 30 or 60) |
@@ -129,9 +141,9 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `POST /api/summary/round` | Yes | Apply end-of-day rounding for a single date (cap = user's weekly goal) |
 | `POST /api/summary/round-week` | Yes | Apply rounding to all 7 days of an ISO week; idempotent, skips already-rounded entries |
 | `PATCH /api/summary/adjust-cell` | Yes | Set total minutes for a (date, categoryId) cell; creates/adjusts/deletes underlying time entries |
-| `GET /api/tokens` | Yes (header-only) | List personal access tokens for the current user, including last-used and expiry metadata |
-| `POST /api/tokens` | Yes (header-only) | Create a token; returns raw token once; label required; token expires after one year |
-| `DELETE /api/tokens/:id` | Yes (header-only) | Revoke a token |
+| `GET /api/tokens` | Interactive | List personal access tokens. Interactive = proxy header, or a session established within the last 5 minutes |
+| `POST /api/tokens` | Interactive | Create a token; returns raw token once; label required; token expires after one year. A Bearer token gets 403 |
+| `DELETE /api/tokens/:id` | Interactive | Revoke a token. A Bearer token gets 403 |
 
 ## Deploy command
 

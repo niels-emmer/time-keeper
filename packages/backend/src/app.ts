@@ -2,7 +2,9 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import { authMiddleware } from './middleware/auth.js';
 import { protectBrowserMutations } from './middleware/browserMutationProtection.js';
+import { protectCsrf } from './lib/csrf.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import { authPublicRouter, authSessionRouter } from './routes/auth.js';
 import { categoriesRouter } from './routes/categories.js';
 import { timerRouter } from './routes/timer.js';
 import { entriesRouter } from './routes/entries.js';
@@ -58,9 +60,20 @@ export function createApp() {
     res.json({ status: 'ok', version: process.env.APP_VERSION ?? 'dev' });
   });
 
+  // Public auth surface: login and status must work with no session. Mounted
+  // before the global guard; `/login` is one of the CSRF-exempt public paths.
+  app.use('/api/auth', authPublicRouter);
+
   // All other API routes require auth
   app.use('/api', authMiddleware);
   app.use('/api', protectBrowserMutations);
+  // CSRF double-submit (D4). Mounted centrally so no mutating route can forget
+  // it; it applies to session-authenticated requests and exempts bearer/header
+  // callers that carry no ambient cookie.
+  app.use('/api', protectCsrf);
+  // Session-scoped auth surface: logout, logout-all, me. It sits behind the
+  // guard and the CSRF middleware on purpose.
+  app.use('/api/auth', authSessionRouter);
   app.use('/api/categories', categoriesRouter);
   app.use('/api/timer', timerRouter);
   app.use('/api/entries', entriesRouter);

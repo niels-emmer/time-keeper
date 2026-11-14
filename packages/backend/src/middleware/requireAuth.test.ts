@@ -138,12 +138,14 @@ describe('local mode', () => {
 
   it('scopes data to the session user, exactly like the header path did', async () => {
     const raw = await createSessionFor('alice@example.com');
-    const cookie = `tk_session=${raw}`;
+    // Session mutations now also carry the double-submit pair (Phase B).
+    const csrf = 'require-auth-csrf-token';
+    const cookie = `tk_session=${raw}; tk_csrf=${csrf}`;
 
     const created = await request(app)
       .post('/api/categories')
       .set('Cookie', cookie)
-      .set({ Host: 'auth-modes.test', Origin: 'http://auth-modes.test' })
+      .set({ Host: 'auth-modes.test', Origin: 'http://auth-modes.test', 'X-CSRF-Token': csrf })
       .send({ name: 'Session project' });
     expect(created.status).toBe(201);
 
