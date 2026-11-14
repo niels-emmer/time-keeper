@@ -4,6 +4,52 @@ import 'package:provider/provider.dart';
 import '../providers/app_state.dart' as app_state;
 import '../services/api_service.dart';
 
+/// Reject any base URL that would put the access token on the wire in clear
+/// text (finding L-9).
+///
+/// [ApiService] sends the token as an `Authorization: Bearer` header on every
+/// request, so a plain `http://` URL leaks it to anything that can observe the
+/// connection. `https://` is therefore required unless the host is loopback,
+/// which is the only case where the traffic never leaves the machine (a
+/// developer running the stack locally).
+///
+/// Returns an error message, or `null` when the URL is acceptable.
+String? validateApiBaseUrl(String value) {
+  final uri = Uri.tryParse(value);
+  if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
+    return 'Enter a full URL including https:// — for example https://api.example.com';
+  }
+
+  if (uri.scheme == 'https') return null;
+  if (uri.scheme == 'http' && _isLoopbackHost(uri.host)) return null;
+
+  return 'Use https:// instead of ${uri.scheme}://. '
+      'Your access token is sent with every request, so over an insecure '
+      'connection it can be read and reused by anyone on the network. '
+      'http:// is allowed only for localhost / 127.0.0.1.';
+}
+
+/// True for the hosts a local development stack runs on: `localhost`, the
+/// IPv4 loopback block (127.0.0.0/8), and IPv6 `::1`.
+bool _isLoopbackHost(String host) {
+  final normalized = host.toLowerCase();
+  if (normalized == 'localhost' ||
+      normalized == '::1' ||
+      normalized == '[::1]') {
+    return true;
+  }
+  // Dart keeps the brackets on IPv6 literals; strip them before testing.
+  final unbracketed = normalized.startsWith('[') && normalized.endsWith(']')
+      ? normalized.substring(1, normalized.length - 1)
+      : normalized;
+  if (unbracketed == '::1') return true;
+
+  final octets = unbracketed.split('.');
+  if (octets.length != 4) return false;
+  final first = int.tryParse(octets[0]);
+  return first == 127 && octets.every((o) => int.tryParse(o) != null);
+}
+
 /// Shown when no credentials are stored in Keychain.
 /// The user enters their API URL and personal access token here.
 class SetupScreen extends StatefulWidget {
@@ -27,57 +73,13 @@ class _SetupScreenState extends State<SetupScreen> {
     super.dispose();
   }
 
-  /// Reject any base URL that would put the access token on the wire in clear
-  /// text (finding L-9).
-  ///
-  /// [ApiService] sends the token as an `Authorization: Bearer` header on every
-  /// request, so a plain `http://` URL leaks it to anything that can observe the
-  /// connection. `https://` is therefore required unless the host is loopback,
-  /// which is the only case where the traffic never leaves the machine (a
-  /// developer running the stack locally).
-  ///
-  /// Returns an error message, or `null` when the URL is acceptable.
-  static String? _validateUrl(String value) {
-    final uri = Uri.tryParse(value);
-    if (uri == null || !uri.hasScheme || uri.host.isEmpty) {
-      return 'Enter a full URL including https:// — for example https://api.example.com';
-    }
-
-    if (uri.scheme == 'https') return null;
-    if (uri.scheme == 'http' && _isLoopbackHost(uri.host)) return null;
-
-    return 'Use https:// instead of ${uri.scheme}://. '
-        'Your access token is sent with every request, so over an insecure '
-        'connection it can be read and reused by anyone on the network. '
-        'http:// is allowed only for localhost / 127.0.0.1.';
-  }
-
-  /// True for the hosts a local development stack runs on: `localhost`, the
-  /// IPv4 loopback block (127.0.0.0/8), and IPv6 `::1`.
-  static bool _isLoopbackHost(String host) {
-    final normalized = host.toLowerCase();
-    if (normalized == 'localhost' || normalized == '::1' || normalized == '[::1]') {
-      return true;
-    }
-    // Dart keeps the brackets on IPv6 literals; strip them before testing.
-    final unbracketed = normalized.startsWith('[') && normalized.endsWith(']')
-        ? normalized.substring(1, normalized.length - 1)
-        : normalized;
-    if (unbracketed == '::1') return true;
-
-    final octets = unbracketed.split('.');
-    if (octets.length != 4) return false;
-    final first = int.tryParse(octets[0]);
-    return first == 127 && octets.every((o) => int.tryParse(o) != null);
-  }
-
   Future<void> _connect() async {
     final url = _urlController.text.trim();
     final token = _tokenController.text.trim();
 
     if (url.isEmpty || token.isEmpty) return;
 
-    final urlError = _validateUrl(url);
+    final urlError = validateApiBaseUrl(url);
     if (urlError != null) {
       setState(() { _testError = urlError; });
       return;
