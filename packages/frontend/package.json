@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "yarn workspace @time-keeper/shared build && vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {

@@ -1,0 +1,69 @@
+# .github/workflows/ci.yml
+#
+# Builds every workspace and runs all three test suites. Any red build or test
+# fails the check run. Node 22 is what the container images run; Node 26 is the
+# canonical local runtime, and both are tested so the two cannot drift again
+# (findings H-5, M-7).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: build-and-test (node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [22, 26]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      # Node 25+ no longer ships Corepack, so install it before enabling Yarn.
+      - name: Enable Yarn 4
+        run: |
+          npm install --global corepack@latest
+          corepack enable
+          yarn --version
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build shared
+        run: yarn workspace @time-keeper/shared build
+
+      - name: Test shared
+        run: yarn workspace @time-keeper/shared test
+
+      - name: Build backend
+        run: yarn workspace @time-keeper/backend build
+
+      - name: Test backend
+        run: yarn workspace @time-keeper/backend test
+
+      - name: Build frontend
+        run: yarn workspace @time-keeper/frontend build
+
+      - name: Test frontend
+        run: yarn workspace @time-keeper/frontend test
+
+      # Guards finding L-6: a build must never emit anything next to the source.
+      - name: Working tree stays clean after a build
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --porcelain
+            echo "::error::The build emitted or modified files in the working tree. Add them to .gitignore or move the emit target."
+            exit 1
+          fi

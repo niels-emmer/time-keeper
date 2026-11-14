@@ -5,29 +5,43 @@ import path from 'path';
 import fs from 'fs';
 import * as schema from './schema.js';
 
-const DB_PATH = process.env.DATABASE_PATH ?? path.join(process.cwd(), 'dev-data', 'time-keeper.db');
+/**
+ * Open a SQLite database at `databasePath` and wrap it in a Drizzle client.
+ *
+ * Pass `':memory:'` for an ephemeral database — that is what the test harness
+ * in `src/test/harness.ts` uses. Production keeps using the module-level `db`
+ * below, which is created from `DATABASE_PATH` exactly as before.
+ */
+export function createDb(databasePath: string) {
+  // An in-memory database has no parent directory to create.
+  if (databasePath !== ':memory:') {
+    const dbDir = path.dirname(databasePath);
+    if (!fs.existsSync(dbDir)) {
+      fs.mkdirSync(dbDir, { recursive: true });
+    }
+  }
 
-// Ensure the directory exists
-const dbDir = path.dirname(DB_PATH);
-if (!fs.existsSync(dbDir)) {
-  fs.mkdirSync(dbDir, { recursive: true });
+  const sqlite = new Database(databasePath);
+
+  // Enable WAL mode for better concurrent read performance
+  sqlite.pragma('journal_mode = WAL');
+  sqlite.pragma('foreign_keys = ON');
+
+  return drizzle(sqlite, { schema });
 }
 
-const sqlite = new Database(DB_PATH);
+export type AppDatabase = ReturnType<typeof createDb>;
 
-// Enable WAL mode for better concurrent read performance
-sqlite.pragma('journal_mode = WAL');
-sqlite.pragma('foreign_keys = ON');
+const DB_PATH = process.env.DATABASE_PATH ?? path.join(process.cwd(), 'dev-data', 'time-keeper.db');
 
-export const db = drizzle(sqlite, { schema });
+export const db = createDb(DB_PATH);
 
 /**
  * Run Drizzle migrations from the ./drizzle directory.
- * Called once at server startup.
+ * Called once at server startup; tests pass their own database.
  */
-export function runMigrations(): void {
+export function runMigrations(database: AppDatabase = db): void {
   const migrationsFolder = path.join(import.meta.dirname, '..', '..', 'drizzle');
-  migrate(db, { migrationsFolder });
+  migrate(database, { migrationsFolder });
   console.log('Database migrations applied.');
 }
-

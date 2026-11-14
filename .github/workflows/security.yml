@@ -12,15 +12,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Enable Corepack / Yarn 4
-        run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Node 25+ no longer ships Corepack, so install it before enabling Yarn.
+      - name: Enable Yarn 4
+        run: |
+          npm install --global corepack@latest
+          corepack enable
+          yarn --version
 
       - name: Install deps
         run: yarn install --immutable
 
+      # `yarn audit` does not exist in Yarn 4, and `continue-on-error` hid the
+      # fact that this job never audited anything (finding M-7).
       - name: Dependency audit
-        run: yarn audit --severity high
-        continue-on-error: true   # inform, don't block, until you've triaged existing issues
+        run: yarn npm audit --all --recursive --severity high
 
   trivy:
     runs-on: ubuntu-latest

@@ -9,6 +9,8 @@
     "jsx": "react-jsx",
     "allowImportingTsExtensions": true,
     "noEmit": true,
+    // Keep `tsc -b` bookkeeping out of the source tree.
+    "tsBuildInfoFile": "./node_modules/.cache/tsconfig.app.tsbuildinfo",
     "paths": {
       "@/*": ["./src/*"]
     }
