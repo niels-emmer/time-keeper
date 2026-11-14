@@ -36,8 +36,8 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setResolvedTheme(resolveTheme(next));
   }, []);
 
-  // Apply stored theme on mount (covers the React-hydration gap; the inline
-  // <head> script handles the pre-mount flash).
+  // Apply stored theme on mount (covers the React-hydration gap; the
+  // same-origin <head> theme-init script handles the pre-mount flash).
   useEffect(() => {
     applyTheme(theme);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
