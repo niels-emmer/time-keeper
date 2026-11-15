@@ -17,7 +17,10 @@ An upgrade is done when the gate below is green — not when `yarn install` succ
 
 1. Branch from `origin/main` (never a stale local `main`): the container and CI both pin
    Node 22 while the host runs Node 26, so both are real targets.
-2. `yarn workspace @time-keeper/shared test` — 92 tests.
+2. `yarn workspace @time-keeper/shared test` — 46 tests, 3 files. (A local run on a tree
+   where `packages/shared/dist` exists reports **92**: `tsc` emits the compiled
+   `*.test.js` next to the sources and `vitest` picks both up. CI runs on a clean checkout
+   and sees 46, so 46 is the number to compare against.)
 3. `yarn workspace @time-keeper/backend test` **and** `test:proxy` — 367 / 373 tests. The
    proxy suite is skipped in local mode and vice versa; a change that touches auth or
    middleware must pass both.
