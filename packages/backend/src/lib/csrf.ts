@@ -35,6 +35,7 @@ const PUBLIC_PATHS = new Set([
   '/auth/login/mfa',
   '/auth/status',
   '/auth/accept-invite',
+  '/auth/reset',
 ]);
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);

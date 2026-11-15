@@ -47,6 +47,10 @@ import {
   startEnrolment,
 } from '../services/mfaService.js';
 import { findUsableInvite, registerInvitedUser } from '../services/inviteService.js';
+import {
+  RESET_CODE_INVALID_MESSAGE,
+  redeemResetCode,
+} from '../services/resetService.js';
 import { isValidUsername, normalizeEmail } from '../services/userService.js';
 
 /**
@@ -107,6 +111,11 @@ const acceptInviteSchema = z.object({
   email: emailField,
   username: z.string().trim().min(3).max(32),
   password: z.string().min(1).max(PASSWORD_MAX_LENGTH),
+});
+
+const resetPasswordSchema = z.object({
+  code: z.string().trim().min(1).max(512),
+  newPassword: z.string().min(1).max(PASSWORD_MAX_LENGTH),
 });
 
 function noStore(res: import('express').Response): void {
@@ -382,12 +391,60 @@ authPublicRouter.post('/accept-invite', (req, res, next) => {
   }
 });
 
+/**
+ * POST /api/auth/reset
+ *
+ * Public by design: the holder of an admin-issued code has no session yet.
+ *
+ * The code is the only credential. Unknown, expired and already-used codes all
+ * produce the same 400 with the same message, so a stale code cannot be probed
+ * for whether its account still exists. On success the password policy (Q22) is
+ * enforced, `must_set_password` is cleared, every session for the account is
+ * revoked and an audit row is written — all in the redemption transaction.
+ */
+authPublicRouter.post('/reset', (req, res, next) => {
+  try {
+    if (!modeAllowsSessions(getAuthMode())) {
+      // Local passwords do not exist in proxy-only mode.
+      res.status(404).json({ error: 'Not Found' });
+      return;
+    }
+
+    const payload = resetPasswordSchema.parse(req.body ?? {});
+
+    const outcome = redeemResetCode({
+      code: payload.code,
+      newPassword: payload.newPassword,
+      ip: requestIp(req),
+      userAgent: req.get('user-agent') ?? null,
+    });
+
+    switch (outcome.status) {
+      case 'invalid':
+        res.status(400).json({
+          error: RESET_CODE_INVALID_MESSAGE,
+          code: 'reset_code_invalid',
+        });
+        return;
+      case 'policy':
+        res.status(400).json({ error: outcome.message, code: 'password_policy' });
+        return;
+      case 'ok':
+        res.status(204).end();
+        return;
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
 export const authSessionRouter = Router();
 
 authSessionRouter.use((_req, res, next) => {
   noStore(res);
   next();
 });
+
 
 /** POST /api/auth/logout — revoke this session only. */
 authSessionRouter.post('/logout', (req, res, next) => {
