@@ -122,6 +122,7 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | Understand Docker layout | `docs/integration/docker.md` |
 | Fix a recurring incident | `docs/memory/incidents.md` |
 | Added a dependency / changed API / changed auth or storage | Update `SECURITY.md` (dep table, audit date, threat model, or "not done" list as appropriate) |
+| Upgrade, defer, or re-triage a dependency | `docs/operations/dependency-upgrades.md` — deferred majors, accepted advisories, and the trigger that reopens each |
 | Changed dev setup, tooling, or style rules | Update `CONTRIBUTING.md` |
 
 ## API routes
@@ -233,6 +234,7 @@ would be stale the moment it was committed. Reproduce it by signing in with an M
 - [invariants.md](invariants.md) — rules that must never be broken
 - [decisions.md](decisions.md) — why we chose what we chose
 - [incidents.md](incidents.md) — root causes of past problems
+- [dependency-upgrades.md](../operations/dependency-upgrades.md) — deferred majors, accepted advisories, and what reopens each
 
 ## Package commands cheat sheet
 
