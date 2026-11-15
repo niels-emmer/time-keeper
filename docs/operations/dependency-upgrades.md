@@ -15,8 +15,9 @@ and the entry is stale, update it in the same PR that acts on it.
 
 An upgrade is done when the gate below is green — not when `yarn install` succeeds.
 
-1. Branch from `origin/main` (never a stale local `main`): the container and CI both pin
-   Node 22 while the host runs Node 26, so both are real targets.
+1. Branch from `origin/main` (never a stale local `main`). The container pins Node 22, CI
+   runs both 22 and 26, and the host runs 26 — so both are real targets, and a suite that
+   passes on only one of them is not verified.
 2. `yarn workspace @time-keeper/shared test` — 46 tests, 3 files. (A local run on a tree
    where `packages/shared/dist` exists reports **92**: `tsc` emits the compiled
    `*.test.js` next to the sources and `vitest` picks both up. CI runs on a clean checkout
