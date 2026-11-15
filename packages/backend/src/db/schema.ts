@@ -100,6 +100,36 @@ export const invites = sqliteTable(
 );
 
 /**
+ * Single-use password reset codes (D5, Q3).
+ *
+ * There is no SMTP. An administrator issues a 60-minute code and hands it over
+ * out of band; it is stored only as a SHA-256 so a database leak yields no
+ * usable code. `created_by` and `used_at` make the lifecycle auditable without
+ * turning this into a second auth surface.
+ *
+ * At most one code is usable per account: issuing a new one deletes the old row
+ * in the same transaction, and redemption claims the row with a conditional
+ * `UPDATE ... WHERE used_at IS NULL`.
+ */
+export const passwordResetCodes = sqliteTable(
+  'password_reset_codes',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    codeHash: text('code_hash').notNull(),
+    createdBy: text('created_by'),
+    expiresAt: text('expires_at').notNull(),
+    usedAt: text('used_at'),
+  },
+  (t) => [
+    index('idx_password_reset_codes_user').on(t.userId),
+    uniqueIndex('idx_password_reset_codes_hash').on(t.codeHash),
+  ]
+);
+
+/**
  * Persisted authentication-attempt counters (Q23, Phase B).
  *
  * Lockout must survive a restart: an in-memory limiter resets the moment the
@@ -261,5 +291,6 @@ export type NewUser = typeof users.$inferInsert;
 export type SessionRow = typeof sessions.$inferSelect;
 export type RecoveryCodeRow = typeof recoveryCodes.$inferSelect;
 export type InviteRow = typeof invites.$inferSelect;
+export type PasswordResetCodeRow = typeof passwordResetCodes.$inferSelect;
 export type AuthEventRow = typeof authEvents.$inferSelect;
 export type AuthAttemptRow = typeof authAttempts.$inferSelect;

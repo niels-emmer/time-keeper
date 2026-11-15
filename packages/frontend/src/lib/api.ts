@@ -128,8 +128,64 @@ export interface MfaEnrolment {
   period: 30;
 }
 
-export interface SettingsPayload {
-  weeklyGoalHours: number;
+/**
+ * An account as the admin surface renders it (Phase E). Credential material
+ * (`password_hash`, `mfa_secret_enc`, recovery codes) is never part of this.
+ */
+export interface AdminUserRecord {
+  id: string;
+  email: string;
+  username: string;
+  displayName: string | null;
+  role: 'user' | 'admin';
+  disabled: boolean;
+  mfaEnabled: boolean;
+  mustSetPassword: boolean;
+  createdAt: string;
+  lastLoginAt: string | null;
+}
+
+/** A row of `GET /api/admin/users`: the account plus its entry count. */
+export interface AdminUser extends AdminUserRecord {
+  entryCount: number;
+}
+
+/** One row of the admin audit viewer (Q12). */
+export interface AdminAuthEvent {
+  id: number;
+  kind: string;
+  actor: { id: string; email: string; username: string } | null;
+  ip: string | null;
+  userAgent: string | null;
+  meta: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface AdminAuthEventPage {
+  events: AdminAuthEvent[];
+  page: number;
+  limit: number;
+  total: number;
+  hasMore: boolean;
+}
+
+/** The admin-issued reset code, returned once and never retrievable again. */
+export interface AdminResetCode {
+  resetCode: string;
+  expiresAt: string;
+}
+
+export type AdminDeleteMode = 'cascade' | 'reassign';
+
+export interface AdminDeleteResult {
+  deleted: true;
+  mode: AdminDeleteMode;
+  entriesReassigned: number;
+  categoriesMoved: number;
+  categoriesMerged: number;
+}
+
+export interface SettingsPayload {  weeklyGoalHours: number;
   roundingIncrementMinutes: 30 | 60;
   /** IANA zone used for local-day bucketing (DEC-2); defaults to UTC. */
   timezone: string;
@@ -376,5 +432,43 @@ export const api = {
         body: JSON.stringify({ label }),
       }),
     revoke: (id: number) => request<void>(`/tokens/${id}`, { method: 'DELETE' }),
+  },
+
+  /**
+   * Administrator surface (Phase E). Every call is 404 for a non-admin and 403
+   * with `mfa_enrolment_required` for a local administrator without MFA; the
+   * Settings entry point is hidden entirely from non-admins.
+   */
+  admin: {
+    users: () => request<{ users: AdminUser[] }>('/admin/users'),
+
+    /** Creates the account and returns its 60-minute reset code exactly once. */
+    createUser: (payload: { email: string; username: string; role: 'user' | 'admin' }) =>
+      request<{ user: AdminUserRecord; resetCode: string; resetExpiresAt: string }>('/admin/users', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+
+    updateUser: (id: string, payload: { role?: 'user' | 'admin'; disabled?: boolean }) =>
+      request<{ user: AdminUserRecord }>(`/admin/users/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      }),
+
+    /** Q16: the caller must choose cascade or reassign explicitly. */
+    deleteUser: (id: string, mode: AdminDeleteMode) =>
+      request<AdminDeleteResult>(`/admin/users/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ mode }),
+      }),
+
+    /** Issues a new code and invalidates the account's previous one. */
+    resetUser: (id: string) =>
+      request<AdminResetCode>(`/admin/users/${encodeURIComponent(id)}/reset`, {
+        method: 'POST',
+      }),
+
+    authEvents: (page = 1, limit = 50) =>
+      request<AdminAuthEventPage>(`/admin/auth-events?page=${page}&limit=${limit}`),
   },
 } as const;
