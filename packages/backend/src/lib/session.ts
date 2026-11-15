@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from 'crypto';
 import type { Request, Response } from 'express';
 import { and, asc, eq, ne } from 'drizzle-orm';
-import { db as defaultDb, type AppDatabase } from '../db/client.js';
+import { db as defaultDb, type AppDatabase, type DatabaseExecutor } from '../db/client.js';
 import { sessions, users } from '../db/schema.js';
 import type { UserRow } from '../db/schema.js';
 import { isSecureRequest } from './proxyTrust.js';
@@ -101,7 +101,7 @@ export interface CreateSessionInput {
  */
 export function createSession(
   input: CreateSessionInput,
-  database: AppDatabase = defaultDb
+  database: DatabaseExecutor = defaultDb
 ): CreatedSession {
   const now = input.now ?? new Date();
   const id = randomBytes(32).toString('base64url');
@@ -139,7 +139,7 @@ export function createSession(
 export function verifySession(
   rawId: string,
   options: { now?: Date } = {},
-  database: AppDatabase = defaultDb
+  database: DatabaseExecutor = defaultDb
 ): VerifiedSession | null {
   const now = options.now ?? new Date();
   const idHash = hashSessionId(rawId);
@@ -187,7 +187,7 @@ export function verifySession(
 export function rotateSession(
   rawId: string,
   input: { userAgent?: string | null; ip?: string | null; now?: Date } = {},
-  database: AppDatabase = defaultDb
+  database: DatabaseExecutor = defaultDb
 ): CreatedSession | null {
   const verified = verifySession(rawId, { now: input.now }, database);
   if (!verified) {
@@ -198,7 +198,7 @@ export function rotateSession(
   return createSession({ userId: verified.user.id, ...input }, database);
 }
 
-export function revokeSession(rawId: string, database: AppDatabase = defaultDb): void {
+export function revokeSession(rawId: string, database: DatabaseExecutor = defaultDb): void {
   database.delete(sessions).where(eq(sessions.idHash, hashSessionId(rawId))).run();
 }
 
@@ -225,7 +225,7 @@ export function isSessionFresh(
 export function revokeAllSessions(
   userId: string,
   options: { exceptRawId?: string } = {},
-  database: AppDatabase = defaultDb
+  database: DatabaseExecutor = defaultDb
 ): number {
   const condition = options.exceptRawId
     ? and(eq(sessions.userId, userId), ne(sessions.idHash, hashSessionId(options.exceptRawId)))
@@ -243,7 +243,7 @@ export function revokeAllSessions(
  */
 export function listSessions(
   userId: string,
-  database: AppDatabase = defaultDb
+  database: DatabaseExecutor = defaultDb
 ): Array<typeof sessions.$inferSelect> {
   return database
     .select()
@@ -263,7 +263,7 @@ export function listSessions(
 export function revokeSessionByIdHash(
   userId: string,
   idHash: string,
-  database: AppDatabase = defaultDb
+  database: DatabaseExecutor = defaultDb
 ): boolean {
   const result = database
     .delete(sessions)

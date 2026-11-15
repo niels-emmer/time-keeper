@@ -1,5 +1,5 @@
 import { eq, or } from 'drizzle-orm';
-import { db as defaultDb, type AppDatabase } from '../db/client.js';
+import { db as defaultDb, type AppDatabase, type DatabaseExecutor } from '../db/client.js';
 import { authEvents, users, type UserRow } from '../db/schema.js';
 import { generateCsrfToken } from '../lib/csrf.js';
 import {
@@ -102,7 +102,7 @@ export interface RecordAuthEventInput {
 
 export function recordAuthEvent(
   input: RecordAuthEventInput,
-  database: AppDatabase = defaultDb
+  database: DatabaseExecutor = defaultDb
 ): void {
   database
     .insert(authEvents)

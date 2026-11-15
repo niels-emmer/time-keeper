@@ -190,50 +190,61 @@ export function changePassword(input: ChangePasswordInput): ChangePasswordOutcom
     return { status: 'policy', message: policy.message };
   }
 
-  const updated = database
-    .update(users)
-    .set({
-      passwordHash: hashPassword(input.newPassword),
-      passwordUpdatedAt: now.toISOString(),
-      mustSetPassword: false,
-    })
-    .where(eq(users.id, user.id))
-    .returning()
-    .get();
-
   // A password change is the moment a stolen session becomes worthless: every
   // other device is signed out, and the caller's own id is replaced rather
-  // than reused (D4 session fixation).
-  const otherSessionsRevoked = revokeAllSessions(
-    user.id,
-    input.currentSessionId ? { exceptRawId: input.currentSessionId } : {},
-    database
-  );
+  // than reused (D4 session fixation). The hash write, the revocation and the
+  // rotation are one transaction, so "the password changed but the old
+  // sessions survived" cannot happen if a later step throws.
+  const result = database.transaction((tx) => {
+    const updatedUser = tx
+      .update(users)
+      .set({
+        passwordHash: hashPassword(input.newPassword),
+        passwordUpdatedAt: now.toISOString(),
+        mustSetPassword: false,
+      })
+      .where(eq(users.id, user.id))
+      .returning()
+      .get();
 
-  const session = input.currentSessionId
-    ? rotateSession(
-        input.currentSessionId,
-        {
-          ip: input.ip ?? null,
-          userAgent: input.userAgent ?? null,
-          now,
-        },
-        database
-      )
-    : null;
+    const revoked = revokeAllSessions(
+      user.id,
+      input.currentSessionId ? { exceptRawId: input.currentSessionId } : {},
+      tx
+    );
 
-  recordAuthEvent(
-    {
-      userId: user.id,
-      kind: 'password_change',
-      ip: input.ip ?? null,
-      userAgent: input.userAgent ?? null,
-      meta: { otherSessionsRevoked },
-    },
-    database
-  );
+    const rotated = input.currentSessionId
+      ? rotateSession(
+          input.currentSessionId,
+          {
+            ip: input.ip ?? null,
+            userAgent: input.userAgent ?? null,
+            now,
+          },
+          tx
+        )
+      : null;
 
-  return { status: 'ok', user: updated, session, otherSessionsRevoked };
+    recordAuthEvent(
+      {
+        userId: user.id,
+        kind: 'password_change',
+        ip: input.ip ?? null,
+        userAgent: input.userAgent ?? null,
+        meta: { otherSessionsRevoked: revoked },
+      },
+      tx
+    );
+
+    return { updatedUser, otherSessionsRevoked: revoked, session: rotated };
+  });
+
+  return {
+    status: 'ok',
+    user: result.updatedUser,
+    session: result.session,
+    otherSessionsRevoked: result.otherSessionsRevoked,
+  };
 }
 
 export interface DeleteOwnAccountInput {

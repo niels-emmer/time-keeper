@@ -32,6 +32,20 @@ export function createDb(databasePath: string) {
 
 export type AppDatabase = ReturnType<typeof createDb>;
 
+/**
+ * A Drizzle client *or* an open transaction handed to `db.transaction(...)`.
+ *
+ * The query surface is identical; the transaction handle simply lacks the
+ * `$client` property. Functions that must be callable from inside a transaction
+ * (session bookkeeping, audit writes) therefore take this instead of
+ * `AppDatabase`.
+ */
+export type DatabaseExecutor = Pick<
+  AppDatabase,
+  'select' | 'insert' | 'update' | 'delete'
+>;
+
+
 const DB_PATH = process.env.DATABASE_PATH ?? path.join(process.cwd(), 'dev-data', 'time-keeper.db');
 
 export const db = createDb(DB_PATH);
