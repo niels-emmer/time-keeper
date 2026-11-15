@@ -1,3 +1,4 @@
+import { AccountSetting } from '@/components/AccountSetting';
 import { CategoryManager } from '@/components/CategoryManager';
 import { WeeklyGoalSetting } from '@/components/WeeklyGoalSetting';
 import { ThemeSetting } from '@/components/ThemeSetting';
@@ -11,6 +12,7 @@ export function Settings() {
       <WeeklyGoalSetting />
       <ThemeSetting />
       <ApiTokenManager />
+      <AccountSetting />
       <AboutSection />
     </div>
   );

@@ -29,7 +29,11 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `packages/backend/src/db/schema.ts` | All data types flow from here (`categories` now carries target cadence/minutes/start fields; `time_entries`, `user_settings`, and legacy `monthly_project_goals`) |
 | `packages/shared/src/utils/rounding.ts` | Core business logic — the rounding algorithm |
 | `packages/backend/src/middleware/auth.ts` | Auth boundary — Bearer tokens, server-side session cookies (`local`/`hybrid`), and `X-authentik-email` only with a trusted peer + matching `X-Internal-Token` in production; also gates token management |
-| `packages/backend/src/routes/auth.ts` | Phase B auth surface — `POST /login`, `GET /status` (public); `POST /logout`, `POST /logout-all`, `GET /me` (session-scoped) |
+| `packages/backend/src/routes/auth.ts` | Auth surface — Phase B: `POST /login`, `GET /status` (public), `POST /logout`, `POST /logout-all`, `GET /me` (session-scoped); Phase C: `POST /accept-invite` (public), `PATCH /me`, `POST /password`, `DELETE /me`, `GET /sessions`, `DELETE /sessions/:id`, `DELETE /sessions/others` |
+| `packages/backend/src/routes/admin.ts` | Admin surface — Phase C carries only `POST /api/admin/invites`; `requireAdmin` answers 404 for non-admins |
+| `packages/backend/src/services/inviteService.ts` | Single-use 72h invite tokens — hashed at rest, atomic claim, one generic failure for unknown/used/expired |
+| `packages/backend/src/services/accountService.ts` | Self-service lifecycle — profile update (username immutable), password change (revokes other sessions, rotates current), hard self-delete cascade with last-admin guard |
+| `packages/backend/src/lib/passwordPolicy.ts` | Q22 password policy — 12 chars minimum, no username/email substrings, local denylist, no outbound calls |
 | `packages/backend/src/lib/csrf.ts` | CSRF double-submit (`tk_csrf` cookie + `X-CSRF-Token`), constant-time compare, mounted centrally on `/api` |
 | `packages/backend/src/lib/session.ts` | Server-side session core — create/verify/rotate/revoke, cookie flags, 5-minute freshness for sensitive actions |
 | `packages/backend/src/services/authService.ts` | Local login (username or email), dummy-hash timing parity, explicit `PublicUser` serialiser, typed MFA-required state |
@@ -58,6 +62,9 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `packages/frontend/src/components/SessionExpiredOverlay.tsx` | Proxy-mode reload overlay, rendered by `AuthGate` when `AUTH_MODE=proxy` and no identity is present |
 | `packages/frontend/src/components/AuthGate.tsx` | Session gate around the routes; renders the app, the local `Login` page, or the proxy reload overlay |
 | `packages/frontend/src/pages/Login.tsx` | Local sign-in — username **or** email + password in one step, generic error copy, explicit MFA-required notice |
+| `packages/frontend/src/pages/Register.tsx` | Invite acceptance (outside `AuthGate`) — token from the URL, inline password policy, single generic failure copy |
+| `packages/frontend/src/pages/Account.tsx` | Self-service account — profile with a read-only username, password change, signed-in devices, typed-confirmation delete |
+| `packages/frontend/src/components/AccountSetting.tsx` | Settings → Account card that links to `/account`, keeping Settings' existing sections unchanged |
 | `packages/frontend/src/lib/theme.ts` | Pure theme utilities — `getStoredTheme`, `setStoredTheme`, `applyTheme`, `resolveTheme` |
 | `packages/frontend/src/context/ThemeContext.tsx` | `ThemeProvider` + `useTheme` hook — manages light/dark/system preference and applies `.dark` class |
 | `packages/frontend/src/lib/authContext.tsx` | Real session state — current user, role, MFA status, active mode, `refresh()`, and login/logout operations |
@@ -121,6 +128,14 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `POST /api/auth/logout` | Session | Revokes the presented session and clears both cookies (CSRF required) |
 | `POST /api/auth/logout-all` | Session | Revokes every session for the account (CSRF required) |
 | `GET /api/auth/me` | Session | Allowlisted account summary; never includes password/MFA secrets |
+| `PATCH /api/auth/me` | Session | Display name and email only; `username` is rejected as immutable (400), a taken email is 409 |
+| `POST /api/auth/password` | Fresh session | Current + new password; revokes every other session, rotates this one, writes `password_change` |
+| `DELETE /api/auth/me` | Fresh session | Hard self-delete with password + typed username; cascades every user-scoped table; last admin is 409 |
+| `GET /api/auth/sessions` | Session | The caller's own signed-in devices, current one flagged |
+| `DELETE /api/auth/sessions/others` | Session | Sign out every other device for this account |
+| `DELETE /api/auth/sessions/:id` | Session | Revoke one own session by its stored hash; another account's id is 404 |
+| `POST /api/auth/accept-invite` | No | Invite-only registration; single generic failure for unknown/used/expired tokens; sets session + CSRF cookies |
+| `POST /api/admin/invites` | Admin | Mint a single-use 72h invite; raw token returned once; 404 for non-admins |
 | `GET /api/info` | Yes | Version, repo URL, current user — drives Settings → About |
 | `GET /api/settings` | Yes | Returns `{ weeklyGoalHours, roundingIncrementMinutes }` |
 | `PUT /api/settings` | Yes | Update `{ weeklyGoalHours, roundingIncrementMinutes }` (increment: 30 or 60) |

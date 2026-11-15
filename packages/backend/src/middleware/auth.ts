@@ -292,6 +292,59 @@ export function requireTokenManagementAuth(
 }
 
 /**
+ * Gate for sensitive account actions (Q17, Phase C).
+ *
+ * Q17 names the actions: password change, token minting, role change, account
+ * deletion, MFA disable. All of them require a credential check within the last
+ * five minutes, so a session left open on an unlocked laptop cannot be used to
+ * take the account over.
+ *
+ *   * Bearer token → **403**. A machine credential must never perform an
+ *     account-lifecycle action.
+ *   * Proxy identity header → allowed. That path is authenticated by Authentik
+ *     on every request; there is no long-lived session to go stale.
+ *   * Session → allowed only when established within the last five minutes,
+ *     otherwise 403 with `code: 'reauthentication_required'`, which the Account
+ *     screen turns into "sign in again" copy.
+ */
+export function requireFreshSession(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): void {
+  if (req.authMethod === 'token') {
+    res.status(403).json({
+      error: 'This action requires interactive (browser) authentication',
+      code: 'interactive_authentication_required',
+    });
+    return;
+  }
+
+  if (req.authMethod === 'header') {
+    next();
+    return;
+  }
+
+  if (req.authMethod === 'session') {
+    if (!req.authSession || !isSessionFresh(req.authSession)) {
+      res.status(403).json({
+        error: 'Re-authentication required',
+        code: 'reauthentication_required',
+      });
+      return;
+    }
+
+    next();
+    return;
+  }
+
+  res.status(403).json({
+    error: 'This action requires interactive (browser) authentication',
+    code: 'interactive_authentication_required',
+  });
+}
+
+/**
  * Deprecated alias retained for importers that still expect the Phase A name.
  * Behaviour is identical to `requireTokenManagementAuth` for header and token
  * callers; the session path is new in Phase B.

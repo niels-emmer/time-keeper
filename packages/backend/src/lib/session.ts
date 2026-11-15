@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from 'crypto';
 import type { Request, Response } from 'express';
-import { and, eq, ne } from 'drizzle-orm';
+import { and, asc, eq, ne } from 'drizzle-orm';
 import { db as defaultDb, type AppDatabase } from '../db/client.js';
 import { sessions, users } from '../db/schema.js';
 import type { UserRow } from '../db/schema.js';
@@ -233,4 +233,42 @@ export function revokeAllSessions(
 
   const result = database.delete(sessions).where(condition).run();
   return result.changes;
+}
+
+/**
+ * Every session belonging to one account, oldest first (Q7/D4).
+ *
+ * Scoped by `user_id` in the query itself, so the self-service device list
+ * cannot be widened into cross-user session administration (Q11).
+ */
+export function listSessions(
+  userId: string,
+  database: AppDatabase = defaultDb
+): Array<typeof sessions.$inferSelect> {
+  return database
+    .select()
+    .from(sessions)
+    .where(eq(sessions.userId, userId))
+    .orderBy(asc(sessions.createdAt))
+    .all();
+}
+
+/**
+ * Revoke one session by its stored hash, but only if it belongs to `userId`.
+ *
+ * Returns false when no row matched — which covers both "already gone" and
+ * "someone else's session" without revealing which, so the route can answer 404
+ * in both cases.
+ */
+export function revokeSessionByIdHash(
+  userId: string,
+  idHash: string,
+  database: AppDatabase = defaultDb
+): boolean {
+  const result = database
+    .delete(sessions)
+    .where(and(eq(sessions.userId, userId), eq(sessions.idHash, idHash)))
+    .run();
+
+  return result.changes > 0;
 }
