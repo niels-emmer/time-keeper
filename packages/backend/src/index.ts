@@ -1,6 +1,7 @@
 import { runMigrations } from './db/client.js';
 import { createApp } from './app.js';
 import { modeAllowsSessions, validateStartupConfig } from './lib/config.js';
+import { pruneAuthAttempts } from './services/authLockout.js';
 import { ensureAdminFromEmail, seedDevAdmin } from './services/userService.js';
 
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
@@ -12,6 +13,11 @@ const isProduction = process.env.NODE_ENV === 'production';
 const config = validateStartupConfig();
 
 runMigrations();
+
+// Q12-consistent retention for `auth_attempts`: an install that has been idle
+// for months starts clean, and the per-IP funnel keeps it trimmed in a
+// long-running process. Active lockouts are never removed (see the function).
+pruneAuthAttempts();
 
 // Q2 / Q18: the first administrator is named by ADMIN_EMAIL. Production fails
 // to boot if it is missing, or if it matches no account on a database that
