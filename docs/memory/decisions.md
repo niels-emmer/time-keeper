@@ -534,3 +534,32 @@ No password is generated or logged. The reset code is a credential with a one-us
 **Why not a CLI seed script:** a boot-time bootstrap is one code path, one place to document, and works for the exact `docker compose up` flow in the deployment guide. A CLI adds a second entry point that can drift.
 
 **Consequences:** a fresh install's container logs contain one credential until it is used or expires. `SECURITY.md` records that residual and recommends setting the password promptly. A populated database keeps the fail-fast behaviour, so a typo cannot silently create a second administrator.
+
+## D-034: Naming why an MFA code was rejected
+
+**Date:** 2026-11-15
+**Status:** Implemented — refines D3
+
+A rejected authenticator code used to be one answer, `mfa_code_invalid`, rendered as "That code is
+not valid. Try again." That leaves the person unable to tell a typo from a code that already worked
+or one the clock has passed by, so the natural next action is to retype the same wrong code.
+
+The rule now:
+
+- **Wrong or expired** → `mfa_code_invalid`. One message, and it explains that codes change every
+  30 seconds so a stale code is the likely cause. These two are deliberately *not* separated.
+- **Already used** → `mfa_code_replayed`. The server knows this exactly: `users.mfa_last_step` is
+  written with a compare-and-set on every accepted code, and a code at or below the stored step is a
+  replay (RFC 6238 §5.2). Naming it is safe because it is a fact about our own record, not about the
+  guess, and it stops a person retrying a code that can never work.
+- Recovery codes keep one generic message: distinguishing "used" from "never existed" there would
+  turn the endpoint into an oracle for a 49-bit space.
+
+**Why not distinguish expired from wrong:** doing so requires knowing whether the submitted digits
+match *any* step, past or future. Answering that tells an attacker when a guess is one or two steps
+off, which is the one thing a TOTP endpoint must not leak. The copy says "codes change every 30
+seconds" instead, which covers the expired case without confirming a near miss.
+
+**Consequences:** the API's 401 body for `/auth/login/mfa` carries a `code`, and the frontend's
+`AuthError` now keeps it so the sign-in card can say "already used" instead of a generic failure.
+`SECURITY.md` records the residual: the replay answer reveals that a code was real and consumed.

@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from 'react';
-import { AlertCircle, ArrowLeft, KeyRound, Loader2, LogIn, ShieldCheck } from 'lucide-react';
+import { Navigate } from 'react-router-dom';
+import { ArrowLeft, KeyRound, Loader2, LogIn, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { InlineError } from '@/components/QueryState';
 import { AuthError, getErrorMessage } from '@/lib/api';
 import { useAuthContext } from '@/lib/authContext';
 
@@ -80,11 +82,24 @@ export function Login() {
       // On success the AuthGate swaps this page for the app; nothing to do.
     } catch (caught) {
       if (caught instanceof AuthError) {
-        setError(
-          useRecoveryCode
-            ? 'That recovery code is not valid, or it has already been used.'
-            : 'That code is not valid. Check your authenticator and try again.'
-        );
+        // The password was already proven at step one, so naming the reason is
+        // safe. "Already used" is the one case our own replay record can prove;
+        // wrong and expired stay one message on purpose — separating them would
+        // reveal whether a guess was close.
+        const replayed = caught.code === 'mfa_code_replayed';
+        if (useRecoveryCode) {
+          setError(
+            replayed
+              ? 'That recovery code has already been used. Each code works only once.'
+              : 'That recovery code is not valid. Check it for typos, or use an authenticator code instead.'
+          );
+        } else {
+          setError(
+            replayed
+              ? 'That code has already been used. Wait for your authenticator to show the next code.'
+              : 'That code is not valid. Authenticator codes change every 30 seconds — wait for the current one and try again.'
+          );
+        }
       } else {
         setError(getErrorMessage(caught, 'Could not verify that code. Please try again.'));
       }
@@ -125,7 +140,7 @@ export function Login() {
           </CardHeader>
           <CardContent>
             {step === 'credentials' ? (
-              <form onSubmit={handleCredentialSubmit} className="space-y-4">
+              <form onSubmit={handleCredentialSubmit} className="space-y-4" noValidate>
                 <div className="space-y-2">
                   <label htmlFor="identifier" className="text-sm font-medium">
                     Username or email
@@ -161,15 +176,7 @@ export function Login() {
                   />
                 </div>
 
-                {error && (
-                  <div
-                    role="alert"
-                    className="flex items-start gap-2 rounded-lg border border-destructive/40 px-3 py-2 text-sm text-destructive"
-                  >
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                    <span>{error}</span>
-                  </div>
-                )}
+                {error && <InlineError message={error} />}
 
                 <Button
                   type="submit"
@@ -185,10 +192,10 @@ export function Login() {
                 </Button>
               </form>
             ) : (
-              <form onSubmit={handleMfaSubmit} className="space-y-4">
+              <form onSubmit={handleMfaSubmit} className="space-y-4" noValidate>
                 <div
                   role="status"
-                  className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm"
+                  className="flex items-start gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-sm"
                 >
                   <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                   <span>
@@ -222,15 +229,7 @@ export function Login() {
                   />
                 </div>
 
-                {error && (
-                  <div
-                    role="alert"
-                    className="flex items-start gap-2 rounded-lg border border-destructive/40 px-3 py-2 text-sm text-destructive"
-                  >
-                    <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                    <span>{error}</span>
-                  </div>
-                )}
+                {error && <InlineError message={error} />}
 
                 <Button
                   type="submit"
@@ -275,4 +274,37 @@ export function Login() {
       </div>
     </div>
   );
+}
+
+/**
+ * Standalone entry for the public `/login` route.
+ *
+ * `docs/operations/local-dev.md` and `README.md` both tell people to open
+ * `/login`, so that URL has to exist. `AuthGate` still handles the *protected*
+ * routes by rendering this same card in place of the route (which is what keeps
+ * the intended URL after sign-in); this wrapper exists only for the explicit
+ * public route. Someone already signed in is sent to the app rather than shown
+ * a second sign-in form.
+ */
+export function LoginPage() {
+  const { loading, user, sessionExpired } = useAuthContext();
+
+  if (loading) {
+    return (
+      <div
+        role="status"
+        aria-live="polite"
+        className="flex min-h-screen items-center justify-center gap-2 text-muted-foreground"
+      >
+        <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+        <span className="text-sm">Checking your session…</span>
+      </div>
+    );
+  }
+
+  if (user && !sessionExpired) {
+    return <Navigate to="/" replace />;
+  }
+
+  return <Login />;
 }

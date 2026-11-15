@@ -116,9 +116,11 @@ describe('totp window at the service level', () => {
     const code = hotp(base32Decode(secret), 1010);
 
     expect(loginAt(userId, secret, 1010, code).status).toBe('ok');
-    expect(loginAt(userId, secret, 1010, code).status).toBe('code_invalid');
+    // The same step a second time is a replay, not a mistyped code.
+    expect(loginAt(userId, secret, 1010, code).status).toBe('code_replayed');
 
-    // An earlier code is dead too: the stored step only moves forward.
+    // An earlier code is outside the window by then, so it is simply invalid —
+    // the stored step never moves backwards either.
     expect(loginAt(userId, secret, 1011, hotp(base32Decode(secret), 1009)).status).toBe(
       'code_invalid'
     );

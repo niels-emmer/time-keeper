@@ -2,6 +2,10 @@ import { lazy, Suspense, type ReactNode } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { Layout } from '@/components/Layout';
 import { AuthGate } from '@/components/AuthGate';
+// Imported statically on purpose: `AuthGate` already pulls the Login card into
+// the main chunk, so a lazy route here only produced a "dynamically imported,
+// also statically imported" warning without splitting anything.
+import { LoginPage } from '@/pages/Login';
 
 const Home = lazy(() => import('@/pages/Home').then((module) => ({ default: module.Home })));
 const Weekly = lazy(() => import('@/pages/Weekly').then((module) => ({ default: module.Weekly })));
@@ -23,6 +27,14 @@ export default function App() {
   return (
     <BrowserRouter>
       <Routes>
+        {/*
+          The documented sign-in URL (README and docs/operations/local-dev.md
+          both say to open /login). It renders the same form `AuthGate` shows in
+          place of a protected route, and sends an already-signed-in visitor to
+          the app. Without this route /login was a blank page.
+        */}
+        <Route path="login" element={<LoginPage />} />
+
         {/*
           Invite acceptance sits outside `AuthGate` on purpose: whoever opens an
           invitation link has no session yet, and the gate would answer with the

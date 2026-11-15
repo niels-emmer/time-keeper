@@ -27,7 +27,6 @@ import {
 import { Input } from '@/components/ui/input';
 import { InlineError, QueryState } from '@/components/QueryState';
 import {
-  ForbiddenError,
   api,
   getErrorMessage,
   type AdminDeleteMode,
@@ -49,13 +48,12 @@ import { useAuthContext } from '@/lib/authContext';
  * table that would fail to load.
  */
 
-/** Q17: a stale session is a different answer from "not allowed". */
-function actionMessage(error: unknown, fallback: string): string {
-  if (error instanceof ForbiddenError && error.code === 'reauthentication_required') {
-    return 'For your security this needs a fresh sign-in. Sign out and sign back in, then try again.';
-  }
-  return getErrorMessage(error, fallback);
-}
+/**
+ * One error mapper for the whole surface: `getErrorMessage` already knows the
+ * Q17 freshness answer ("a stale session is a different answer from not
+ * allowed"), the MFA codes, and how to stay non-empty when the server sends
+ * nothing usable.
+ */
 
 function formatDate(value: string | null): string {
   if (!value) {
@@ -179,7 +177,7 @@ export function AdminUsers() {
     },
     onError: (caught) => {
       setNotice(null);
-      setActionError(actionMessage(caught, 'Could not update that account.'));
+      setActionError(getErrorMessage(caught, 'Could not update that account.'));
     },
   });
 
@@ -198,7 +196,7 @@ export function AdminUsers() {
       );
     },
     onError: (caught) => {
-      setDeleteError(actionMessage(caught, 'Could not delete that account.'));
+      setDeleteError(getErrorMessage(caught, 'Could not delete that account.'));
     },
   });
 
@@ -209,7 +207,7 @@ export function AdminUsers() {
       setResetError(null);
     },
     onError: (caught) => {
-      setResetError(actionMessage(caught, 'Could not issue a reset code.'));
+      setResetError(getErrorMessage(caught, 'Could not issue a reset code.'));
     },
   });
 
@@ -314,121 +312,105 @@ export function AdminUsers() {
             emptyTitle="No accounts yet"
             className="py-8"
           >
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-left text-xs text-muted-foreground">
-                    <th className="pb-2 font-medium">Account</th>
-                    <th className="pb-2 font-medium">Role</th>
-                    <th className="pb-2 font-medium">Status</th>
-                    <th className="pb-2 font-medium">MFA</th>
-                    <th className="pb-2 font-medium">Entries</th>
-                    <th className="pb-2 font-medium">Last sign-in</th>
-                    <th className="pb-2 text-right font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data?.users.map((account) => {
-                    const isSelf = account.id === currentUser?.id;
-                    const pending = updateMutation.isPending && updateMutation.variables?.id === account.id;
+            <ul className="divide-y">
+              {data?.users.map((account) => {
+                const isSelf = account.id === currentUser?.id;
+                const pending = updateMutation.isPending && updateMutation.variables?.id === account.id;
 
-                    return (
-                      <tr key={account.id} className="border-b last:border-0">
-                        <td className="py-2 pr-4">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{account.username}</span>
-                            {isSelf && <Badge variant="outline">You</Badge>}
-                          </div>
-                          <p className="text-xs text-muted-foreground">{account.email}</p>
-                        </td>
-                        <td className="py-2 pr-4">
-                          <RoleBadge role={account.role} />
-                        </td>
-                        <td className="py-2 pr-4">
-                          {account.disabled ? (
-                            <Badge variant="destructive">Disabled</Badge>
-                          ) : (
-                            <Badge variant="outline">Active</Badge>
-                          )}
-                        </td>
-                        <td className="py-2 pr-4 text-muted-foreground">
-                          {account.mfaEnabled ? 'Enabled' : 'Off'}
-                        </td>
-                        <td className="py-2 pr-4 tabular-nums text-muted-foreground">
-                          {account.entryCount}
-                        </td>
-                        <td className="py-2 pr-4 text-muted-foreground">
-                          {formatDate(account.lastLoginAt)}
-                        </td>
-                        <td className="py-2">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 gap-1 px-2 text-xs"
-                              aria-label={`${account.role === 'admin' ? 'Make user' : 'Make admin'} ${account.username}`}
-                              disabled={pending}
-                              onClick={() =>
-                                updateMutation.mutate({
-                                  id: account.id,
-                                  payload: { role: account.role === 'admin' ? 'user' : 'admin' },
-                                })
-                              }
-                            >
-                              {account.role === 'admin' ? (
-                                <ShieldOff className="h-3.5 w-3.5" />
-                              ) : (
-                                <ShieldCheck className="h-3.5 w-3.5" />
-                              )}
-                              {account.role === 'admin' ? 'Make user' : 'Make admin'}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 gap-1 px-2 text-xs"
-                              aria-label={`${account.disabled ? 'Enable' : 'Disable'} ${account.username}`}
-                              disabled={pending}
-                              onClick={() =>
-                                updateMutation.mutate({
-                                  id: account.id,
-                                  payload: { disabled: !account.disabled },
-                                })
-                              }
-                            >
-                              {account.disabled ? (
-                                <CheckCircle2 className="h-3.5 w-3.5" />
-                              ) : (
-                                <Ban className="h-3.5 w-3.5" />
-                              )}
-                              {account.disabled ? 'Enable' : 'Disable'}
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 gap-1 px-2 text-xs"
-                              aria-label={`Issue reset code for ${account.username}`}
-                              onClick={() => openReset(account)}
-                            >
-                              <KeyRound className="h-3.5 w-3.5" />
-                              Reset
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="ghost"
-                              className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                              aria-label={`Delete ${account.username}`}
-                              onClick={() => openDelete(account)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                return (
+                  // A list, not a table: at 390px a seven-column table pushes the
+                  // actions off-screen, and the actions are the point of this
+                  // screen. One block per account keeps every control reachable.
+                  <li key={account.id} className="space-y-2 py-3 first:pt-0 last:pb-0">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-sm font-medium">{account.username}</span>
+                          {isSelf && <Badge variant="outline">You</Badge>}
+                        </div>
+                        <p className="truncate text-xs text-muted-foreground">{account.email}</p>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <RoleBadge role={account.role} />
+                        {account.disabled ? (
+                          <Badge variant="destructive">Disabled</Badge>
+                        ) : (
+                          <Badge variant="outline">Active</Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <p className="text-xs text-muted-foreground">
+                      {account.mfaEnabled ? 'Two-factor on' : 'Two-factor off'} ·{' '}
+                      {account.entryCount} {account.entryCount === 1 ? 'entry' : 'entries'} · Last
+                      sign-in {formatDate(account.lastLoginAt)}
+                    </p>
+
+                    <div className="flex flex-wrap items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 gap-1 px-2 text-xs"
+                        aria-label={`${account.role === 'admin' ? 'Make user' : 'Make admin'} ${account.username}`}
+                        disabled={pending}
+                        onClick={() =>
+                          updateMutation.mutate({
+                            id: account.id,
+                            payload: { role: account.role === 'admin' ? 'user' : 'admin' },
+                          })
+                        }
+                      >
+                        {account.role === 'admin' ? (
+                          <ShieldOff className="h-3.5 w-3.5" />
+                        ) : (
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                        )}
+                        {account.role === 'admin' ? 'Make user' : 'Make admin'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 gap-1 px-2 text-xs"
+                        aria-label={`${account.disabled ? 'Enable' : 'Disable'} ${account.username}`}
+                        disabled={pending}
+                        onClick={() =>
+                          updateMutation.mutate({
+                            id: account.id,
+                            payload: { disabled: !account.disabled },
+                          })
+                        }
+                      >
+                        {account.disabled ? (
+                          <CheckCircle2 className="h-3.5 w-3.5" />
+                        ) : (
+                          <Ban className="h-3.5 w-3.5" />
+                        )}
+                        {account.disabled ? 'Enable' : 'Disable'}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 gap-1 px-2 text-xs"
+                        aria-label={`Issue reset code for ${account.username}`}
+                        onClick={() => openReset(account)}
+                      >
+                        <KeyRound className="h-3.5 w-3.5" />
+                        Reset
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                        aria-label={`Delete ${account.username}`}
+                        onClick={() => openDelete(account)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
           </QueryState>
         </CardContent>
       </Card>
@@ -500,7 +482,7 @@ export function AdminUsers() {
 
               {createMutation.isError && (
                 <InlineError
-                  message={actionMessage(createMutation.error, 'Could not create that account.')}
+                  message={getErrorMessage(createMutation.error, 'Could not create that account.')}
                 />
               )}
 

@@ -75,6 +75,14 @@ export const MFA_NOT_STARTED_MESSAGE =
   'Start two-factor authentication setup before confirming a code.';
 export const MFA_NOT_ENABLED_MESSAGE = 'Two-factor authentication is not enabled for this account.';
 export const MFA_CODE_INVALID_MESSAGE = 'That code is not valid. Try again.';
+/**
+ * A code that verified but had already been consumed — the RFC 6238 replay
+ * case. It is reported separately because it is a fact about our own record,
+ * not about the guess: saying so cannot help an attacker, and it stops a person
+ * from retyping a code that can never work again.
+ */
+export const MFA_CODE_REPLAYED_MESSAGE =
+  'That code has already been used. Wait for your authenticator to show the next code.';
 export const MFA_PASSWORD_INCORRECT_MESSAGE = 'Current password is incorrect.';
 export const MFA_NO_PASSWORD_MESSAGE =
   'This account has no password yet. Ask an administrator for a reset code.';
@@ -437,6 +445,7 @@ export type MfaLoginOutcome =
   | ({ status: 'ok' } & CompletedLogin)
   | { status: 'invalid' }
   | { status: 'code_invalid' }
+  | { status: 'code_replayed' }
   | { status: 'not_enabled' }
   | { status: 'rate_limited'; retryAfterMs: number };
 
@@ -565,7 +574,7 @@ export function loginWithMfa(input: MfaLoginInput): MfaLoginOutcome {
         },
         database
       );
-      return { status: 'code_invalid' };
+      return { status: 'code_replayed' };
     }
 
     clearMfaFailures(user.id, database);

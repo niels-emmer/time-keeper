@@ -213,6 +213,59 @@ describe('Account', () => {
     ).toBeTruthy();
   });
 
+  it('explains a rejected MFA code instead of showing an empty alert', async () => {
+    apiMock.enrolMfa.mockResolvedValue({
+      secret: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+      otpauthUri: 'otpauth://totp/Time%20Keeper:alice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+      algorithm: 'SHA1',
+      digits: 6,
+      period: 30,
+    });
+    // The server's line is blank — the case that used to render an empty banner.
+    apiMock.confirmMfa.mockRejectedValue(new ApiError('', 400, 'mfa_code_invalid'));
+
+    renderAccount();
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /set up two-factor authentication/i })
+    );
+    fireEvent.change(await screen.findByLabelText(/Enter the 6-digit code/i), {
+      target: { value: '000000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /confirm and turn on/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent?.trim().length ?? 0).toBeGreaterThan(0);
+    // Wrong and expired share one message on purpose; it still says what to do.
+    expect(alert.textContent).toMatch(/That code is not valid/i);
+    expect(alert.textContent).toMatch(/change every 30 seconds/i);
+    expect(screen.getByRole('button', { name: /dismiss error/i })).toBeTruthy();
+  });
+
+  it('falls back to readable copy when a failure carries no message at all', async () => {
+    apiMock.enrolMfa.mockResolvedValue({
+      secret: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+      otpauthUri: 'otpauth://totp/Time%20Keeper:alice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+      algorithm: 'SHA1',
+      digits: 6,
+      period: 30,
+    });
+    apiMock.confirmMfa.mockRejectedValue(new ApiError('   ', 400));
+
+    renderAccount();
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /set up two-factor authentication/i })
+    );
+    fireEvent.change(await screen.findByLabelText(/Enter the 6-digit code/i), {
+      target: { value: '000000' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /confirm and turn on/i }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent).toMatch(/Could not confirm that code/i);
+  });
+
   it('requires the password before turning MFA off', async () => {
     userState.user = { ...USER, mfaEnabled: true };
 

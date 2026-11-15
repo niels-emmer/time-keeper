@@ -18,8 +18,6 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { InlineError, QueryState } from '@/components/QueryState';
 import {
-  ApiError,
-  ForbiddenError,
   api,
   getErrorMessage,
   type AuthUser,
@@ -37,25 +35,9 @@ import { useAuthContext } from '@/lib/authContext';
  *
  * Q17 freshness is surfaced explicitly: a 403 with `reauthentication_required`
  * means the session is older than five minutes and the person must sign in
- * again, which is a different answer from "you are not allowed".
+ * again, which is a different answer from "you are not allowed". That mapping
+ * lives in `getErrorMessage`, so every auth surface answers it identically.
  */
-
-function mutationErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof ForbiddenError) {
-    if (error.code === 'reauthentication_required') {
-      return 'For your security this needs a fresh sign-in. Sign out and sign back in, then try again.';
-    }
-    if (error.code === 'interactive_authentication_required') {
-      return 'This action needs a browser sign-in. It cannot be done with an API token.';
-    }
-  }
-
-  if (error instanceof ApiError || error instanceof Error) {
-    return getErrorMessage(error, fallback);
-  }
-
-  return fallback;
-}
 
 function formatDate(value: string): string {
   const parsed = new Date(value);
@@ -117,7 +99,7 @@ function SuccessNote({ message }: { message: string }) {
   return (
     <p
       role="status"
-      className="rounded-lg border border-emerald-500/40 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
+      className="rounded-xl border border-emerald-500/40 bg-emerald-50 px-3 py-2 text-sm text-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-200"
     >
       {message}
     </p>
@@ -145,7 +127,7 @@ function ProfileSection({ user }: { user: AuthUser }) {
     },
     onError: (caught) => {
       setSaved(false);
-      setError(mutationErrorMessage(caught, 'Could not save your profile.'));
+      setError(getErrorMessage(caught, 'Could not save your profile.'));
     },
   });
 
@@ -260,7 +242,7 @@ function PasswordSection() {
     },
     onError: (caught) => {
       setSaved(null);
-      setError(mutationErrorMessage(caught, 'Could not change your password.'));
+      setError(getErrorMessage(caught, 'Could not change your password.'));
     },
   });
 
@@ -371,7 +353,7 @@ function SessionsSection() {
       qc.invalidateQueries({ queryKey: ['auth', 'sessions'] });
     },
     onError: (caught) =>
-      setError(mutationErrorMessage(caught, 'Could not sign out the other devices.')),
+      setError(getErrorMessage(caught, 'Could not sign out the other devices.')),
   });
 
   const revokeOne = useMutation({
@@ -380,7 +362,7 @@ function SessionsSection() {
       setError(null);
       qc.invalidateQueries({ queryKey: ['auth', 'sessions'] });
     },
-    onError: (caught) => setError(mutationErrorMessage(caught, 'Could not sign out that device.')),
+    onError: (caught) => setError(getErrorMessage(caught, 'Could not sign out that device.')),
   });
 
   const sessions: SessionSummary[] = data?.sessions ?? [];
@@ -488,7 +470,7 @@ function DeleteAccountSection({ user }: { user: AuthUser }) {
       await refresh();
     },
     onError: (caught) => {
-      setError(mutationErrorMessage(caught, 'Could not delete your account.'));
+      setError(getErrorMessage(caught, 'Could not delete your account.'));
     },
   });
 
@@ -663,7 +645,7 @@ function RecoveryCodesPanel({
 }) {
   return (
     <div className="space-y-3">
-      <div className="rounded-lg border border-amber-400/40 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
+      <div className="rounded-xl border border-amber-400/40 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
         <p className="font-medium">Save these recovery codes now.</p>
         <p className="text-xs opacity-80">
           Each code works once, and this is the only time they are shown. Keep them somewhere
@@ -723,7 +705,7 @@ function MfaSection({ user }: { user: AuthUser }) {
       setError(null);
       setNote(null);
     },
-    onError: (caught) => setError(mutationErrorMessage(caught, 'Could not start MFA setup.')),
+    onError: (caught) => setError(getErrorMessage(caught, 'Could not start MFA setup.')),
   });
 
   const confirm = useMutation({
@@ -735,7 +717,7 @@ function MfaSection({ user }: { user: AuthUser }) {
       setError(null);
       await refresh();
     },
-    onError: (caught) => setError(mutationErrorMessage(caught, 'Could not confirm that code.')),
+    onError: (caught) => setError(getErrorMessage(caught, 'Could not confirm that code.')),
   });
 
   const disable = useMutation({
@@ -749,7 +731,7 @@ function MfaSection({ user }: { user: AuthUser }) {
       await refresh();
     },
     onError: (caught) =>
-      setError(mutationErrorMessage(caught, 'Could not disable two-factor authentication.')),
+      setError(getErrorMessage(caught, 'Could not disable two-factor authentication.')),
   });
 
   const regenerate = useMutation({
@@ -762,7 +744,7 @@ function MfaSection({ user }: { user: AuthUser }) {
       setNote(null);
     },
     onError: (caught) =>
-      setError(mutationErrorMessage(caught, 'Could not regenerate your recovery codes.')),
+      setError(getErrorMessage(caught, 'Could not regenerate your recovery codes.')),
   });
 
   const pending = enrol.isPending || confirm.isPending || disable.isPending || regenerate.isPending;
@@ -777,7 +759,7 @@ function MfaSection({ user }: { user: AuthUser }) {
       </CardHeader>
       <CardContent className="space-y-4">
         {user.role === 'admin' && !user.mfaEnabled && !recoveryCodes && (
-          <div className="flex items-start gap-2 rounded-lg border border-amber-400/40 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
+          <div className="flex items-start gap-2 rounded-xl border border-amber-400/40 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>
               Administrator accounts must enable two-factor authentication. Administrator

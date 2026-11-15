@@ -1,15 +1,27 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthError } from '@/lib/api';
-import { Login } from '../Login';
+import { Login, LoginPage } from '../Login';
 
-const { loginMock, loginMfaMock } = vi.hoisted(() => ({
+const { loginMock, loginMfaMock, authState } = vi.hoisted(() => ({
   loginMock: vi.fn(),
   loginMfaMock: vi.fn(),
+  authState: {
+    loading: false,
+    user: null as { id: string } | null,
+    sessionExpired: false,
+  },
 }));
 
 vi.mock('@/lib/authContext', () => ({
-  useAuthContext: () => ({ login: loginMock, loginMfa: loginMfaMock }),
+  useAuthContext: () => ({
+    login: loginMock,
+    loginMfa: loginMfaMock,
+    loading: authState.loading,
+    user: authState.user,
+    sessionExpired: authState.sessionExpired,
+  }),
 }));
 
 function fillAndSubmit(identifier = 'alice', password = 'correct horse') {
@@ -25,6 +37,9 @@ describe('Login', () => {
   beforeEach(() => {
     loginMock.mockReset();
     loginMfaMock.mockReset();
+    authState.loading = false;
+    authState.user = null;
+    authState.sessionExpired = false;
   });
 
   it('submits the username/email and password in one step', async () => {
@@ -99,7 +114,7 @@ describe('Login', () => {
 
   it('keeps a rejected code on the second step with actionable copy', async () => {
     loginMock.mockResolvedValue({ status: 'mfa_required' });
-    loginMfaMock.mockRejectedValue(new AuthError(401));
+    loginMfaMock.mockRejectedValue(new AuthError(401, 'mfa_code_invalid'));
 
     fillAndSubmit('alice', 'correct horse');
 
@@ -107,11 +122,23 @@ describe('Login', () => {
     fireEvent.change(codeInput, { target: { value: '000000' } });
     fireEvent.click(screen.getByRole('button', { name: /verify and sign in/i }));
 
-    expect(
-      await screen.findByText(/That code is not valid. Check your authenticator/i)
-    ).toBeTruthy();
+    expect(await screen.findByText(/That code is not valid.*change every 30 seconds/i)).toBeTruthy();
     // Still on the code step: the person can simply try the next code.
     expect(screen.getByLabelText('Authentication code')).toBeTruthy();
+  });
+
+  it('names an already-used code separately from a wrong one', async () => {
+    loginMock.mockResolvedValue({ status: 'mfa_required' });
+    loginMfaMock.mockRejectedValue(new AuthError(401, 'mfa_code_replayed'));
+
+    fillAndSubmit('alice', 'correct horse');
+
+    const codeInput = await screen.findByLabelText('Authentication code');
+    fireEvent.change(codeInput, { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: /verify and sign in/i }));
+
+    expect(await screen.findByText(/already been used/i)).toBeTruthy();
+    expect(screen.queryByText(/That code is not valid/i)).toBeNull();
   });
 
   it('keeps submit disabled until both fields are filled', () => {
@@ -129,5 +156,60 @@ describe('Login', () => {
       target: { value: 'correct horse' },
     });
     expect(button.disabled).toBe(false);
+  });
+});
+
+describe('LoginPage — the documented /login route', () => {
+  beforeEach(() => {
+    loginMock.mockReset();
+    loginMfaMock.mockReset();
+    authState.loading = false;
+    authState.user = null;
+    authState.sessionExpired = false;
+  });
+
+  function renderRoute() {
+    return render(
+      <MemoryRouter initialEntries={['/login']}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/" element={<p>app home</p>} />
+        </Routes>
+      </MemoryRouter>
+    );
+  }
+
+  it('renders the sign-in form for a signed-out visitor', () => {
+    renderRoute();
+
+    expect(screen.getByLabelText('Username or email')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /sign in/i })).toBeTruthy();
+  });
+
+  it('sends an already signed-in visitor into the app', () => {
+    authState.user = { id: 'user-1' };
+
+    renderRoute();
+
+    expect(screen.getByText('app home')).toBeTruthy();
+    expect(screen.queryByLabelText('Username or email')).toBeNull();
+  });
+
+  it('keeps the form for a signed-in-but-expired session', () => {
+    authState.user = { id: 'user-1' };
+    authState.sessionExpired = true;
+
+    renderRoute();
+
+    expect(screen.getByLabelText('Username or email')).toBeTruthy();
+  });
+
+  it('shows a quiet status while the session is being checked', () => {
+    authState.loading = true;
+
+    renderRoute();
+
+    expect(screen.getByRole('status')).toBeTruthy();
+    expect(screen.getByText(/Checking your session/i)).toBeTruthy();
   });
 });

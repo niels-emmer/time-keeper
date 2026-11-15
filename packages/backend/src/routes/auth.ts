@@ -38,6 +38,7 @@ import {
 import {
   MFA_ALREADY_ENABLED_MESSAGE,
   MFA_CODE_INVALID_MESSAGE,
+  MFA_CODE_REPLAYED_MESSAGE,
   MFA_NOT_ENABLED_MESSAGE,
   MFA_NOT_STARTED_MESSAGE,
   confirmEnrolment,
@@ -237,6 +238,14 @@ authPublicRouter.post('/login/mfa', (req, res, next) => {
 
     if (outcome.status === 'code_invalid') {
       res.status(401).json({ error: MFA_CODE_INVALID_MESSAGE, code: 'mfa_code_invalid' });
+      return;
+    }
+
+    if (outcome.status === 'code_replayed') {
+      // Same 401 as any code failure — the password path is untouched either
+      // way — but a distinct code so the UI can say "that one was already used"
+      // instead of implying the person mistyped a fresh code.
+      res.status(401).json({ error: MFA_CODE_REPLAYED_MESSAGE, code: 'mfa_code_replayed' });
       return;
     }
 

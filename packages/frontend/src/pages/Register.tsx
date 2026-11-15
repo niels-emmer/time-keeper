@@ -1,9 +1,10 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertCircle, CheckCircle2, Circle, Loader2, UserPlus } from 'lucide-react';
+import { CheckCircle2, Circle, Loader2, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { InlineError } from '@/components/QueryState';
 import { api, getErrorMessage } from '@/lib/api';
 import { useAuthContext } from '@/lib/authContext';
 import { cn } from '@/lib/utils';
@@ -208,15 +209,7 @@ export function Register() {
               </ul>
             </div>
 
-            {error && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 rounded-lg border border-destructive/40 px-3 py-2 text-sm text-destructive"
-              >
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>{error}</span>
-              </div>
-            )}
+            {error && <InlineError message={error} />}
 
             <Button
               type="submit"

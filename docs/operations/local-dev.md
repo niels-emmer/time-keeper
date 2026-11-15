@@ -50,9 +50,10 @@ Both `dev` scripts build `@time-keeper/shared` first, so this works from a clean
 
 The frontend Vite dev server proxies `/api/*` to `VITE_API_URL` (default `http://localhost:3001`) automatically — see `packages/frontend/vite.config.ts`.
 
-Open http://localhost:5173/login and sign in with `admin@localhost` / `devadmin` (or the password
-you set in `DEV_ADMIN_PASSWORD`). No OAuth2 / Authentik is needed: this is the real local login,
-session and MFA path.
+Open http://localhost:5173/login and sign in as username `devadmin` (email `admin@localhost`) with
+the password you set in `DEV_ADMIN_PASSWORD`. If you did not set it, the password was generated once
+and printed at first boot — it is **not** a fixed development password. No OAuth2 / Authentik is
+needed: this is the real local login, session and MFA path.
 
 ## Auth in development
 
@@ -69,6 +70,29 @@ DEV_ADMIN_PASSWORD='a long dev passphrase' yarn workspace @time-keeper/backend d
 
 Sign in at http://localhost:5173/login. Enrol TOTP at `/account` if you want to exercise the second
 step (any authenticator app works; the ten recovery codes are shown once).
+
+**Enrolled MFA stops working when the backend restarts.** Development has no
+`MFA_ENCRYPTION_KEY`, so the process generates an ephemeral one; a restart makes the stored
+secret undecryptable and every authenticator code invalid. If you want enrolment to survive
+restarts, generate a key **once**, save it, and pass the same value every time:
+
+```bash
+# once
+openssl rand -base64 32 > .dev-mfa.key     # do not commit this file
+
+# every run
+MFA_ENCRYPTION_KEY="$(cat .dev-mfa.key)" DEV_ADMIN_PASSWORD='a long dev passphrase' \
+  yarn workspace @time-keeper/backend dev
+```
+
+Without a saved key, the way back in is to clear the enrolment. Sign-in will keep asking for a code
+that can never verify, so there is no UI path; either delete the development database
+(`dev-data/time-keeper.db*`) and let it re-seed, or clear the flag directly:
+
+```bash
+sqlite3 dev-data/time-keeper.db \
+  "UPDATE users SET mfa_enabled = 0, mfa_secret_enc = NULL, mfa_last_step = NULL WHERE username = 'devadmin';"
+```
 
 `DEV_USER_ID` is a **proxy-mode-only** shortcut and is ignored in local mode:
 

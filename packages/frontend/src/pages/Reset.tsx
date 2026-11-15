@@ -1,9 +1,10 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AlertCircle, CheckCircle2, Circle, KeyRound, Loader2 } from 'lucide-react';
+import { CheckCircle2, Circle, KeyRound, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { InlineError } from '@/components/QueryState';
 import { ApiError, api, getErrorMessage } from '@/lib/api';
 import { cn } from '@/lib/utils';
 
@@ -99,7 +100,7 @@ export function Reset() {
           <CardContent className="space-y-4">
             <div
               role="status"
-              className="flex items-start gap-2 rounded-lg border border-primary/30 bg-primary/5 px-3 py-2 text-sm"
+              className="flex items-start gap-2 rounded-xl border border-primary/30 bg-primary/5 px-3 py-2 text-sm"
             >
               <CheckCircle2
                 className="mt-0.5 h-4 w-4 shrink-0 text-primary"
@@ -206,15 +207,7 @@ export function Reset() {
               address, or that appears on its local common-password list.
             </p>
 
-            {error && (
-              <div
-                role="alert"
-                className="flex items-start gap-2 rounded-lg border border-destructive/40 px-3 py-2 text-sm text-destructive"
-              >
-                <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-                <span>{error}</span>
-              </div>
-            )}
+            {error && <InlineError message={error} />}
 
             <Button type="submit" className="w-full gap-2" disabled={!canSubmit}>
               {submitting ? (
