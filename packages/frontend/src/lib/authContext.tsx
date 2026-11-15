@@ -32,6 +32,8 @@ export interface AuthContextValue {
   sessionExpired: boolean;
   markSessionExpired: () => void;
   refresh: () => Promise<AuthStatus>;
+  /** Replace the cached user after a profile or password change. */
+  applyUser: (user: AuthUser) => void;
   login: (identifier: string, password: string) => Promise<LoginResponse>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
@@ -46,6 +48,7 @@ export const AuthContext = createContext<AuthContextValue>({
   sessionExpired: false,
   markSessionExpired: () => {},
   refresh: async () => ({ authenticated: false, mode: 'local' }),
+  applyUser: () => {},
   login: async () => ({ status: 'mfa_required' }),
   logout: async () => {},
   logoutAll: async () => {},
@@ -139,6 +142,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const markSessionExpired = useCallback(() => setSessionExpired(true), []);
 
+  const applyUser = useCallback((next: AuthUser) => {
+    setUser(next);
+    setSessionExpired(false);
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -150,6 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         sessionExpired,
         markSessionExpired,
         refresh,
+        applyUser,
         login,
         logout,
         logoutAll,

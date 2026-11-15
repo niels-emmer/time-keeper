@@ -26,9 +26,34 @@ export class AuthError extends Error {
 
 /** Thrown when the server returns 403: authenticated, but not allowed. */
 export class ForbiddenError extends Error {
-  constructor(message = 'You do not have permission to do that.') {
+  /**
+   * The server's machine-readable reason, when it sent one. `reauthentication_
+   * required` is the Q17 freshness gate; the Account screen turns it into a
+   * "sign in again" prompt rather than a generic permission error.
+   */
+  readonly code?: string;
+
+  constructor(message = 'You do not have permission to do that.', code?: string) {
     super(message);
     this.name = 'ForbiddenError';
+    this.code = code;
+  }
+}
+
+/**
+ * Any other non-2xx answer. Carries the status and the server's `code` so a
+ * form can tell a 409 (email already taken) from a 400 (policy message)
+ * without string-matching the copy.
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
   }
 }
 
@@ -55,6 +80,41 @@ export interface AuthStatus {
 export type LoginResponse =
   | { status: 'ok'; user: AuthUser; csrfToken: string }
   | { status: 'mfa_required' };
+
+/** One signed-in device, as the account screen lists it (D4). */
+export interface SessionSummary {
+  /** The stored SHA-256 of the session id — a handle, not the cookie value. */
+  id: string;
+  createdAt: string;
+  lastSeenAt: string;
+  expiresAt: string;
+  absoluteExpiresAt: string;
+  userAgent: string | null;
+  ip: string | null;
+  current: boolean;
+}
+
+export interface AcceptInvitePayload {
+  token: string;
+  email: string;
+  username: string;
+  password: string;
+}
+
+export interface ProfilePayload {
+  displayName?: string | null;
+  email?: string;
+}
+
+export interface ChangePasswordPayload {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface DeleteAccountPayload {
+  password: string;
+  confirmUsername: string;
+}
 
 export interface SettingsPayload {
   weeklyGoalHours: number;
@@ -142,10 +202,12 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     }
     if (res.status === 403) {
       const body = await res.json().catch(() => ({}));
-      throw new ForbiddenError((body as { error?: string }).error);
+      const parsed = body as { error?: string; code?: string };
+      throw new ForbiddenError(parsed.error, parsed.code);
     }
     const body = await res.json().catch(() => ({}));
-    throw new Error((body as { error?: string }).error ?? `HTTP ${res.status}`);
+    const parsed = body as { error?: string; code?: string };
+    throw new ApiError(parsed.error ?? `HTTP ${res.status}`, res.status, parsed.code);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -163,6 +225,43 @@ export const api = {
     logout: () => request<void>('/auth/logout', { method: 'POST' }),
     logoutAll: () => request<void>('/auth/logout-all', { method: 'POST' }),
     me: () => request<{ user: AuthUser }>('/auth/me'),
+
+    /** Registration by invitation (Phase C). Public — no session exists yet. */
+    acceptInvite: (payload: AcceptInvitePayload) =>
+      request<{ status: 'ok'; user: AuthUser; csrfToken: string }>('/auth/accept-invite', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+
+    /** Display name and email only; the username is immutable server-side. */
+    updateProfile: (payload: ProfilePayload) =>
+      request<{ user: AuthUser }>('/auth/me', {
+        method: 'PATCH',
+        body: JSON.stringify(payload),
+      }),
+
+    changePassword: (payload: ChangePasswordPayload) =>
+      request<{ user: AuthUser; otherSessionsRevoked: number }>('/auth/password', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+
+    deleteAccount: (payload: DeleteAccountPayload) =>
+      request<void>('/auth/me', {
+        method: 'DELETE',
+        body: JSON.stringify(payload),
+      }),
+
+    sessions: () =>
+      request<{ currentSessionId: string | null; sessions: SessionSummary[] }>(
+        '/auth/sessions'
+      ),
+
+    revokeSession: (id: string) =>
+      request<void>(`/auth/sessions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+    revokeOtherSessions: () =>
+      request<{ revoked: number }>('/auth/sessions/others', { method: 'DELETE' }),
   },
 
   categories: {

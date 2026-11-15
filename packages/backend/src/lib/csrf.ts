@@ -30,7 +30,7 @@ export const CSRF_COOKIE = 'tk_csrf';
 export const CSRF_HEADER = 'x-csrf-token';
 
 /** Paths that are public by design and therefore cannot carry the cookie yet. */
-const PUBLIC_PATHS = new Set(['/auth/login', '/auth/status']);
+const PUBLIC_PATHS = new Set(['/auth/login', '/auth/status', '/auth/accept-invite']);
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 

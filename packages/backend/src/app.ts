@@ -5,6 +5,7 @@ import { protectBrowserMutations } from './middleware/browserMutationProtection.
 import { protectCsrf } from './lib/csrf.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { authPublicRouter, authSessionRouter } from './routes/auth.js';
+import { adminRouter } from './routes/admin.js';
 import { categoriesRouter } from './routes/categories.js';
 import { timerRouter } from './routes/timer.js';
 import { entriesRouter } from './routes/entries.js';
@@ -81,6 +82,9 @@ export function createApp() {
   app.use('/api/info', infoRouter);
   app.use('/api/settings', settingsRouter);
   app.use('/api/tokens', tokensRouter);
+  // Admin surface (Phase C carries only invite issuance; the rest is Phase E).
+  // `requireAdmin` answers 404 for non-admins, so the path stays undiscoverable.
+  app.use('/api/admin', adminRouter);
 
   app.use(errorHandler);
 
