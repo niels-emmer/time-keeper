@@ -361,7 +361,10 @@ describe('POST /api/auth/login/mfa', () => {
     // …and the remaining nine still work.
     const third = await mfaLogin(USERNAME, PASSWORD, recoveryCodes[1]);
     expect(third.status).toBe(200);
-  });
+    // Scrypt-hashing ten recovery codes and verifying against them is
+    // intentionally expensive; the 5 s default is too tight on a loaded CI
+    // runner (Node 26 timed out at 5 s while Node 22 passed).
+  }, 30_000);
 
   it('stores recovery codes hashed, never in plaintext', async () => {
     const session = await requireSession();
@@ -557,7 +560,9 @@ describe('POST /api/auth/mfa/recovery-codes/regenerate', () => {
     const events = db.select().from(schema.authEvents).all().map((row) => row.kind);
     expect(events).toContain('mfa_recovery_codes_regenerated');
     expect(events).toContain('mfa_recovery_code_used');
-  });
+    // Two sets of ten scrypt hashes plus verifications; see the timeout note
+    // on the recovery-code test above.
+  }, 30_000);
 });
 
 describe('Q8 — administrators without MFA', () => {
