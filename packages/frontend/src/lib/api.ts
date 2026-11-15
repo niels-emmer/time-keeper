@@ -18,9 +18,18 @@ const BASE = '/api';
  * a 403 is a permission/CSRF answer, not an expiry.
  */
 export class AuthError extends Error {
-  constructor(status = 401) {
+  /**
+   * The server's machine-readable reason, when it sent one. A 401 is normally a
+   * missing/expired session, but `/auth/login/mfa` also answers 401 for a code
+   * failure (the password was already proven). Carrying the code keeps the
+   * "which one was it" decision with the caller instead of string-matching.
+   */
+  readonly code?: string;
+
+  constructor(status = 401, code?: string) {
     super(`Session expired (HTTP ${status})`);
     this.name = 'AuthError';
+    this.code = code;
   }
 }
 
@@ -215,21 +224,98 @@ function readCsrfToken(): string | undefined {
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
 
 /**
- * Human-readable text for any query or mutation failure. Surfaces the server's
- * `error` message when there is one, and never leaves the caller to render a
- * blank panel (finding M-3).
+ * Copy that is better than the server's own line, keyed by the stable `code`
+ * the API sends. Everything not listed here keeps the server's message: a route
+ * that knows something specific (a password-policy violation, a taken email)
+ * says it better than a generic table can.
+ *
+ * The MFA entries are the readable, *safe* reasons a code can fail. Wrong and
+ * expired deliberately share one line: telling them apart would reveal whether
+ * a guess was close, which is exactly what must not leak. "Already used" is the
+ * one reason that is safe to name, because it is about our own replay record
+ * rather than about the guess.
  */
-export function getErrorMessage(
-  error: unknown,
-  fallback = 'Something went wrong. Please try again.'
-): string {
+const CODE_MESSAGES: Record<string, string> = {
+  mfa_code_invalid:
+    'That code is not valid. Authenticator codes change every 30 seconds, so wait for the current one and try again.',
+  mfa_code_replayed:
+    'That code has already been used. Wait for your authenticator to show the next code, then try again.',
+  mfa_enrolment_not_started:
+    'Setup needs restarting: start two-factor setup again to get a fresh key, then confirm it.',
+  mfa_already_enabled: 'Two-factor authentication is already on for this account.',
+  mfa_not_enabled: 'Two-factor authentication is not on for this account.',
+  reauthentication_required:
+    'For your security this needs a fresh sign-in. Sign in again, then retry.',
+  interactive_authentication_required:
+    'This action needs a browser sign-in. It cannot be done with an API token.',
+  last_admin: 'This is the last administrator, so it cannot be removed or demoted.',
+};
+
+const GENERIC_FALLBACK = 'Something went wrong. Please try again.';
+
+/**
+ * Readable copy for the failures that arrive without a JSON body at all.
+ * `express-rate-limit` answers a plain-text 429, and a proxy in front of the app
+ * can answer 502/503 with HTML; both used to surface as "HTTP 429"/"HTTP 502",
+ * which is technically non-empty but tells the person nothing.
+ */
+const STATUS_MESSAGES: Record<number, string> = {
+  400: 'That request was not valid. Check the form and try again.',
+  403: 'You do not have permission to do that.',
+  404: 'That item no longer exists.',
+  409: 'That conflicts with something that already exists.',
+  413: 'That request was too large.',
+  429: 'Too many requests. That limit is temporary — wait a minute and try again.',
+  500: 'Something went wrong on the server. Try again.',
+  502: 'The server is not reachable right now. Try again in a moment.',
+  503: 'The server is not reachable right now. Try again in a moment.',
+  504: 'The server took too long to answer. Try again in a moment.',
+};
+
+function statusMessage(status: number): string {
+  return STATUS_MESSAGES[status] ?? `HTTP ${status}`;
+}
+
+/**
+ * A server-provided message is only usable when it is a non-blank string. An
+ * error body of `{}`, `{ issues: [...] }`, `{ error: null }` or `{ error: {} }`
+ * must never render as an empty alert (finding: empty MFA error banner).
+ */
+export function normalizeServerMessage(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+function mappedCodeMessage(code: string | undefined): string | undefined {
+  return code ? CODE_MESSAGES[code] : undefined;
+}
+
+/**
+ * Human-readable text for any query or mutation failure.
+ *
+ * Guarantees non-empty copy: the server's message when it is usable, a
+ * code-specific line when we have a better one, and a generic fallback when
+ * neither exists. Never leaves the caller to render a blank panel (finding M-3,
+ * and the empty MFA error banner).
+ */
+export function getErrorMessage(error: unknown, fallback = GENERIC_FALLBACK): string {
+  const safeFallback = normalizeServerMessage(fallback) ?? GENERIC_FALLBACK;
+
   if (error instanceof AuthError) {
-    return 'Your session has expired. Reload the page to sign in again.';
+    return mappedCodeMessage(error.code) ?? 'Your session has expired. Reload the page to sign in again.';
   }
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
+  if (error instanceof ForbiddenError || error instanceof ApiError) {
+    return (
+      mappedCodeMessage(error.code) ?? normalizeServerMessage(error.message) ?? safeFallback
+    );
   }
-  return fallback;
+  if (error instanceof Error) {
+    return normalizeServerMessage(error.message) ?? safeFallback;
+  }
+  return safeFallback;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -266,16 +352,28 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (!res.ok) {
     if (res.status === 401) {
-      throw new AuthError(res.status);
+      // A 401 is usually an expired session, but `/auth/login/mfa` also answers
+      // 401 for a rejected code. Read the body best-effort so the caller can
+      // tell the two apart; a non-JSON body simply yields no code.
+      const body = await res.json().catch(() => ({}));
+      const parsed = body as { code?: string };
+      throw new AuthError(res.status, normalizeServerMessage(parsed.code));
     }
     if (res.status === 403) {
       const body = await res.json().catch(() => ({}));
-      const parsed = body as { error?: string; code?: string };
-      throw new ForbiddenError(parsed.error, parsed.code);
+      const parsed = body as { error?: unknown; code?: string };
+      throw new ForbiddenError(
+        normalizeServerMessage(parsed.error) ?? 'You do not have permission to do that.',
+        normalizeServerMessage(parsed.code)
+      );
     }
     const body = await res.json().catch(() => ({}));
-    const parsed = body as { error?: string; code?: string };
-    throw new ApiError(parsed.error ?? `HTTP ${res.status}`, res.status, parsed.code);
+    const parsed = body as { error?: unknown; code?: string };
+    throw new ApiError(
+      normalizeServerMessage(parsed.error) ?? statusMessage(res.status),
+      res.status,
+      normalizeServerMessage(parsed.code)
+    );
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;

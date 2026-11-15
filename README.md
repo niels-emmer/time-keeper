@@ -17,6 +17,14 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
     <td align="center"><img src="docs/screenshots/monthly.png" width="380" alt="Monthly tab — projected vs actual + billable breakdown"/><br/><sub><b>Monthly</b> — projected vs actual + billable breakdown</sub></td>
     <td align="center"><img src="docs/screenshots/settings.png" width="380" alt="Settings tab — categories, targets, and weekly goal"/><br/><sub><b>Settings</b> — categories, targets &amp; weekly goal</sub></td>
   </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/login.png" width="380" alt="Sign-in page — username or email plus password"/><br/><sub><b>Sign in</b> — local account, no external IdP</sub></td>
+    <td align="center"><img src="docs/screenshots/account.png" width="380" alt="Account page — profile, password, MFA and devices"/><br/><sub><b>Account</b> — profile, password &amp; 2FA</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/admin-users.png" width="380" alt="Admin users list with roles, status and account actions"/><br/><sub><b>Admin users</b> — roles, status &amp; actions</sub></td>
+    <td align="center"><img src="docs/screenshots/reset.png" width="380" alt="Reset page — redeem an admin-issued code and set a password"/><br/><sub><b>Reset</b> — redeem a code, set a password</sub></td>
+  </tr>
 </table>
 
 

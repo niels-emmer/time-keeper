@@ -94,8 +94,15 @@ describe('AdminUsers', () => {
 
     expect(await screen.findByText('bob')).not.toBeNull();
     expect(screen.getByText('bob@example.com')).not.toBeNull();
-    expect(screen.getByText('7')).not.toBeNull();
+    // Entry count, MFA state and last sign-in share one summary line so all of
+    // them stay visible at 390px.
+    expect(screen.getByText(/7 entries/)).not.toBeNull();
     expect(screen.getByText('Admin')).not.toBeNull();
+    // The controls are visible without horizontal scrolling: one of each is
+    // rendered per account.
+    expect(screen.getByRole('button', { name: 'Delete bob' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Make user boss' })).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Make admin bob' })).not.toBeNull();
   });
 
   it('creates an account and shows the reset code exactly once', async () => {

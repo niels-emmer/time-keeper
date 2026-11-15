@@ -393,8 +393,12 @@ describe('POST /api/auth/login/mfa', () => {
 
     const replay = await mfaLogin(USERNAME, PASSWORD, code);
 
+    // A code that was already consumed is reported as exactly that: it is a
+    // fact about our own record, so naming it cannot help an attacker and it
+    // stops the person retyping a code that can never work again.
     expect(replay.status).toBe(401);
-    expect(replay.body.code).toBe('mfa_code_invalid');
+    expect(replay.body.code).toBe('mfa_code_replayed');
+    expect(replay.body.error).toMatch(/already been used/i);
 
     const events = db.select().from(schema.authEvents).all().map((row) => row.kind);
     expect(events).toContain('mfa_code_replay_rejected');

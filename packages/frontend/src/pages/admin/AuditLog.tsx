@@ -94,36 +94,27 @@ export function AdminAuditLog() {
           emptyTitle="No events yet"
           className="py-8"
         >
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b text-left text-xs text-muted-foreground">
-                  <th className="pb-2 font-medium">When</th>
-                  <th className="pb-2 font-medium">Event</th>
-                  <th className="pb-2 font-medium">Actor</th>
-                  <th className="pb-2 font-medium">Details</th>
-                  <th className="pb-2 font-medium">IP</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data?.events.map((event) => (
-                  <tr key={event.id} className="border-b last:border-0 align-top">
-                    <td className="whitespace-nowrap py-2 pr-4 text-muted-foreground">
-                      {formatDate(event.createdAt)}
-                    </td>
-                    <td className="py-2 pr-4 font-medium capitalize">{humaniseKind(event.kind)}</td>
-                    <td className="py-2 pr-4 text-muted-foreground">
-                      {event.actor ? event.actor.username : '—'}
-                    </td>
-                    <td className="max-w-[18rem] py-2 pr-4 text-muted-foreground">
-                      {describeMeta(event)}
-                    </td>
-                    <td className="py-2 text-muted-foreground">{event.ip ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <ul className="divide-y">
+            {data?.events.map((event) => (
+              // Stacked rows rather than a five-column table: at 390px the
+              // table only fit "When" and "Event", so actor, details and IP
+              // were hidden behind a scrollbar nobody could see.
+              <li key={event.id} className="space-y-0.5 py-2 first:pt-0 last:pb-0">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="min-w-0 truncate text-sm font-medium capitalize">
+                    {humaniseKind(event.kind)}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {formatDate(event.createdAt)}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {event.actor ? event.actor.username : '—'} · {describeMeta(event)}
+                  {event.ip ? ` · ${event.ip}` : ''}
+                </p>
+              </li>
+            ))}
+          </ul>
 
           <div className="mt-4 flex items-center justify-between gap-2">
             <p className="text-xs text-muted-foreground">

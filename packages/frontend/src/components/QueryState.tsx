@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { AlertCircle, Loader2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { getErrorMessage } from '@/lib/api';
+import { getErrorMessage, normalizeServerMessage } from '@/lib/api';
 
 interface QueryStateProps {
   /** The first load (or a refetch with no cached data) is in flight. */
@@ -60,7 +60,7 @@ export function QueryState({
       <div
         role="alert"
         className={cn(
-          'flex flex-col items-center justify-center gap-2 rounded-2xl border border-destructive/40 bg-card px-4 py-10 text-center',
+          'flex flex-col items-center justify-center gap-2 rounded-xl border border-destructive/40 bg-card px-4 py-10 text-center',
           className
         )}
       >
@@ -89,7 +89,7 @@ export function QueryState({
     return (
       <div
         className={cn(
-          'flex flex-col items-center justify-center rounded-2xl border border-dashed py-12 text-center text-muted-foreground',
+          'flex flex-col items-center justify-center rounded-xl border border-dashed py-12 text-center text-muted-foreground',
           className
         )}
       >
@@ -114,6 +114,10 @@ interface InlineErrorProps {
  * sit inside an otherwise usable panel.
  */
 export function InlineError({ message, onRetry, onDismiss, className }: InlineErrorProps) {
+  // Defence in depth: an empty banner is worse than a generic one. Every
+  // mutation error must say *something* the person can act on.
+  const text = normalizeServerMessage(message) ?? 'Something went wrong. Please try again.';
+
   return (
     <div
       role="alert"
@@ -123,7 +127,7 @@ export function InlineError({ message, onRetry, onDismiss, className }: InlineEr
       )}
     >
       <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
-      <p className="flex-1 text-destructive">{message}</p>
+      <p className="flex-1 text-destructive">{text}</p>
       <div className="flex shrink-0 items-center gap-1">
         {onRetry && (
           <Button size="sm" variant="ghost" className="h-7 px-2 text-destructive" onClick={onRetry}>
