@@ -48,6 +48,7 @@ import {
   startEnrolment,
 } from '../services/mfaService.js';
 import { findUsableInvite, registerInvitedUser } from '../services/inviteService.js';
+import { registerInviteIpAttempt, registerResetIpAttempt } from '../services/authLockout.js';
 import {
   RESET_CODE_INVALID_MESSAGE,
   redeemResetCode,
@@ -313,9 +314,18 @@ authPublicRouter.post('/accept-invite', (req, res, next) => {
       return;
     }
 
+    // Dedicated per-IP bucket before any token lookup: the general `/api`
+    // limiter is a throughput budget, not a guessing budget.
+    const ip = requestIp(req);
+    const ipAttempt = registerInviteIpAttempt(ip);
+    if (!ipAttempt.allowed) {
+      res.setHeader('Retry-After', String(Math.max(1, Math.ceil(ipAttempt.retryAfterMs / 1000))));
+      res.status(429).json({ error: 'Too many attempts. Try again later.' });
+      return;
+    }
+
     const payload = acceptInviteSchema.parse(req.body);
     const now = new Date();
-    const ip = requestIp(req);
     const userAgent = req.get('user-agent') ?? null;
 
     const invite = findUsableInvite(payload.token, { now });
@@ -419,12 +429,23 @@ authPublicRouter.post('/reset', (req, res, next) => {
       return;
     }
 
+    // Dedicated per-IP bucket before the code lookup. A reset code is a
+    // high-entropy secret, but a stricter bucket than the general 120/min
+    // ceiling costs nothing and closes the reviewer's finding.
+    const ip = requestIp(req);
+    const ipAttempt = registerResetIpAttempt(ip);
+    if (!ipAttempt.allowed) {
+      res.setHeader('Retry-After', String(Math.max(1, Math.ceil(ipAttempt.retryAfterMs / 1000))));
+      res.status(429).json({ error: 'Too many attempts. Try again later.' });
+      return;
+    }
+
     const payload = resetPasswordSchema.parse(req.body ?? {});
 
     const outcome = redeemResetCode({
       code: payload.code,
       newPassword: payload.newPassword,
-      ip: requestIp(req),
+      ip,
       userAgent: req.get('user-agent') ?? null,
     });
 

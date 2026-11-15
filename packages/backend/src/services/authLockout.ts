@@ -1,4 +1,4 @@
-import { eq } from 'drizzle-orm';
+import { and, eq, isNull, lt, lte, or } from 'drizzle-orm';
 import { db as defaultDb, type AppDatabase } from '../db/client.js';
 import { authAttempts, type AuthAttemptRow } from '../db/schema.js';
 
@@ -55,6 +55,32 @@ export const MFA_MAX_BACKOFF_MS = 5 * 60 * 1000;
 export const MFA_IP_WINDOW_MS = 60 * 1000;
 export const MFA_IP_MAX_ATTEMPTS = 20;
 
+/**
+ * Dedicated per-IP buckets for the two public credential-redemption endpoints
+ * (`POST /api/auth/accept-invite`, `POST /api/auth/reset`).
+ *
+ * These did not have their own limit: they sat on the general 120/min `/api`
+ * ceiling, which is a throughput budget, not a guessing budget. An invite
+ * token and a reset code are both high-entropy secrets, so 10 attempts per
+ * quarter hour per address makes online guessing pointless while leaving room
+ * for a legitimate person who mistypes their email, username or password a few
+ * times.
+ *
+ * Like every other counter here, these are rows in `auth_attempts`, so a
+ * restart cannot reset an attack in progress.
+ */
+export const INVITE_IP_WINDOW_MS = 15 * 60 * 1000;
+export const INVITE_IP_MAX_ATTEMPTS = 10;
+export const RESET_IP_WINDOW_MS = 15 * 60 * 1000;
+export const RESET_IP_MAX_ATTEMPTS = 10;
+
+/**
+ * How long a counter row is kept. Matches the 90-day audit-retention decision
+ * (Q12) so `auth_attempts` cannot grow without bound on an install with no
+ * scheduler. Pruning never removes a row whose lockout is still in effect.
+ */
+export const AUTH_ATTEMPT_RETENTION_DAYS = 90;
+
 interface Clock {
   now?: Date | number;
 }
@@ -84,6 +110,14 @@ function mfaKey(userId: string): string {
 
 function mfaIpKey(ip: string): string {
   return `mfa-ip:${ip}`;
+}
+
+function inviteIpKey(ip: string): string {
+  return `invite-ip:${ip}`;
+}
+
+function resetIpKey(ip: string): string {
+  return `reset-ip:${ip}`;
 }
 
 function readRow(key: string, database: AppDatabase): AuthAttemptRow | undefined {
@@ -136,6 +170,13 @@ function registerWindowAttempt(
 ): IpAttemptResult {
   const database = options.database ?? defaultDb;
   const nowMs = toMillis(options.now);
+
+  // Opportunistic retention: this funnel is reached by every authentication
+  // entry point (password, MFA, invite, reset), so a long-running process keeps
+  // the table trimmed without needing a scheduler. The delete is a no-op while
+  // the table is already small.
+  pruneAuthAttempts({ now: new Date(nowMs), database });
+
   const row = readRow(key, database);
 
   let windowStartedMs = row ? new Date(row.windowStartedAt).getTime() : nowMs;
@@ -283,6 +324,24 @@ export function registerMfaIpAttempt(ip: string, options: AttemptOptions = {}): 
   );
 }
 
+/** Count one invite-acceptance attempt against the caller's address. */
+export function registerInviteIpAttempt(ip: string, options: AttemptOptions = {}): IpAttemptResult {
+  return registerWindowAttempt(
+    inviteIpKey(ip),
+    { windowMs: INVITE_IP_WINDOW_MS, maxAttempts: INVITE_IP_MAX_ATTEMPTS },
+    options
+  );
+}
+
+/** Count one password-reset redemption against the caller's address. */
+export function registerResetIpAttempt(ip: string, options: AttemptOptions = {}): IpAttemptResult {
+  return registerWindowAttempt(
+    resetIpKey(ip),
+    { windowMs: RESET_IP_WINDOW_MS, maxAttempts: RESET_IP_MAX_ATTEMPTS },
+    options
+  );
+}
+
 export function checkMfaLock(userId: string, options: AttemptOptions = {}): AccountLockState {
   return readLock(mfaKey(userId), options);
 }
@@ -315,4 +374,35 @@ export function clearAccountFailures(identifier: string, database: AppDatabase =
 /** Total rows, for tests and operational inspection. */
 export function countAttemptRows(database: AppDatabase = defaultDb): number {
   return database.select().from(authAttempts).all().length;
+}
+
+/**
+ * Retention for `auth_attempts` (Q12-consistent, 90 days).
+ *
+ * A row is removed only when it is older than the cutoff **and** no lockout is
+ * still in force. The second condition is what keeps the pruning safe: deleting
+ * a row with a future `locked_until` would end an active lockout early, which is
+ * exactly what an attacker would want.
+ *
+ * Called at startup and opportunistically from the per-IP attempt funnel, so an
+ * install with no external scheduler still cannot accumulate rows forever.
+ */
+export function pruneAuthAttempts(
+  options: { retentionDays?: number; now?: Date; database?: AppDatabase } = {}
+): number {
+  const database = options.database ?? defaultDb;
+  const now = options.now ?? new Date();
+  const days = options.retentionDays ?? AUTH_ATTEMPT_RETENTION_DAYS;
+  const cutoff = new Date(now.getTime() - days * 24 * 60 * 60 * 1000).toISOString();
+  const nowIso = now.toISOString();
+
+  return database
+    .delete(authAttempts)
+    .where(
+      and(
+        lt(authAttempts.updatedAt, cutoff),
+        or(isNull(authAttempts.lockedUntil), lte(authAttempts.lockedUntil, nowIso))
+      )
+    )
+    .run().changes;
 }

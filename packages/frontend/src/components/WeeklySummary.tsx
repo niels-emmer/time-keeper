@@ -298,25 +298,25 @@ export function WeeklySummary() {
             Click a total cell to adjust that day/category total directly. Click a day header to inspect, edit, or backfill the actual entries for that day.
           </p>
         </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <table className="w-full text-sm">
+        <CardContent className="p-0">
+          <table className="w-full table-fixed text-xs">
             <thead>
               <tr className="border-b">
-                <th className="p-3 text-left font-medium text-muted-foreground">Category</th>
+                <th className="px-2 py-2 text-left font-medium text-muted-foreground sm:px-3">Category</th>
                 {summary.days.map((day, index) => (
-                  <th key={day.date} className="w-20 p-3 text-center font-medium text-muted-foreground">
+                  <th key={day.date} className="w-8 px-0.5 py-2 text-center font-medium text-muted-foreground sm:w-16 sm:px-2">
                     <button
                       type="button"
-                      className="mx-auto flex flex-col items-center rounded-md px-1 py-1 transition-colors hover:bg-muted"
+                      className="mx-auto flex w-full flex-col items-center rounded-md py-1 transition-colors hover:bg-muted"
                       onClick={() => setDayLogDate(day.date)}
                     >
-                      <span>{DAYS[index]}</span>
-                      <span className="text-[11px] text-muted-foreground">{day.date.slice(5)}</span>
-                      <span className="text-[11px] text-primary">Log</span>
+                      <span className="text-[10px] leading-tight sm:text-xs">{DAYS[index]}</span>
+                      <span className="whitespace-nowrap text-[9px] leading-tight text-muted-foreground sm:text-[11px]">{day.date.slice(5)}</span>
+                      <span className="text-[9px] leading-tight text-primary sm:text-[11px]">Log</span>
                     </button>
                   </th>
                 ))}
-                <th className="p-3 text-right font-medium text-muted-foreground">Total</th>
+                <th className="w-10 px-1 py-2 text-right font-medium text-muted-foreground sm:w-20 sm:px-3">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -327,16 +327,20 @@ export function WeeklySummary() {
 
                 return (
                   <tr key={categoryId} className="border-b last:border-0">
-                    <td className="p-3">
-                      <div className="flex items-center gap-2">
+                    <td className="px-2 py-2 sm:px-3">
+                      <div className="flex items-start gap-1.5">
                         <span
-                          className="inline-block h-2.5 w-2.5 rounded-full flex-shrink-0"
+                          className="mt-1 inline-block h-2 w-2 flex-shrink-0 rounded-full"
                           style={{ backgroundColor: category.color }}
                         />
-                        <span className="font-medium">{category.name}</span>
-                        {category.workdayCode && (
-                          <span className="text-xs text-muted-foreground">{category.workdayCode}</span>
-                        )}
+                        <div className="min-w-0">
+                          <span className="break-words font-medium">{category.name}</span>
+                          {category.workdayCode && (
+                            <span className="block text-[10px] text-muted-foreground">
+                              {category.workdayCode}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </td>
                     {summary.days.map((day, index) => {
@@ -368,17 +372,17 @@ export function WeeklySummary() {
                                   handleCancel();
                                 }
                               }}
-                              className="w-16 rounded border border-ring bg-transparent px-1 py-2 text-center text-sm tabular-nums focus:outline-none focus:ring-1 focus:ring-ring"
+                              className="w-full rounded border border-ring bg-transparent px-0.5 py-2 text-center text-[11px] tabular-nums focus:outline-none focus:ring-1 focus:ring-ring sm:px-2"
                             />
                           ) : (
-                            <span className="block cursor-pointer rounded p-3 transition-colors hover:bg-muted/50">
+                            <span className="block cursor-pointer rounded py-2 transition-colors hover:bg-muted/50">
                               {displayMinutes > 0 ? `${(displayMinutes / 60).toFixed(1)}h` : '–'}
                             </span>
                           )}
                         </td>
                       );
                     })}
-                    <td className="p-3 text-right font-semibold tabular-nums">{(rowTotal / 60).toFixed(1)}h</td>
+                    <td className="px-1 py-2 text-right font-semibold tabular-nums sm:px-3">{(rowTotal / 60).toFixed(1)}h</td>
                   </tr>
                 );
               })}
@@ -387,13 +391,13 @@ export function WeeklySummary() {
                 {summary.days.map((day, index) => (
                   <td
                     key={day.date}
-                    className={`p-3 text-center tabular-nums ${computedDayMinutes[index] >= day.goalMinutes ? 'text-green-400' : ''}`}
+                    className={`px-0.5 py-2 text-center tabular-nums sm:px-2 ${computedDayMinutes[index] >= day.goalMinutes ? 'text-green-400' : ''}`}
                   >
                     {computedDayMinutes[index] > 0 ? `${(computedDayMinutes[index] / 60).toFixed(1)}h` : '–'}
                   </td>
                 ))}
                 <td
-                  className={`p-3 text-right tabular-nums ${computedWeekMinutes >= summary.goalMinutes ? 'text-green-400' : ''}`}
+                  className={`px-1 py-2 text-right tabular-nums sm:px-3 ${computedWeekMinutes >= summary.goalMinutes ? 'text-green-400' : ''}`}
                 >
                   {(computedWeekMinutes / 60).toFixed(1)}h
                 </td>

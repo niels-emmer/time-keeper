@@ -164,3 +164,65 @@ describe('persistence across a simulated restart (Q23)', () => {
     second.db.$client.close();
   });
 });
+
+describe('retention (Q12-consistent, 90 days)', () => {
+  it('removes rows older than the retention window', () => {
+    const old = new Date(T0.getTime() - 91 * 24 * 60 * 60 * 1000);
+    lockout.registerIpAttempt('198.51.100.9', { now: old, database: db });
+    expect(lockout.countAttemptRows(db)).toBe(1);
+
+    const removed = lockout.pruneAuthAttempts({ now: T0, database: db });
+    expect(removed).toBe(1);
+    expect(lockout.countAttemptRows(db)).toBe(0);
+  });
+
+  it('keeps rows inside the retention window', () => {
+    const recent = new Date(T0.getTime() - 89 * 24 * 60 * 60 * 1000);
+    lockout.registerIpAttempt('203.0.113.77', { now: recent, database: db });
+
+    const removed = lockout.pruneAuthAttempts({ now: T0, database: db });
+    expect(removed).toBe(0);
+    expect(lockout.countAttemptRows(db)).toBe(1);
+  });
+
+  it('never deletes a row whose lockout is still in force', async () => {
+    const { authAttempts } = await import('../db/schema.js');
+    const veryOld = new Date(T0.getTime() - 200 * 24 * 60 * 60 * 1000).toISOString();
+    const stillLocked = new Date(T0.getTime() + 60_000).toISOString();
+
+    db.insert(authAttempts)
+      .values({
+        attemptKey: 'acct:locked@example.com',
+        failureCount: 5,
+        windowStartedAt: veryOld,
+        lockedUntil: stillLocked,
+        updatedAt: veryOld,
+      })
+      .run();
+
+    const removed = lockout.pruneAuthAttempts({ now: T0, database: db });
+    expect(removed).toBe(0);
+    expect(lockout.countAttemptRows(db)).toBe(1);
+  });
+});
+
+describe('dedicated invite and reset IP buckets', () => {
+  it('allows ten invite attempts from one address, then refuses the eleventh', () => {
+    for (let i = 1; i <= 10; i += 1) {
+      expect(lockout.registerInviteIpAttempt('203.0.113.9', { now: T0, database: db }).allowed).toBe(true);
+    }
+
+    const blocked = lockout.registerInviteIpAttempt('203.0.113.9', { now: T0, database: db });
+    expect(blocked.allowed).toBe(false);
+    expect(blocked.retryAfterMs).toBeGreaterThan(0);
+  });
+
+  it('keeps the invite and reset buckets independent', () => {
+    for (let i = 1; i <= 10; i += 1) {
+      lockout.registerInviteIpAttempt('203.0.113.10', { now: T0, database: db });
+    }
+
+    // Exhausting invites must not deny a legitimate password reset.
+    expect(lockout.registerResetIpAttempt('203.0.113.10', { now: T0, database: db }).allowed).toBe(true);
+  });
+});

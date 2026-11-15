@@ -563,3 +563,54 @@ seconds" instead, which covers the expired case without confirming a near miss.
 **Consequences:** the API's 401 body for `/auth/login/mfa` carries a `code`, and the frontend's
 `AuthError` now keeps it so the sign-in card can say "already used" instead of a generic failure.
 `SECURITY.md` records the residual: the replay answer reveals that a code was real and consumed.
+
+## D-035: Dedicated per-IP limits for credential redemption, and attempt-row retention
+
+**Date:** 2026-11-15
+**Status:** Implemented — closes two reviewer findings from the auth build
+
+`POST /api/auth/accept-invite` and `POST /api/auth/reset` were only covered by the general
+120/min `/api` limiter. That is a throughput budget, not a guessing budget: it says nothing about
+how many times one address may present a token or a reset code.
+
+**Decision:**
+
+- Each endpoint gets its own fixed-window per-IP bucket in `auth_attempts`, in the same style as
+  the existing login and MFA limits: **10 attempts per 15 minutes**, keyed `invite-ip:<addr>` and
+  `reset-ip:<addr>`. The buckets are independent, so exhausting invites cannot deny a legitimate
+  password reset. A refusal is `429` with `Retry-After`.
+- `auth_attempts` is pruned to the same **90-day** window as `auth_events`. A row is removed only
+  when it is older than the cutoff **and** has no lockout still in force (`locked_until` in the
+  future), because deleting an active lockout would end it early — precisely what an attacker
+  wants. Pruning runs at startup and opportunistically through the per-IP attempt funnel, so an
+  install with no scheduler cannot grow the table without bound.
+
+**Why 10/15 min rather than 10/min:** these are rare, deliberate actions. Ten attempts in a quarter
+hour leaves room for a person who mistypes an email, username or password a few times, while making
+online guessing of a token or code pointless. The secrets themselves (32 random bytes) already make
+guessing infeasible; the bucket is defence in depth and a cheap one.
+
+**Not in scope:** WebAuthn, SMTP and password-reset-by-email remain out of scope and need their own
+decision.
+
+## D-036: One password-policy implementation for the API and the invite checklist
+
+**Date:** 2026-11-15
+**Status:** Implemented
+
+The invite form's password checklist was a second, hand-written copy of the policy. It had drifted:
+it omitted the common-password denylist entirely, and it treated an empty field as passing
+"does not contain your username/email", so it could show green ticks for a password the API
+rejects. That is worse than no checklist, because it actively misleads.
+
+**Decision:** the policy (`checkPasswordPolicy`, the denylist, and the minimum length) moves into
+`@time-keeper/shared`. The backend's `lib/passwordPolicy.ts` re-exports it, so every existing caller
+is unchanged. The frontend's `getPasswordPolicyChecks` is built from the same primitives:
+
+- Four rules in API order: length, username, email, and "not a common or easily guessed password"
+  (the denylist plus the repeated-character/keyboard-run check fused into one user-facing rule).
+- Content rules are **unmet until a password is typed**, matching the reset page's "both passwords
+  match" rule, which already required non-empty input.
+
+**Consequence:** the submit button's client-side gate now agrees with the server, and adding a rule
+means changing one function rather than two copies.
