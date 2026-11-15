@@ -53,10 +53,11 @@ jobs:
       - name: Test backend
         run: yarn workspace @time-keeper/backend test
 
-      # The same suite under the other auth mode: proxy (above, the default)
-      # and local (below). Proxy-only suites declare their skip explicitly.
-      - name: Test backend (AUTH_MODE=local)
-        run: yarn workspace @time-keeper/backend test:local
+      # The default run above is AUTH_MODE=local (the Phase F default). Run the
+      # same suite again under the proxy header path so the optional mode cannot
+      # drift; proxy-only suites declare their skip explicitly and vice versa.
+      - name: Test backend (AUTH_MODE=proxy)
+        run: yarn workspace @time-keeper/backend test:proxy
 
       - name: Build frontend
         run: yarn workspace @time-keeper/frontend build

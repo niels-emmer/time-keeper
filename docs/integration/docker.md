@@ -7,7 +7,10 @@
 | `frontend` | Built from `packages/frontend/Dockerfile` | 80 | — (none; `frontend:80` on `proxy-net`) | Serves React SPA, proxies `/api/*` to backend |
 | `backend` | Built from `packages/backend/Dockerfile` | 3001 | — (none; `backend:3001` on `proxy-net`) | Express API + SQLite |
 
-Auth is not a Docker service — it is handled by Authentik's embedded outpost running inside your existing Authentik stack, integrated via NPM forward auth. In production, set `INTERNAL_PROXY_SECRET` in `.env` before starting the stack or the backend will refuse to trust browser-auth headers.
+Auth is not a separate Docker service. By default (`AUTH_MODE=local`) the backend owns accounts,
+sessions and MFA; nothing else is needed. The optional `AUTH_MODE=proxy` path uses Authentik's
+embedded outpost inside your existing Authentik stack, integrated via NPM forward auth; only then
+must `INTERNAL_PROXY_SECRET` be set in `.env`.
 
 ## Network layout
 
@@ -15,15 +18,19 @@ Both services attach to the external `proxy-net` Docker network and publish **no
 
 ```
 Internet
-  └── NPM (TLS + Authentik forward auth; attached to proxy-net)
+  └── NPM (TLS; attached to proxy-net)
         ├── frontend:80 (nginx)
-        │     └── /api/* → backend:3001 (Express)
+        │     └── /api/* → backend:3001 (Express; session cookie by default)
         └── api.* host (TLS only) → backend:3001 (Bearer token check)
 
 Docker network (proxy-net):
   frontend:80 (nginx)
       └── /api/* → backend:3001 (Express)
 ```
+
+With `AUTH_MODE=proxy` (or `hybrid`), NPM additionally runs Authentik forward auth for the main
+host and forwards `X-authentik-email`; the trust rules are unchanged. The default local mode is a
+plain TLS reverse proxy to `frontend:80`.
 
 > **Security (C-1): do not add a `ports:` mapping for either service.** The frontend nginx blindly forwards `X-authentik-email` to the backend and stamps `X-Internal-Token` onto whatever request arrives. If `:80` were published, anyone who can connect to it could authenticate as any email they choose. Nginx must never be the only hop in front of the backend. As defence in depth, the backend also rejects the header path unless the TCP peer is loopback/private or in `TRUSTED_PROXY_CIDRS`.
 
@@ -57,9 +64,14 @@ Both Dockerfiles use the **repo root** as the build context (`.`). This is requi
 | Variable | Set by | Purpose |
 |----------|--------|---------|
 | `APP_VERSION` | Build arg (`--build-arg APP_VERSION=...`) | Optional explicit version override; served by `GET /api/info` and shown in Settings → About. Falls back to the latest git tag in the clone, then `packages/backend/package.json`. |
-| `INTERNAL_PROXY_SECRET` | `.env` / deployment secret | Shared secret between frontend nginx and backend. Required in production so the backend only trusts `X-authentik-email` when the proxied request also carries a matching `X-Internal-Token`. |
-| `TRUSTED_PROXY_CIDRS` | `.env` / deployment secret (optional) | Comma-separated CIDRs that **extend** the backend's built-in loopback/RFC 1918 allowlist for the `X-authentik-email` peer check. Leave unset for the default single-host topology, where nginx and the backend share `proxy-net`. |
-| `DEV_USER_ID` | Shell env (dev only) | Email address to use as the user identity in dev mode (bypasses auth) |
+| `AUTH_MODE` | `.env` | `local` (default), `proxy` or `hybrid`. Selects the browser auth path. |
+| `SESSION_SECRET` | `.env` / deployment secret | **Required in production** (≥32 chars). Rotating it signs everyone out. |
+| `MFA_ENCRYPTION_KEY` | `.env` / deployment secret | **Required in production** (32 bytes, base64 or hex). Encrypts TOTP secrets at rest. **Changing it invalidates every enrolled secret.** |
+| `ADMIN_EMAIL` | `.env` | **Required.** The account promoted to `role='admin'`. On a migrated DB it must match an existing email; on an empty DB it is created with a one-time reset code printed to the logs. |
+| `INTERNAL_PROXY_SECRET` | `.env` / deployment secret | Required only when `AUTH_MODE=proxy`/`hybrid`. Shared secret between frontend nginx and backend so `X-authentik-email` is trusted only with a matching `X-Internal-Token`. |
+| `TRUSTED_PROXY_CIDRS` | `.env` (optional, proxy mode) | Comma-separated CIDRs that **extend** the backend's built-in loopback/RFC 1918 allowlist for the `X-authentik-email` peer check. Leave unset for the default topology, where nginx and the backend share `proxy-net`. |
+| `DEV_ADMIN_PASSWORD` | Shell env / dev overlay (dev only) | Password for the seeded `admin@localhost` development administrator. If unset, a random one is printed once at creation. |
+| `DEV_USER_ID` | Shell env (dev only) | Email identity for `AUTH_MODE=proxy` development only. Ignored in local mode. |
 
 Pass `APP_VERSION` at build time:
 ```bash
@@ -71,7 +83,7 @@ APP_VERSION=$(git describe --tags --abbrev=0) docker compose up -d --build
 | File | Purpose |
 |------|---------|
 | `docker-compose.yml` | Production |
-| `docker-compose.dev.yml` | Development overlay (hot reload, no auth) |
+| `docker-compose.dev.yml` | Development overlay (hot reload; local login with the seeded dev admin) |
 
 To run in development:
 ```bash
@@ -79,6 +91,9 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 ```
 
 ## API endpoints (internal reference)
+
+The auth surface (`/api/auth/*`, `/api/admin/*`) is listed in
+[docs/memory/INDEX.md](../memory/INDEX.md#api-routes). This table covers the data API.
 
 | Endpoint | Auth | Purpose |
 |----------|------|---------|
@@ -107,16 +122,19 @@ Manual verification (nothing is published to the host, so run these inside the D
 # Health (no auth needed; run inside the backend container)
 docker compose exec backend wget -qO- http://localhost:3001/api/health
 
-# Authentik-header path through nginx. The frontend container is already on
-# proxy-net, and nginx stamps X-Internal-Token itself.
+# Local mode: the public status probe reports whether a session exists and the mode.
+docker compose exec frontend wget -qO- http://localhost/api/auth/status
+
+# Proxy mode only: the Authentik-header path through nginx. The frontend
+# container is already on proxy-net, and nginx stamps X-Internal-Token itself.
 docker compose exec frontend sh -c \
   'wget -qO- --header="X-authentik-email: you@example.com" http://localhost/api/info'
 
-# Get weekly goal setting (same path)
+# Proxy mode only: get weekly goal setting through the header path
 docker compose exec frontend sh -c \
   'wget -qO- --header="X-authentik-email: you@example.com" http://localhost/api/settings'
 
-# Test category reorder from a container attached to proxy-net
+# Proxy mode only: test category reorder from a container attached to proxy-net
 docker run --rm --network proxy-net curlimages/curl -s -X PATCH \
   http://frontend/api/categories/reorder \
   -H "Content-Type: application/json" \

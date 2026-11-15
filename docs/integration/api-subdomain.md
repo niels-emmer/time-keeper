@@ -1,14 +1,14 @@
 # API Subdomain Setup (`api.*`)
 
-This guide explains how to set up the separate API subdomain used by the macOS status bar app. The subdomain proxies directly to the backend **without** Authentik forward auth; the backend validates the Bearer token itself.
+This guide explains how to set up the separate API subdomain used by the macOS status bar app. The subdomain proxies directly to the backend **without** the browser session / forward-auth path; the backend validates the Bearer token itself.
 
 ## Why a separate subdomain?
 
-The main domain (`timekeeper.yourdomain.com`) runs through Authentik's forward-auth proxy, which is browser-session-based. Native apps cannot participate in that flow. The `api.*` subdomain exposes the same backend directly, protected by a per-user API token.
+The main domain (`timekeeper.yourdomain.com`) is a browser surface: by default it uses the app's local login and a `tk_session` cookie, and with `AUTH_MODE=proxy` it uses Authentik forward auth. Native apps can participate in neither cookie-and-redirect flow. The `api.*` subdomain exposes the same backend directly, protected by a per-user API token.
 
 ```
 Native app → https://api.timekeeper.yourdomain.com → NPM (TLS only, proxy-net) → backend:3001 → Bearer token check
-Browser    → https://timekeeper.yourdomain.com    → NPM (TLS + Authentik, proxy-net) → frontend:80/nginx → backend:3001 → X-authentik-email
+Browser    → https://timekeeper.yourdomain.com    → NPM (TLS; local login, or Authentik in proxy mode) → frontend:80/nginx → backend:3001
 ```
 
 Both NPM and the Time Keeper containers share the external `proxy-net` Docker network. No host ports are published — all traffic stays inside Docker.
@@ -83,7 +83,7 @@ The app will test the connection before saving.
 | Token stolen in transit | HTTPS enforced; NPM terminates TLS before the backend |
 | Token brute-forced | 256-bit entropy (43-char base64url); rate-limiting applies (120 req/min) |
 | Token stolen from device | Stored in macOS Keychain (not in plain text); revoke from web app immediately |
-| Compromised token creates new tokens | Token management endpoints (`/api/tokens/*`) require Authentik header auth — a Bearer token cannot create or list tokens |
+| Compromised token creates new tokens | Token management endpoints (`/api/tokens/*`) require interactive auth (a session fresher than five minutes, or the proxy header in proxy mode) — a Bearer token cannot create or list tokens |
 | Backend exposed on network | Backend is on `proxy-net` Docker network — reachable by NPM and other containers on that network, but not from the host or LAN directly (no published ports) |
 
 ## Revoking a token

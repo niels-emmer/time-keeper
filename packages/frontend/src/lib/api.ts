@@ -311,6 +311,18 @@ export const api = {
         body: JSON.stringify(payload),
       }),
 
+    /**
+     * Redeem an admin-issued reset code and set a new password (D5, Phase F).
+     * Public — the holder has no session yet. Works for a forgotten password
+     * and for the `must_set_password` bootstrap of a newly created or migrated
+     * account. Success is 204 and does not sign the caller in.
+     */
+    resetPassword: (payload: { code: string; newPassword: string }) =>
+      request<void>('/auth/reset', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      }),
+
     /** Display name and email only; the username is immutable server-side. */
     updateProfile: (payload: ProfilePayload) =>
       request<{ user: AuthUser }>('/auth/me', {

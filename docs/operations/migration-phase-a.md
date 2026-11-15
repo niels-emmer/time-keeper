@@ -172,7 +172,10 @@ curl -s -H "X-authentik-email: you@example.com" \
 Then run the queries from step 3 against the live database. Every account
 created by the migration has `must_set_password = 1` and an unusable password
 hash; none of them has a password to reset, and none of them is a security
-regression, because the proxy path is still the only way in until Phase B.
+regression, because the proxy path is still the way in until the cutover issues
+reset codes. The cutover order (hybrid → issue codes → set passwords → enrol MFA
+→ `AUTH_MODE=local`) is in
+[docs/integration/auth.md](../integration/auth.md#migrated-database-the-homeserver-case).
 
 ## 6. Rollback
 
@@ -202,5 +205,5 @@ different database file.
   immutable (Q14), so an unwanted one needs an admin rename path that Phase E
   owns.
 - **Everyone starts with `must_set_password = 1`** and no password. Until an
-  admin issues reset codes (Phase E), migrated accounts can only be used through
-  the proxy path.
+  admin issues reset codes (Phase E, or the cutover window), migrated accounts
+  can only be used through the proxy path.

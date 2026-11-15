@@ -77,7 +77,8 @@ afterAll(() => {
  * proxy headers. Under `AUTH_MODE=local` the header is ignored by design, so
  * this file is skipped rather than pretending the behaviour exists.
  */
-const proxyModeSuite = process.env.AUTH_MODE === 'local' ? describe.skip : describe;
+// Phase F: the default is local, so "unset" must also skip this proxy-only suite.
+const proxyModeSuite = (process.env.AUTH_MODE ?? 'local') === 'local' ? describe.skip : describe;
 
 proxyModeSuite('auth peer allowlist (C-1)', () => {
   it('rejects X-authentik-email from a public peer even with a valid internal token', async () => {

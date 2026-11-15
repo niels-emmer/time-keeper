@@ -20,7 +20,7 @@ Move the backend with `PORT` and tell the frontend where it went with `VITE_API_
 
 ```bash
 # Terminal 1 — backend on any free port (3101 used here purely as an example)
-PORT=3101 DEV_USER_ID=you@example.com yarn workspace @time-keeper/backend dev
+PORT=3101 DEV_ADMIN_PASSWORD='a long dev passphrase' yarn workspace @time-keeper/backend dev
 
 # Terminal 2 — frontend, pointed at that port
 VITE_API_URL=http://localhost:3101 yarn workspace @time-keeper/frontend dev
@@ -38,7 +38,7 @@ If you set only one of them, the UI keeps calling the old port and you get a str
 yarn install
 
 # 2. Start the backend (Terminal 1)
-DEV_USER_ID=you@example.com yarn workspace @time-keeper/backend dev
+DEV_ADMIN_PASSWORD='a long dev passphrase' yarn workspace @time-keeper/backend dev
 # API runs on http://localhost:3001  — see "Ports" above if that is taken
 
 # 3. Start the frontend (Terminal 2)
@@ -50,7 +50,34 @@ Both `dev` scripts build `@time-keeper/shared` first, so this works from a clean
 
 The frontend Vite dev server proxies `/api/*` to `VITE_API_URL` (default `http://localhost:3001`) automatically — see `packages/frontend/vite.config.ts`.
 
-No OAuth2 / Authentik needed. The backend uses `DEV_USER_ID` as the user identity.
+Open http://localhost:5173/login and sign in with `admin@localhost` / `devadmin` (or the password
+you set in `DEV_ADMIN_PASSWORD`). No OAuth2 / Authentik is needed: this is the real local login,
+session and MFA path.
+
+## Auth in development
+
+`AUTH_MODE` defaults to `local`, and that is the path development is meant to exercise. On first
+boot (non-production, local/hybrid mode) the backend seeds a development administrator:
+
+- email `admin@localhost`, username `devadmin`, role `admin`
+- password from `DEV_ADMIN_PASSWORD`, or a random one printed **once** at creation
+- an existing `admin@localhost` is never reset, so a restart does not change your credentials
+
+```bash
+DEV_ADMIN_PASSWORD='a long dev passphrase' yarn workspace @time-keeper/backend dev
+```
+
+Sign in at http://localhost:5173/login. Enrol TOTP at `/account` if you want to exercise the second
+step (any authenticator app works; the ten recovery codes are shown once).
+
+`DEV_USER_ID` is a **proxy-mode-only** shortcut and is ignored in local mode:
+
+```bash
+AUTH_MODE=proxy DEV_USER_ID=you@example.com yarn workspace @time-keeper/backend dev
+```
+
+Sessions use an ephemeral `SESSION_SECRET` in development unless you set one, so they reset when
+the process restarts.
 
 ## Option B: Run with Docker Compose (dev mode)
 
@@ -60,7 +87,9 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up
 
 - Frontend: http://localhost:5173
 - Backend: http://localhost:3001
-- No auth in dev mode — backend reads `DEV_USER_ID=dev@localhost` from the dev compose overlay
+- Local login with the seeded dev admin (`admin@localhost` / `devadmin`, or
+  `DEV_ADMIN_PASSWORD` from the dev overlay)
+- Sessions and MFA keys are ephemeral in the dev overlay, so they reset on restart
 
 ## Database
 
@@ -92,8 +121,11 @@ This creates a new SQL file in `packages/backend/drizzle/`. Commit it alongside 
 yarn workspace @time-keeper/shared test          # run once
 yarn workspace @time-keeper/shared test:watch    # watch mode
 
-# Backend (settings route, validation, auth middleware)
+# Backend in the default (local) auth mode
 yarn workspace @time-keeper/backend test
+
+# The same suite against the optional proxy header path
+yarn workspace @time-keeper/backend test:proxy
 
 # Frontend (theme utilities)
 yarn workspace @time-keeper/frontend test

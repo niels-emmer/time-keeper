@@ -17,11 +17,13 @@ const originalEnv = { ...process.env };
 
 let db: AppDatabase;
 let userService: typeof import('./userService.js');
+let resetService: typeof import('./resetService.js');
 
 beforeEach(async () => {
   process.env = { ...originalEnv };
   ({ db } = await createTestApp());
   userService = await import('./userService.js');
+  resetService = await import('./resetService.js');
 });
 
 afterEach(() => {
@@ -129,6 +131,42 @@ describe('ensureAdminFromEmail (Q2 / Q18)', () => {
     expect(() =>
       userService.ensureAdminFromEmail('owner@example.com', { isProduction: true }, db)
     ).toThrow(/matches no user/);
+  });
+
+  it('creates the first administrator on an empty production database', () => {
+    const result = userService.ensureAdminFromEmail('Owner@Example.com', {
+      isProduction: true,
+    }, db);
+
+    expect(result?.promoted).toBe(true);
+    expect(result?.user.email).toBe('owner@example.com');
+    expect(result?.user.role).toBe('admin');
+    expect(result?.user.username).toBe('owner');
+    // No password is generated or logged; the account must set one via /reset.
+    expect(result?.user.mustSetPassword).toBe(true);
+    expect(verifyPassword('anything', result!.user.passwordHash)).toBe(false);
+    expect(result?.bootstrapResetCode?.code).toBeTruthy();
+
+    // The printed code is real: redeeming it sets a password and clears the flag.
+    const redeemed = resetService.redeemResetCode({
+      code: result!.bootstrapResetCode!.code,
+      newPassword: 'a properly long passphrase',
+      database: db,
+    });
+    expect(redeemed.status).toBe('ok');
+
+    const row = db.select().from(users).where(eq(users.id, result!.user.id)).get();
+    expect(row?.mustSetPassword).toBe(false);
+    expect(verifyPassword('a properly long passphrase', row!.passwordHash)).toBe(true);
+  });
+
+  it('does not mint a bootstrap code when a populated database already has accounts', () => {
+    seedUser(db, 'someone@example.com');
+
+    expect(() =>
+      userService.ensureAdminFromEmail('owner@example.com', { isProduction: true }, db)
+    ).toThrow(/matches no user/);
+    expect(db.select().from(users).all()).toHaveLength(1);
   });
 
   it('warns and continues outside production', () => {

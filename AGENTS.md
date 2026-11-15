@@ -90,7 +90,7 @@ After any release that visibly changes the UI, suggest regenerating these screen
 | Package manager | Yarn 4 (workspaces) |
 | Backend | Node.js + Express + Drizzle ORM + SQLite |
 | Frontend | React + Vite + Tailwind + shadcn/ui |
-| Auth | Authentik embedded outpost via NPM forward auth (reads `X-authentik-email`) |
+| Auth | App-owned local accounts (password + TOTP MFA, server-side sessions); optional Authentik proxy mode via `AUTH_MODE=proxy` |
 | Container | Docker Compose |
 
 ## Workspace commands
@@ -137,7 +137,7 @@ docs/memory/          # Architectural memory — read every session
   invariants.md       #   Hard rules that must never be broken
   incidents.md        #   Root causes of past problems and fixes
 docs/integration/     # Auth, Docker, PWA integration details
-  auth.md             #   Authentik + NPM forward auth setup
+  auth.md             #   Local accounts, cutover/rollback, optional Authentik proxy mode
   docker.md           #   Container layout and networking
   pwa.md              #   Installing on macOS and Android
 docs/operations/      # How to run, deploy, troubleshoot

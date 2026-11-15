@@ -45,7 +45,9 @@ docker run --rm -v "$PWD":/src:ro -w /app node:22-bookworm-slim sh -c '
   yarn workspace @time-keeper/backend test'
 ```
 
-Expected tail: `Test Files 19 passed (19)` / `Tests 102 passed (102)`. The backend suite runs against an in-memory SQLite database, so the container needs no volume and leaves nothing behind.
+Expected tail: all backend test files and tests pass, with the proxy-only suites skipped in the
+default (`local`) mode. The backend suite runs against an in-memory SQLite database, so the
+container needs no volume and leaves nothing behind.
 
 Quick start:
 
@@ -53,26 +55,31 @@ Quick start:
 corepack enable
 yarn install
 
-# Terminal 1 — backend
-DEV_USER_ID=you@example.com yarn workspace @time-keeper/backend dev
+# Terminal 1 — backend (seeds admin@localhost / devadmin on first run)
+DEV_ADMIN_PASSWORD='a long dev passphrase' yarn workspace @time-keeper/backend dev
 
 # Terminal 2 — frontend
 yarn workspace @time-keeper/frontend dev
 ```
 
-Then open http://localhost:5173.
+Then open http://localhost:5173/login and sign in with `admin@localhost` and that password. This is
+the real local auth path; `DEV_USER_ID` is a `AUTH_MODE=proxy`-only shortcut. See
+[docs/operations/local-dev.md](docs/operations/local-dev.md#auth-in-development).
 
 ## Running tests
 
 ```bash
 yarn workspace @time-keeper/shared test
-yarn workspace @time-keeper/backend test
+yarn workspace @time-keeper/backend test        # AUTH_MODE=local (the default)
+yarn workspace @time-keeper/backend test:proxy  # the optional proxy header path
 yarn workspace @time-keeper/frontend test
 ```
 
 Each backend/frontend `test` **and `dev`** script builds `@time-keeper/shared` first, so a clean checkout works without a separate build step (Yarn 4 does not run `pretest`/`predev` hooks, so the build is chained explicitly inside the script rather than declared as a lifecycle hook). The backend suite runs against an in-memory SQLite database and never touches `./dev-data/`.
 
-CI (`.github/workflows/ci.yml`) runs install, build, and all three suites on Node 22 and 26, and fails on any red step.
+CI (`.github/workflows/ci.yml`) runs install, build, and all three suites on Node 22 and 26, plus
+the backend suite again under `AUTH_MODE=proxy`, and fails on any red step. Auth changes must keep
+both modes green: proxy-only suites declare their skip explicitly (and vice versa).
 
 ## Code style
 

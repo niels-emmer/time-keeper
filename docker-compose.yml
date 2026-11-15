@@ -1,14 +1,20 @@
 services:
 
   # Frontend: React SPA served by nginx, proxies /api/* to backend
-  # Auth is handled upstream by Authentik's proxy outpost via NPM forward auth.
-  # Authentik sets X-authentik-email on authenticated requests; nginx passes it to the backend.
   #
-  # SECURITY (C-1): this service deliberately publishes NO host ports. Publishing
-  # :80 would let anyone who can reach the host send X-authentik-email and be
-  # authenticated as that user, because nginx stamps the internal token onto
-  # whatever identity header arrives. NPM must instead reach it as
-  # `frontend:80` over the external `proxy-net` network below.
+  # Auth: the app owns it by default (AUTH_MODE=local). Users sign in at the
+  # app's own /login with password + optional TOTP; sessions are server-side and
+  # revocable. The Authentik forward-auth header path still exists behind
+  # AUTH_MODE=proxy (or hybrid during a staged migration) and needs NPM's
+  # forward-auth host config; in that mode nginx passes X-authentik-email to the
+  # backend.
+  #
+  # SECURITY (C-1): this service deliberately publishes NO host ports. In proxy
+  # mode, publishing :80 would let anyone who can reach the host send
+  # X-authentik-email and be authenticated as that user, because nginx stamps the
+  # internal token onto whatever identity header arrives. NPM must instead reach
+  # it as `frontend:80` over the external `proxy-net` network below. In local
+  # mode the same rule holds: no port is published.
   frontend:
     build:
       context: .
@@ -20,7 +26,7 @@ services:
       # (via the frontend nginx) from direct api.* calls. Generate once with:
       #   openssl rand -hex 32
       # and set in a .env file or your deployment secrets manager.
-      INTERNAL_PROXY_SECRET: ${INTERNAL_PROXY_SECRET}
+      INTERNAL_PROXY_SECRET: ${INTERNAL_PROXY_SECRET:-}
     networks:
       - proxy-net
     depends_on:
@@ -49,21 +55,28 @@ services:
       # When set, the backend only accepts X-authentik-email from requests that
       # carry a matching X-Internal-Token header — preventing header injection
       # via the api.* subdomain even if NPM is misconfigured.
-      INTERNAL_PROXY_SECRET: ${INTERNAL_PROXY_SECRET}
-      # Phase A auth configuration. The backend refuses to boot in production
-      # without SESSION_SECRET, MFA_ENCRYPTION_KEY and a resolvable
-      # ADMIN_EMAIL, so these are passed through and validated there rather
-      # than duplicated as compose-time requirements.
+      INTERNAL_PROXY_SECRET: ${INTERNAL_PROXY_SECRET:-}
+      # Auth configuration. The backend refuses to boot in production without
+      # SESSION_SECRET and MFA_ENCRYPTION_KEY, and ADMIN_EMAIL must name an
+      # existing account on a migrated database. These are passed through and
+      # validated by the backend at boot rather than duplicated as compose-time
+      # requirements, so the failure message names the missing variable.
       #
-      # AUTH_MODE: proxy keeps today's Authentik header path authoritative.
-      # Phase F flips the default to `local`.
-      AUTH_MODE: ${AUTH_MODE:-proxy}
-      # The existing account promoted to role='admin' at boot (Q2). Must match
-      # a pre-existing email in a migrated database.
+      # AUTH_MODE: local (default) is the app's own password + TOTP login.
+      #   proxy   = Authentik header path (NPM forward auth still required).
+      #   hybrid  = accept both during a staged migration.
+      # Also passed through so a `.env` file or the deployment secret store is
+      # the single source of truth for all four values.
+      AUTH_MODE: ${AUTH_MODE:-local}
+      # On a migrated database this must be one of the pre-existing emails; it
+      # is promoted to role='admin' at boot. On a brand-new empty database the
+      # backend creates the first administrator and prints a one-time reset
+      # code to the logs (see docs/operations/deployment.md).
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
-      # Session and MFA key material. Generate with:
+      # REQUIRED in production. Generate once and keep them stable:
       #   SESSION_SECRET:     openssl rand -base64 48
       #   MFA_ENCRYPTION_KEY: openssl rand -base64 32
+      # Changing MFA_ENCRYPTION_KEY invalidates every enrolled TOTP secret.
       SESSION_SECRET: ${SESSION_SECRET:-}
       MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:-}
     volumes:
