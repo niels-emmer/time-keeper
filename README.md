@@ -25,6 +25,10 @@ Runs as a PWA — installs to the macOS Dock and Android home screen with no app
     <td align="center"><img src="docs/screenshots/admin-users.png" width="380" alt="Admin users list with roles, status and account actions"/><br/><sub><b>Admin users</b> — roles, status &amp; actions</sub></td>
     <td align="center"><img src="docs/screenshots/reset.png" width="380" alt="Reset page — redeem an admin-issued code and set a password"/><br/><sub><b>Reset</b> — redeem a code, set a password</sub></td>
   </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/register.png" width="380" alt="Register page — accept an invitation and choose a password"/><br/><sub><b>Register</b> — accept an invite</sub></td>
+    <td></td>
+  </tr>
 </table>
 
 
