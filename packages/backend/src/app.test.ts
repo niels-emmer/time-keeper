@@ -99,3 +99,43 @@ describe('P1-6: trust proxy depth (two hops: NPM then frontend nginx)', () => {
     expect(res.body.ip).not.toBe('1.1.1.1');
   });
 });
+
+/**
+ * express-rate-limit v8 keys IPv6 clients by subnet, not by full address: the
+ * default `keyGenerator` returns `ipKeyGenerator(req.ip, ipv6Subnet)` with an
+ * effective `ipv6Subnet` of 56 bits. v7 keyed the raw `req.ip`, so every
+ * address in an allocation had its own counter — an attacker holding a /64 (or
+ * a residential /56) could rotate the interface ID and mint a fresh bucket for
+ * each request, which made IP-based limits decorative on IPv6.
+ *
+ * These tests pin that behaviour, because it is now part of the security
+ * argument: a silent regression to per-address keying would reopen the bypass
+ * without failing any other test.
+ */
+describe('express-rate-limit v8: IPv6 keying by /56 subnet', () => {
+  it('shares one bucket across two addresses inside the same /56, but not across /56s', {
+    timeout: 30_000,
+  }, async () => {
+    const { app } = await createTestApp();
+
+    // Exhaust the budget from one address, through the two trusted hops.
+    for (let i = 0; i < 120; i += 1) {
+      const res = await request(app)
+        .get('/api/health')
+        .set('X-Forwarded-For', '2001:db8:0:1::1, 10.0.0.2');
+      expect(res.status).toBe(200);
+    }
+
+    // Same /56 (2001:db8::/56), different interface ID: the counter is shared.
+    const sameSubnet = await request(app)
+      .get('/api/health')
+      .set('X-Forwarded-For', '2001:db8:0:ff::2, 10.0.0.2');
+    expect(sameSubnet.status).toBe(429);
+
+    // A different /56 is a different client and keeps its own budget.
+    const otherSubnet = await request(app)
+      .get('/api/health')
+      .set('X-Forwarded-For', '2001:db8:0:100::1, 10.0.0.2');
+    expect(otherSubnet.status).toBe(200);
+  });
+});
