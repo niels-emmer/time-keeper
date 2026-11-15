@@ -125,46 +125,60 @@ function SortableRow({ cat, onEdit, onDelete, deleteDisabled }: SortableRowProps
     <div
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-3 rounded-lg border bg-card px-4 py-3"
+      className="flex items-start gap-3 rounded-lg border bg-card px-4 py-3"
     >
       <button
         {...attributes}
         {...listeners}
-        className="touch-none cursor-grab flex-shrink-0 text-muted-foreground active:cursor-grabbing"
+        className="mt-0.5 touch-none cursor-grab flex-shrink-0 text-muted-foreground active:cursor-grabbing"
         aria-label="Drag to reorder"
         tabIndex={-1}
       >
         <GripVertical className="h-4 w-4" />
       </button>
 
-      <span className="h-4 w-4 flex-shrink-0 rounded-full" style={{ backgroundColor: cat.color }} />
-
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium">{cat.name}</p>
-        <div className="space-y-0.5 text-xs text-muted-foreground">
-          {cat.workdayCode && <p className="truncate">{cat.workdayCode}</p>}
-          {targetSummary && <p className="truncate">{targetSummary}</p>}
+        {/*
+          The title line wraps instead of clipping. The billable badge used to
+          sit on the outer row, where at 390px it squeezed this column to ~98px
+          and truncated the target summary to "Weekly target •…". Keeping the
+          badge inside the wrapping title line gives the metadata its full width;
+          nothing is hidden and the information is unchanged.
+        */}
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span
+            className="h-3.5 w-3.5 flex-shrink-0 rounded-full"
+            style={{ backgroundColor: cat.color }}
+          />
+          <span className="min-w-0 break-words font-medium">{cat.name}</span>
+          {cat.workdayCode && (
+            <span className="text-xs text-muted-foreground">{cat.workdayCode}</span>
+          )}
+          {cat.billable && (
+            <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
+              billable
+            </span>
+          )}
         </div>
+        {targetSummary && (
+          <p className="mt-0.5 break-words text-xs text-muted-foreground">{targetSummary}</p>
+        )}
       </div>
 
-      {cat.billable && (
-        <span className="flex-shrink-0 rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">
-          billable
-        </span>
-      )}
-
-      <Button variant="ghost" size="icon" onClick={() => onEdit(cat)}>
-        <Pencil className="h-4 w-4" />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => onDelete(cat.id)}
-        disabled={deleteDisabled}
-        aria-label={`Delete ${cat.name}`}
-      >
-        <Trash2 className="h-4 w-4 text-destructive" />
-      </Button>
+      <div className="flex shrink-0 items-center gap-1">
+        <Button variant="ghost" size="icon" onClick={() => onEdit(cat)} aria-label={`Edit ${cat.name}`}>
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => onDelete(cat.id)}
+          disabled={deleteDisabled}
+          aria-label={`Delete ${cat.name}`}
+        >
+          <Trash2 className="h-4 w-4 text-destructive" />
+        </Button>
+      </div>
     </div>
   );
 }

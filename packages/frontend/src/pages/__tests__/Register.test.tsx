@@ -71,6 +71,52 @@ describe('Register', () => {
     expect(submit.disabled).toBe(false);
   });
 
+  it('shows every rule the API checks, including the denylist', () => {
+    renderRegister();
+
+    const list = screen.getByLabelText('Password requirements');
+    const labels = Array.from(list.querySelectorAll('li')).map((item) => item.textContent ?? '');
+
+    expect(labels).toHaveLength(4);
+    expect(labels[0]).toMatch(/at least 12 characters/i);
+    expect(labels[1]).toMatch(/username/i);
+    expect(labels[2]).toMatch(/email address/i);
+    expect(labels[3]).toMatch(/common or easily guessed/i);
+  });
+
+  it('does not tick content rules before a password is typed', () => {
+    renderRegister();
+
+    const list = screen.getByLabelText('Password requirements');
+    const items = Array.from(list.querySelectorAll('li'));
+
+    // None of the four is satisfied by an empty field — the old checklist went
+    // green for "does not contain your username" before anything was typed.
+    expect(items.every((item) => !item.className.includes('emerald'))).toBe(true);
+  });
+
+  it('keeps submit disabled for a long but denylisted password', () => {
+    renderRegister();
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'new@example.com' } });
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'newcomer' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password1234' } });
+
+    const submit = screen.getByRole('button', { name: /create account/i }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+  });
+
+  it('keeps submit disabled when the password contains the email local part', () => {
+    renderRegister();
+
+    fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'new@example.com' } });
+    fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'someone' } });
+    fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'a-new-kind-of-passphrase' } });
+
+    const submit = screen.getByRole('button', { name: /create account/i }) as HTMLButtonElement;
+    expect(submit.disabled).toBe(true);
+  });
+
   it('sends the token from the URL with a normalised username', async () => {
     acceptInviteMock.mockResolvedValue({ status: 'ok', user: {}, csrfToken: 'token' });
     refreshMock.mockResolvedValue({ authenticated: true, mode: 'local' });

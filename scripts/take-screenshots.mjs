@@ -2,8 +2,8 @@
  * Screenshot capture for `docs/screenshots/` — 390×844 @2x, dark theme.
  *
  * Covers the four tabs plus the auth surfaces (login, account, admin users,
- * reset). Demo data is seeded through the API first: an empty app makes a poor
- * screenshot and hides layout problems.
+ * reset, register). Demo data is seeded through the API first: an empty app
+ * makes a poor screenshot and hides layout problems.
  *
  * Playwright is intentionally *not* a project dependency (it downloads browser
  * binaries and would need a SECURITY.md dependency review for a dev-only tool).
@@ -374,6 +374,25 @@ if (resetCode) {
   await anon.close();
 } else {
   console.warn('No reset code available; skipped reset.png');
+}
+
+// ── register.png (signed out, fresh unused invite) ──────────────────────────
+// The invite token is the only credential the page needs; minting a fresh one
+// keeps the run repeatable, and nothing is submitted so it is not consumed.
+const invite = await api(page, 'POST', '/admin/invites', { role: 'user' });
+const inviteToken = invite.body?.token ?? null;
+if (inviteToken) {
+  const anon = await browser.newPage({ viewport: VIEWPORT, deviceScaleFactor: 2 });
+  await anon.addInitScript(() => localStorage.setItem('time-keeper-theme', 'dark'));
+  await anon.goto(`${BASE}/register?token=${encodeURIComponent(inviteToken)}`, {
+    waitUntil: 'networkidle',
+  });
+  await anon.waitForTimeout(700);
+  await anon.screenshot({ path: path.join(OUT, 'register.png') });
+  console.log('✓ register.png');
+  await anon.close();
+} else {
+  console.warn(`Could not mint an invite (HTTP ${invite.status}); skipped register.png`);
 }
 
 await browser.close();

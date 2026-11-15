@@ -1,6 +1,7 @@
 import { useMemo, useState, type FormEvent, type ReactNode } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Circle, Loader2, UserPlus } from 'lucide-react';
+import { getPasswordPolicyChecks } from '@time-keeper/shared';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -14,19 +15,13 @@ import { cn } from '@/lib/utils';
  *
  * Registration is invite-only (D2): the token in the query string is the only
  * credential, so there is no self-service signup path to render. The page shows
- * the password policy inline — the same four things the API checks — because
- * discovering a policy by rejection is a bad first impression.
+ * the password policy inline — the same rules the API checks, from the same
+ * shared implementation — because discovering a policy by rejection is a bad
+ * first impression.
  *
  * A bad token produces the backend's single generic message; unknown, used and
  * expired links are deliberately indistinguishable.
  */
-
-const MIN_PASSWORD_LENGTH = 12;
-
-interface PolicyCheck {
-  label: string;
-  met: boolean;
-}
 
 export function Register() {
   const [searchParams] = useSearchParams();
@@ -40,30 +35,10 @@ export function Register() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const policyChecks = useMemo<PolicyCheck[]>(() => {
-    const loweredPassword = password.toLowerCase();
-    const normalisedUsername = username.trim().toLowerCase();
-    const normalisedEmail = email.trim().toLowerCase();
-    const emailLocalPart = normalisedEmail.includes('@')
-      ? normalisedEmail.slice(0, normalisedEmail.indexOf('@'))
-      : normalisedEmail;
-
-    return [
-      {
-        label: `At least ${MIN_PASSWORD_LENGTH} characters`,
-        met: password.length >= MIN_PASSWORD_LENGTH,
-      },
-      {
-        label: 'Does not contain your username',
-        met:
-          normalisedUsername.length < 3 || !loweredPassword.includes(normalisedUsername),
-      },
-      {
-        label: 'Does not contain your email address',
-        met: emailLocalPart.length < 3 || !loweredPassword.includes(emailLocalPart),
-      },
-    ];
-  }, [password, username, email]);
+  const policyChecks = useMemo(
+    () => getPasswordPolicyChecks(password, { username, email }),
+    [password, username, email]
+  );
 
   const passwordMeetsPolicy = policyChecks.every((check) => check.met);
 
@@ -192,7 +167,7 @@ export function Register() {
               <ul className="space-y-1 pt-1" aria-label="Password requirements">
                 {policyChecks.map((check) => (
                   <li
-                    key={check.label}
+                    key={check.id}
                     className={cn(
                       'flex items-center gap-2 text-xs',
                       check.met ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
