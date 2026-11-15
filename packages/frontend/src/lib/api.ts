@@ -116,6 +116,18 @@ export interface DeleteAccountPayload {
   confirmUsername: string;
 }
 
+/**
+ * What `POST /api/auth/mfa/enrol` returns. The secret and URI are shown exactly
+ * once; nothing is active until `confirmMfa` succeeds.
+ */
+export interface MfaEnrolment {
+  secret: string;
+  otpauthUri: string;
+  algorithm: 'SHA1';
+  digits: 6;
+  period: 30;
+}
+
 export interface SettingsPayload {
   weeklyGoalHours: number;
   roundingIncrementMinutes: 30 | 60;
@@ -222,6 +234,16 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ identifier, password }),
       }),
+
+    /**
+     * Complete the MFA challenge (Phase D). The password is re-sent because the
+     * server issued no half-authenticated token at the first step.
+     */
+    loginMfa: (identifier: string, password: string, code: string) =>
+      request<LoginResponse>('/auth/login/mfa', {
+        method: 'POST',
+        body: JSON.stringify({ identifier, password, code }),
+      }),
     logout: () => request<void>('/auth/logout', { method: 'POST' }),
     logoutAll: () => request<void>('/auth/logout-all', { method: 'POST' }),
     me: () => request<{ user: AuthUser }>('/auth/me'),
@@ -262,6 +284,31 @@ export const api = {
 
     revokeOtherSessions: () =>
       request<{ revoked: number }>('/auth/sessions/others', { method: 'DELETE' }),
+
+    /**
+     * MFA (Phase D). `enrol` returns a pending secret and changes nothing;
+     * `confirm` is the only call that can activate it, and it returns the ten
+     * recovery codes exactly once.
+     */
+    enrolMfa: () => request<MfaEnrolment>('/auth/mfa/enrol', { method: 'POST' }),
+
+    confirmMfa: (code: string) =>
+      request<{ recoveryCodes: string[] }>('/auth/mfa/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ code }),
+      }),
+
+    disableMfa: (password: string) =>
+      request<void>('/auth/mfa/disable', {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      }),
+
+    regenerateRecoveryCodes: (password: string) =>
+      request<{ recoveryCodes: string[] }>('/auth/mfa/recovery-codes/regenerate', {
+        method: 'POST',
+        body: JSON.stringify({ password }),
+      }),
   },
 
   categories: {

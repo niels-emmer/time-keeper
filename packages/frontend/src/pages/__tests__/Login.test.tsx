@@ -3,10 +3,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthError } from '@/lib/api';
 import { Login } from '../Login';
 
-const { loginMock } = vi.hoisted(() => ({ loginMock: vi.fn() }));
+const { loginMock, loginMfaMock } = vi.hoisted(() => ({
+  loginMock: vi.fn(),
+  loginMfaMock: vi.fn(),
+}));
 
 vi.mock('@/lib/authContext', () => ({
-  useAuthContext: () => ({ login: loginMock }),
+  useAuthContext: () => ({ login: loginMock, loginMfa: loginMfaMock }),
 }));
 
 function fillAndSubmit(identifier = 'alice', password = 'correct horse') {
@@ -21,6 +24,7 @@ function fillAndSubmit(identifier = 'alice', password = 'correct horse') {
 describe('Login', () => {
   beforeEach(() => {
     loginMock.mockReset();
+    loginMfaMock.mockReset();
   });
 
   it('submits the username/email and password in one step', async () => {
@@ -57,6 +61,57 @@ describe('Login', () => {
     expect(
       await screen.findByText(/Two-factor authentication is required/i)
     ).toBeTruthy();
+  });
+
+  it('moves to the second step and completes with a TOTP code', async () => {
+    loginMock.mockResolvedValue({ status: 'mfa_required' });
+    loginMfaMock.mockResolvedValue({ status: 'ok', user: {}, csrfToken: 'token' });
+
+    fillAndSubmit('alice', 'correct horse');
+
+    const codeInput = (await screen.findByLabelText('Authentication code')) as HTMLInputElement;
+    fireEvent.change(codeInput, { target: { value: '123456' } });
+    fireEvent.click(screen.getByRole('button', { name: /verify and sign in/i }));
+
+    await waitFor(() =>
+      expect(loginMfaMock).toHaveBeenCalledWith('alice', 'correct horse', '123456')
+    );
+  });
+
+  it('offers a recovery-code path that submits the same request', async () => {
+    loginMock.mockResolvedValue({ status: 'mfa_required' });
+    loginMfaMock.mockResolvedValue({ status: 'ok', user: {}, csrfToken: 'token' });
+
+    fillAndSubmit('alice', 'correct horse');
+
+    await screen.findByLabelText('Authentication code');
+    fireEvent.click(screen.getByRole('button', { name: /use a recovery code/i }));
+
+    fireEvent.change(screen.getByLabelText('Recovery code'), {
+      target: { value: 'ABCDE-FGHJK' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /verify and sign in/i }));
+
+    await waitFor(() =>
+      expect(loginMfaMock).toHaveBeenCalledWith('alice', 'correct horse', 'ABCDE-FGHJK')
+    );
+  });
+
+  it('keeps a rejected code on the second step with actionable copy', async () => {
+    loginMock.mockResolvedValue({ status: 'mfa_required' });
+    loginMfaMock.mockRejectedValue(new AuthError(401));
+
+    fillAndSubmit('alice', 'correct horse');
+
+    const codeInput = await screen.findByLabelText('Authentication code');
+    fireEvent.change(codeInput, { target: { value: '000000' } });
+    fireEvent.click(screen.getByRole('button', { name: /verify and sign in/i }));
+
+    expect(
+      await screen.findByText(/That code is not valid. Check your authenticator/i)
+    ).toBeTruthy();
+    // Still on the code step: the person can simply try the next code.
+    expect(screen.getByLabelText('Authentication code')).toBeTruthy();
   });
 
   it('keeps submit disabled until both fields are filled', () => {

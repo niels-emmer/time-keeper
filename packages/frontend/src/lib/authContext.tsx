@@ -27,6 +27,12 @@ export interface AuthContextValue {
   user: AuthUser | null;
   role: 'user' | 'admin' | null;
   mfaEnabled: boolean;
+  /**
+   * A local-mode administrator who has not enrolled TOTP. The backend answers
+   * their admin calls with `mfa_enrolment_required`, so the shell prompts them
+   * to enrol instead of letting them walk into 404s.
+   */
+  mfaEnrolmentRequired: boolean;
   mode: AuthMode | null;
   loading: boolean;
   sessionExpired: boolean;
@@ -35,6 +41,8 @@ export interface AuthContextValue {
   /** Replace the cached user after a profile or password change. */
   applyUser: (user: AuthUser) => void;
   login: (identifier: string, password: string) => Promise<LoginResponse>;
+  /** Second step: TOTP code or recovery code, with the same credential pair. */
+  loginMfa: (identifier: string, password: string, code: string) => Promise<LoginResponse>;
   logout: () => Promise<void>;
   logoutAll: () => Promise<void>;
 }
@@ -43,6 +51,7 @@ export const AuthContext = createContext<AuthContextValue>({
   user: null,
   role: null,
   mfaEnabled: false,
+  mfaEnrolmentRequired: false,
   mode: null,
   loading: false,
   sessionExpired: false,
@@ -50,6 +59,7 @@ export const AuthContext = createContext<AuthContextValue>({
   refresh: async () => ({ authenticated: false, mode: 'local' }),
   applyUser: () => {},
   login: async () => ({ status: 'mfa_required' }),
+  loginMfa: async () => ({ status: 'mfa_required' }),
   logout: async () => {},
   logoutAll: async () => {},
 });
@@ -122,6 +132,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [refresh]
   );
 
+  const loginMfa = useCallback(
+    async (identifier: string, password: string, code: string): Promise<LoginResponse> => {
+      const result = await api.auth.loginMfa(identifier, password, code);
+
+      if (result.status === 'ok') {
+        setUser(result.user);
+        setSessionExpired(false);
+        try {
+          await refresh();
+        } catch {
+          // The completion response itself is enough to enter the app.
+        }
+      }
+
+      return result;
+    },
+    [refresh]
+  );
+
   const logout = useCallback(async () => {
     try {
       await api.auth.logout();
@@ -153,6 +182,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         user,
         role: user?.role ?? null,
         mfaEnabled: user?.mfaEnabled ?? false,
+        mfaEnrolmentRequired: Boolean(
+          user && user.role === 'admin' && !user.mfaEnabled && mode !== 'proxy'
+        ),
         mode,
         loading,
         sessionExpired,
@@ -160,6 +192,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         refresh,
         applyUser,
         login,
+        loginMfa,
         logout,
         logoutAll,
       }}

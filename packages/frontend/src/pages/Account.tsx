@@ -1,14 +1,18 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
+  Check,
+  Copy,
   KeyRound,
   Loader2,
   LogOut,
   MonitorSmartphone,
   Save,
+  ShieldCheck,
   UserRound,
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,6 +23,7 @@ import {
   api,
   getErrorMessage,
   type AuthUser,
+  type MfaEnrolment,
   type SessionSummary,
 } from '@/lib/api';
 import { useAuthContext } from '@/lib/authContext';
@@ -101,6 +106,7 @@ export function Account() {
     <div className="mx-auto max-w-2xl space-y-8">
       <ProfileSection user={user} />
       <PasswordSection />
+      <MfaSection user={user} />
       <SessionsSection />
       <DeleteAccountSection user={user} />
     </div>
@@ -556,6 +562,438 @@ function DeleteAccountSection({ user }: { user: AuthUser }) {
             Delete my account
           </Button>
         </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Group a base32 secret the way authenticator apps display it for manual entry. */
+function groupSecret(secret: string): string {
+  return (secret.match(/.{1,4}/g) ?? []).join(' ');
+}
+
+/**
+ * The `otpauth://` URI rendered as a QR code, entirely in the browser.
+ *
+ * `qrcode` is the only new dependency in Phase D: MIT, no network access, and
+ * it renders to a data URL so the secret never leaves this tab. A hand-written
+ * QR encoder would be far more code and far more risk than the problem is worth.
+ */
+function EnrolmentQrCode({ value }: { value: string }) {
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    try {
+      QRCode.toDataURL(value, { margin: 1, width: 216, errorCorrectionLevel: 'M' })
+        .then((url) => {
+          if (!cancelled) setDataUrl(url);
+        })
+        .catch(() => {
+          // The secret is still shown as text below, so a failed render is not fatal.
+          if (!cancelled) setDataUrl(null);
+        });
+    } catch {
+      setDataUrl(null);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [value]);
+
+  if (!dataUrl) {
+    return (
+      <div className="flex h-[216px] w-[216px] items-center justify-center rounded-xl border border-dashed text-xs text-muted-foreground">
+        Preparing QR code…
+      </div>
+    );
+  }
+
+  return (
+    <img
+      src={dataUrl}
+      width={216}
+      height={216}
+      alt="QR code for your authenticator app"
+      className="rounded-xl border bg-white p-2"
+    />
+  );
+}
+
+function CopyButton({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  }
+
+  return (
+    <Button type="button" size="sm" variant="outline" className="gap-2" onClick={copy}>
+      {copied ? (
+        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+      ) : (
+        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+      )}
+      {copied ? 'Copied' : label}
+    </Button>
+  );
+}
+
+/**
+ * Recovery codes, shown exactly once.
+ *
+ * They are displayed after confirmation and after a regeneration — the only two
+ * moments the server ever has the plaintext. Dismissing this panel is the end of
+ * them, which the copy says plainly.
+ */
+function RecoveryCodesPanel({
+  codes,
+  onDismiss,
+}: {
+  codes: string[];
+  onDismiss: () => void;
+}) {
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg border border-amber-400/40 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
+        <p className="font-medium">Save these recovery codes now.</p>
+        <p className="text-xs opacity-80">
+          Each code works once, and this is the only time they are shown. Keep them somewhere
+          safe — they are how you get back in if you lose your authenticator.
+        </p>
+      </div>
+
+      <ul className="grid grid-cols-2 gap-2 font-mono text-sm" aria-label="Recovery codes">
+        {codes.map((code) => (
+          <li key={code} className="rounded-md border bg-muted/40 px-2 py-1.5 tracking-wide">
+            {code}
+          </li>
+        ))}
+      </ul>
+
+      <div className="flex items-center gap-2">
+        <CopyButton value={codes.join('\n')} label="Copy all codes" />
+        <Button type="button" size="sm" onClick={onDismiss}>
+          I have saved these codes
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Two-factor authentication (Phase D, D3/Q8).
+ *
+ * Three states, and each one is deliberate:
+ *
+ *   not enrolled → one button. Enrolling issues a *pending* secret; login is
+ *                  unchanged until the pending code is confirmed.
+ *   enrolling    → QR + manual key + a confirm field. The card says plainly
+ *                  that nothing is active yet, because a half-finished setup
+ *                  that silently protects nothing is worse than none.
+ *   enrolled     → regenerate (password) or disable (password + freshness).
+ *
+ * Administrators who have not enrolled see the Q8 warning: the backend refuses
+ * their admin routes with `mfa_enrolment_required`, so this is their route out.
+ */
+function MfaSection({ user }: { user: AuthUser }) {
+  const { refresh } = useAuthContext();
+
+  const [enrolment, setEnrolment] = useState<MfaEnrolment | null>(null);
+  const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null);
+  const [confirmCode, setConfirmCode] = useState('');
+  const [password, setPassword] = useState('');
+  const [passwordFor, setPasswordFor] = useState<'disable' | 'regenerate' | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+
+  const enrol = useMutation({
+    mutationFn: () => api.auth.enrolMfa(),
+    onSuccess: (result) => {
+      setEnrolment(result);
+      setConfirmCode('');
+      setError(null);
+      setNote(null);
+    },
+    onError: (caught) => setError(mutationErrorMessage(caught, 'Could not start MFA setup.')),
+  });
+
+  const confirm = useMutation({
+    mutationFn: () => api.auth.confirmMfa(confirmCode.trim()),
+    onSuccess: async (result) => {
+      setRecoveryCodes(result.recoveryCodes);
+      setEnrolment(null);
+      setConfirmCode('');
+      setError(null);
+      await refresh();
+    },
+    onError: (caught) => setError(mutationErrorMessage(caught, 'Could not confirm that code.')),
+  });
+
+  const disable = useMutation({
+    mutationFn: () => api.auth.disableMfa(password),
+    onSuccess: async () => {
+      setPassword('');
+      setPasswordFor(null);
+      setRecoveryCodes(null);
+      setError(null);
+      setNote('Two-factor authentication is off. Your account is protected by your password only.');
+      await refresh();
+    },
+    onError: (caught) =>
+      setError(mutationErrorMessage(caught, 'Could not disable two-factor authentication.')),
+  });
+
+  const regenerate = useMutation({
+    mutationFn: () => api.auth.regenerateRecoveryCodes(password),
+    onSuccess: (result) => {
+      setRecoveryCodes(result.recoveryCodes);
+      setPassword('');
+      setPasswordFor(null);
+      setError(null);
+      setNote(null);
+    },
+    onError: (caught) =>
+      setError(mutationErrorMessage(caught, 'Could not regenerate your recovery codes.')),
+  });
+
+  const pending = enrol.isPending || confirm.isPending || disable.isPending || regenerate.isPending;
+
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <ShieldCheck className="h-4 w-4" />
+          Two-factor authentication
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {user.role === 'admin' && !user.mfaEnabled && !recoveryCodes && (
+          <div className="flex items-start gap-2 rounded-lg border border-amber-400/40 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>
+              Administrator accounts must enable two-factor authentication. Administrator
+              features stay locked until it is on.
+            </span>
+          </div>
+        )}
+
+        {note && <SuccessNote message={note} />}
+        {error && <InlineError message={error} onDismiss={() => setError(null)} />}
+
+        {recoveryCodes ? (
+          <RecoveryCodesPanel
+            codes={recoveryCodes}
+            onDismiss={() => {
+              setRecoveryCodes(null);
+              setNote('Two-factor authentication is on. Keep your recovery codes somewhere safe.');
+            }}
+          />
+        ) : user.mfaEnabled ? (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Two-factor authentication is on. Signing in needs your password and a code from
+              your authenticator app.
+            </p>
+
+            {passwordFor === null ? (
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={pending}
+                  onClick={() => {
+                    setPasswordFor('regenerate');
+                    setPassword('');
+                    setError(null);
+                  }}
+                >
+                  Regenerate recovery codes
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  className="text-destructive hover:text-destructive"
+                  disabled={pending}
+                  onClick={() => {
+                    setPasswordFor('disable');
+                    setPassword('');
+                    setError(null);
+                  }}
+                >
+                  Turn off
+                </Button>
+              </div>
+            ) : (
+              <form
+                className="space-y-3"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (pending || password.length === 0) return;
+                  if (passwordFor === 'disable') disable.mutate();
+                  else regenerate.mutate();
+                }}
+              >
+                <div className="space-y-2">
+                  <label htmlFor="mfa-password" className="text-sm font-medium">
+                    Password
+                  </label>
+                  <Input
+                    id="mfa-password"
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    disabled={pending}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {passwordFor === 'disable'
+                      ? 'Your password is required, and this needs a sign-in from the last five minutes. Turning this off deletes your recovery codes.'
+                      : 'Your password is required, and this needs a sign-in from the last five minutes. Your old codes stop working immediately.'}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="submit"
+                    size="sm"
+                    variant={passwordFor === 'disable' ? 'destructive' : 'default'}
+                    className="gap-2"
+                    disabled={pending || password.length === 0}
+                  >
+                    {pending && <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />}
+                    {passwordFor === 'disable' ? 'Turn off two-factor' : 'Regenerate codes'}
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    disabled={pending}
+                    onClick={() => {
+                      setPasswordFor(null);
+                      setPassword('');
+                      setError(null);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            )}
+          </>
+        ) : enrolment ? (
+          <div className="space-y-4">
+            <div className="flex flex-col gap-4 sm:flex-row">
+              <EnrolmentQrCode value={enrolment.otpauthUri} />
+
+              <div className="min-w-0 flex-1 space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Scan the code with your authenticator app, or add this key by hand:
+                </p>
+                <p className="select-all break-all rounded-md border bg-muted/40 px-2 py-1.5 font-mono text-xs">
+                  {groupSecret(enrolment.secret)}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  <CopyButton value={enrolment.secret} label="Copy key" />
+                  <CopyButton value={enrolment.otpauthUri} label="Copy setup link" />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Time-based codes: SHA-1, 6 digits, 30 seconds.
+                </p>
+              </div>
+            </div>
+
+            <form
+              className="space-y-3"
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (pending || confirmCode.trim().length === 0) return;
+                confirm.mutate();
+              }}
+            >
+              <div className="space-y-2">
+                <label htmlFor="mfa-confirm-code" className="text-sm font-medium">
+                  Enter the 6-digit code to finish setup
+                </label>
+                <Input
+                  id="mfa-confirm-code"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
+                  placeholder="123456"
+                  maxLength={6}
+                  className="max-w-[10rem] font-mono tracking-[0.4em]"
+                  value={confirmCode}
+                  onChange={(event) => setConfirmCode(event.target.value)}
+                  disabled={pending}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Nothing is active until this code is confirmed — signing in still uses your
+                  password alone.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <Button
+                  type="submit"
+                  size="sm"
+                  className="gap-2"
+                  disabled={pending || confirmCode.trim().length === 0}
+                >
+                  {confirm.isPending ? (
+                    <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+                  ) : (
+                    <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                  )}
+                  Confirm and turn on
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  disabled={pending}
+                  onClick={() => {
+                    setEnrolment(null);
+                    setConfirmCode('');
+                    setError(null);
+                  }}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </form>
+          </div>
+        ) : (
+          <>
+            <p className="text-sm text-muted-foreground">
+              Add a second step to signing in: your password plus a 6-digit code from an
+              authenticator app. You will also get ten single-use recovery codes.
+            </p>
+            <Button
+              type="button"
+              size="sm"
+              className="gap-2"
+              disabled={pending}
+              onClick={() => enrol.mutate()}
+            >
+              {enrol.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+              )}
+              Set up two-factor authentication
+            </Button>
+          </>
+        )}
       </CardContent>
     </Card>
   );

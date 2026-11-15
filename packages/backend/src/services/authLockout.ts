@@ -31,6 +31,30 @@ export const ACCOUNT_FAILURE_THRESHOLD = 5;
 export const ACCOUNT_BASE_BACKOFF_MS = 60 * 1000;
 export const ACCOUNT_MAX_BACKOFF_MS = 15 * 60 * 1000;
 
+/**
+ * MFA-specific limits (Phase D).
+ *
+ * A wrong TOTP code is **not** a failed password, and it must not be able to
+ * lock the password path: anyone who knows a username could otherwise keep a
+ * legitimate user out of their own account by submitting garbage codes. So the
+ * MFA counter lives in its own key namespace with its own, gentler schedule:
+ *
+ *   * 10 wrong codes before anything happens (typos and a stale clock are
+ *     common; 5 is too tight for a 6-digit code read off a phone),
+ *   * then 30 s, doubling to a 5-minute cap — long enough to make online
+ *     guessing pointless, short enough that a fat-fingered human is never
+ *     locked out for the afternoon,
+ *   * cleared by a successful code, and it never touches `acct:` rows.
+ *
+ * The per-IP window for the completion endpoint is separate as well, so a run
+ * of MFA typos cannot exhaust the password endpoint's per-minute budget.
+ */
+export const MFA_FAILURE_THRESHOLD = 10;
+export const MFA_BASE_BACKOFF_MS = 30 * 1000;
+export const MFA_MAX_BACKOFF_MS = 5 * 60 * 1000;
+export const MFA_IP_WINDOW_MS = 60 * 1000;
+export const MFA_IP_MAX_ATTEMPTS = 20;
+
 interface Clock {
   now?: Date | number;
 }
@@ -52,6 +76,14 @@ function accountKey(identifier: string): string {
 
 function ipKey(ip: string): string {
   return `ip:${ip}`;
+}
+
+function mfaKey(userId: string): string {
+  return `mfa:${userId}`;
+}
+
+function mfaIpKey(ip: string): string {
+  return `mfa-ip:${ip}`;
 }
 
 function readRow(key: string, database: AppDatabase): AuthAttemptRow | undefined {
@@ -79,30 +111,44 @@ export interface IpAttemptResult {
   retryAfterMs: number;
 }
 
+export interface AccountLockState {
+  locked: boolean;
+  retryAfterMs: number;
+}
+
+export interface AccountFailureResult {
+  failureCount: number;
+  lockedUntil: string | null;
+  retryAfterMs: number;
+}
+
 /**
- * Count one login attempt against the caller's address.
+ * Count one request against a fixed window.
  *
  * The window is fixed from the first attempt in it, not sliding on every
- * request: a sliding window would let an attacker at exactly 10/min keep a
+ * request: a sliding window would let an attacker at exactly the limit keep a
  * legitimate user out indefinitely by nudging the boundary.
  */
-export function registerIpAttempt(ip: string, options: AttemptOptions = {}): IpAttemptResult {
+function registerWindowAttempt(
+  key: string,
+  policy: { windowMs: number; maxAttempts: number },
+  options: AttemptOptions
+): IpAttemptResult {
   const database = options.database ?? defaultDb;
   const nowMs = toMillis(options.now);
-  const key = ipKey(ip);
   const row = readRow(key, database);
 
   let windowStartedMs = row ? new Date(row.windowStartedAt).getTime() : nowMs;
   let count = row?.failureCount ?? 0;
 
-  if (nowMs - windowStartedMs >= AUTH_IP_WINDOW_MS) {
+  if (nowMs - windowStartedMs >= policy.windowMs) {
     windowStartedMs = nowMs;
     count = 0;
   }
 
   count += 1;
-  const allowed = count <= AUTH_IP_MAX_ATTEMPTS;
-  const retryAfterMs = allowed ? 0 : Math.max(0, windowStartedMs + AUTH_IP_WINDOW_MS - nowMs);
+  const allowed = count <= policy.maxAttempts;
+  const retryAfterMs = allowed ? 0 : Math.max(0, windowStartedMs + policy.windowMs - nowMs);
 
   writeRow(
     key,
@@ -118,21 +164,15 @@ export function registerIpAttempt(ip: string, options: AttemptOptions = {}): IpA
   return { allowed, attempts: count, retryAfterMs };
 }
 
-export interface AccountLockState {
-  locked: boolean;
-  retryAfterMs: number;
-}
-
 /**
- * Report whether an identifier is currently locked out.
+ * Report whether a key is currently locked out.
  *
  * An expired lock is cleared in place so the next failure starts a fresh
  * escalation from one, rather than inheriting the count that produced the lock.
  */
-export function checkAccountLock(identifier: string, options: AttemptOptions = {}): AccountLockState {
+function readLock(key: string, options: AttemptOptions): AccountLockState {
   const database = options.database ?? defaultDb;
   const nowMs = toMillis(options.now);
-  const key = accountKey(identifier);
   const row = readRow(key, database);
 
   if (!row?.lockedUntil) {
@@ -158,32 +198,22 @@ export function checkAccountLock(identifier: string, options: AttemptOptions = {
   return { locked: false, retryAfterMs: 0 };
 }
 
-export interface AccountFailureResult {
-  failureCount: number;
-  lockedUntil: string | null;
-  retryAfterMs: number;
-}
-
-/**
- * Backoff after the Nth consecutive password failure.
- *
- * 5 → 1 min, 6 → 2 min, 7 → 4 min, 8 → 8 min, 9+ → the 15 min cap.
- */
-export function recordAccountFailure(
-  identifier: string,
-  options: AttemptOptions = {}
+/** Record one failure and escalate the backoff once the threshold is reached. */
+function recordFailure(
+  key: string,
+  policy: { threshold: number; baseBackoffMs: number; maxBackoffMs: number },
+  options: AttemptOptions
 ): AccountFailureResult {
   const database = options.database ?? defaultDb;
   const nowMs = toMillis(options.now);
-  const key = accountKey(identifier);
   const row = readRow(key, database);
 
   const failureCount = (row?.failureCount ?? 0) + 1;
   let lockedUntil: string | null = null;
 
-  if (failureCount >= ACCOUNT_FAILURE_THRESHOLD) {
-    const exponent = failureCount - ACCOUNT_FAILURE_THRESHOLD;
-    const backoffMs = Math.min(ACCOUNT_BASE_BACKOFF_MS * 2 ** exponent, ACCOUNT_MAX_BACKOFF_MS);
+  if (failureCount >= policy.threshold) {
+    const exponent = failureCount - policy.threshold;
+    const backoffMs = Math.min(policy.baseBackoffMs * 2 ** exponent, policy.maxBackoffMs);
     lockedUntil = new Date(nowMs + backoffMs).toISOString();
   }
 
@@ -203,6 +233,78 @@ export function recordAccountFailure(
     lockedUntil,
     retryAfterMs: lockedUntil ? new Date(lockedUntil).getTime() - nowMs : 0,
   };
+}
+
+/** Count one login attempt against the caller's address. */
+export function registerIpAttempt(ip: string, options: AttemptOptions = {}): IpAttemptResult {
+  return registerWindowAttempt(
+    ipKey(ip),
+    { windowMs: AUTH_IP_WINDOW_MS, maxAttempts: AUTH_IP_MAX_ATTEMPTS },
+    options
+  );
+}
+
+export function checkAccountLock(
+  identifier: string,
+  options: AttemptOptions = {}
+): AccountLockState {
+  return readLock(accountKey(identifier), options);
+}
+
+/**
+ * Backoff after the Nth consecutive password failure.
+ *
+ * 5 → 1 min, 6 → 2 min, 7 → 4 min, 8 → 8 min, 9+ → the 15 min cap.
+ */
+export function recordAccountFailure(
+  identifier: string,
+  options: AttemptOptions = {}
+): AccountFailureResult {
+  return recordFailure(
+    accountKey(identifier),
+    {
+      threshold: ACCOUNT_FAILURE_THRESHOLD,
+      baseBackoffMs: ACCOUNT_BASE_BACKOFF_MS,
+      maxBackoffMs: ACCOUNT_MAX_BACKOFF_MS,
+    },
+    options
+  );
+}
+
+/**
+ * MFA-scoped counters (Phase D). Separate key namespace, separate policy: see
+ * the constants above for why a wrong code must never touch the password path.
+ */
+export function registerMfaIpAttempt(ip: string, options: AttemptOptions = {}): IpAttemptResult {
+  return registerWindowAttempt(
+    mfaIpKey(ip),
+    { windowMs: MFA_IP_WINDOW_MS, maxAttempts: MFA_IP_MAX_ATTEMPTS },
+    options
+  );
+}
+
+export function checkMfaLock(userId: string, options: AttemptOptions = {}): AccountLockState {
+  return readLock(mfaKey(userId), options);
+}
+
+export function recordMfaFailure(
+  userId: string,
+  options: AttemptOptions = {}
+): AccountFailureResult {
+  return recordFailure(
+    mfaKey(userId),
+    {
+      threshold: MFA_FAILURE_THRESHOLD,
+      baseBackoffMs: MFA_BASE_BACKOFF_MS,
+      maxBackoffMs: MFA_MAX_BACKOFF_MS,
+    },
+    options
+  );
+}
+
+/** A successful code ends the streak; it never clears a password lock. */
+export function clearMfaFailures(userId: string, database: AppDatabase = defaultDb): void {
+  database.delete(authAttempts).where(eq(authAttempts.attemptKey, mfaKey(userId))).run();
 }
 
 /** A successful password (or an MFA challenge after a correct password) clears the backoff. */

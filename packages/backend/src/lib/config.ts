@@ -82,6 +82,32 @@ function isProduction(env: NodeJS.ProcessEnv): boolean {
 }
 
 /**
+ * The 32-byte MFA key this process uses, resolved on demand.
+ *
+ * `validateStartupConfig()` runs before the server binds a port, but modules
+ * that encrypt (or decrypt) a TOTP secret also need the key later, and tests
+ * import those modules directly without booting the server. One resolver means
+ * both paths read the same value and the development fallback is generated once
+ * and written back to `env` rather than being regenerated per call.
+ */
+export function resolveMfaEncryptionKey(env: NodeJS.ProcessEnv = process.env): Buffer {
+  const existing = env.MFA_ENCRYPTION_KEY ? decodeKey(env.MFA_ENCRYPTION_KEY) : null;
+  if (existing) {
+    return existing;
+  }
+
+  if (isProduction(env)) {
+    throw new Error(
+      'MFA_ENCRYPTION_KEY must be set in production (32 bytes, base64 or hex; generate one with: openssl rand -base64 32)'
+    );
+  }
+
+  const generated = randomBytes(MFA_KEY_BYTES);
+  env.MFA_ENCRYPTION_KEY = generated.toString('base64');
+  return generated;
+}
+
+/**
  * Validate the environment and resolve the secrets the process will use.
  *
  * Mutates `env` in the non-production case only, so that modules reading

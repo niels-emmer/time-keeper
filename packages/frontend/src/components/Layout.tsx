@@ -1,9 +1,10 @@
-import { NavLink, Outlet } from 'react-router-dom';
-import { Timer, BarChart2, Calendar, RefreshCw, Settings, WifiOff } from 'lucide-react';
+import { Link, NavLink, Outlet } from 'react-router-dom';
+import { ShieldAlert, Timer, BarChart2, Calendar, RefreshCw, Settings, WifiOff } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useWeeklySummary } from '@/hooks/useSummary';
 import { useTimer } from '@/hooks/useTimer';
 import { useAppStatus } from '@/lib/appStatusContext';
+import { useAuthContext } from '@/lib/authContext';
 
 const navItems = [
   { to: '/', icon: Timer, label: 'Track' },
@@ -63,6 +64,7 @@ function WeeklyProgress() {
 
 export function Layout() {
   const { isOnline, recentlyReconnected, updateAvailable, applyingUpdate, applyUpdate, dismissUpdate } = useAppStatus();
+  const { mfaEnrolmentRequired } = useAuthContext();
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -76,6 +78,33 @@ export function Layout() {
           </div>
         </div>
       </header>
+
+      {/*
+        Q8: an administrator authenticated locally who has not enrolled MFA is
+        refused by every admin route with `mfa_enrolment_required`. Saying so
+        here, with a route to the fix, is the difference between a puzzling
+        failure and an obvious next step.
+      */}
+      {mfaEnrolmentRequired && (
+        <div className="border-b bg-card px-4 py-3">
+          <div className="flex items-start gap-3 rounded-xl border border-amber-400/40 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">Enable two-factor authentication.</p>
+              <p className="text-xs opacity-80">
+                Administrator features stay locked until your account has an authenticator app
+                confirmed.
+              </p>
+            </div>
+            <Link
+              to="/account"
+              className="shrink-0 text-xs font-medium underline underline-offset-2"
+            >
+              Set it up
+            </Link>
+          </div>
+        </div>
+      )}
 
       {(!isOnline || recentlyReconnected || updateAvailable) && (
         <div className="space-y-2 border-b bg-card px-4 py-3">
