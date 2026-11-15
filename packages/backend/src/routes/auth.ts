@@ -35,6 +35,17 @@ import {
   recordAuthEvent,
   serializeUser,
 } from '../services/authService.js';
+import {
+  MFA_ALREADY_ENABLED_MESSAGE,
+  MFA_CODE_INVALID_MESSAGE,
+  MFA_NOT_ENABLED_MESSAGE,
+  MFA_NOT_STARTED_MESSAGE,
+  confirmEnrolment,
+  disableMfa,
+  loginWithMfa,
+  regenerateRecoveryCodes,
+  startEnrolment,
+} from '../services/mfaService.js';
 import { findUsableInvite, registerInvitedUser } from '../services/inviteService.js';
 import { isValidUsername, normalizeEmail } from '../services/userService.js';
 
@@ -68,6 +79,18 @@ const loginSchema = z
     message: 'identifier, username or email is required',
     path: ['identifier'],
   });
+
+/**
+ * The MFA completion body: the same credential pair plus a code.
+ *
+ * `code` is deliberately one loose field rather than two: a 6-digit TOTP code
+ * and a `XXXXX-XXXXX` recovery code both arrive here, and the server decides
+ * which path to take from the shape. It is length-capped so a hostile body
+ * cannot make the service do unbounded work.
+ */
+const loginMfaSchema = loginSchema.and(
+  z.object({ code: z.string().trim().min(1).max(64) })
+);
 
 const emailField = z
   .string()
@@ -142,6 +165,74 @@ authPublicRouter.post('/login', (req, res, next) => {
 
     if (outcome.status === 'mfa_required') {
       res.status(200).json({ status: 'mfa_required' });
+      return;
+    }
+
+    setSessionCookie(res, req, outcome.session.id);
+    setCsrfCookie(res, req, outcome.csrfToken);
+
+    res.status(200).json({
+      status: 'ok',
+      user: serializeUser(outcome.user),
+      csrfToken: outcome.csrfToken,
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/auth/login/mfa
+ *
+ * Completes the challenge Phase B leaves open. The body is the same identifier
+ * and password as `/login` plus a `code`, which may be a 6-digit TOTP code or a
+ * recovery code. Phase B issued no cookie and no half-authenticated token, so
+ * re-presenting the password is what makes this request self-contained: a
+ * stolen "challenge" is worthless on its own.
+ *
+ * Responses are typed the same way as `/login`. A wrong password is a
+ * credential failure (401, password lockout counter); a wrong *code* is a code
+ * failure (401 with its own message, MFA counter only) so guessing codes can
+ * never lock the password path. Nothing here is enumerable: an unknown account
+ * still pays for one scrypt and answers like a wrong password.
+ */
+authPublicRouter.post('/login/mfa', (req, res, next) => {
+  try {
+    if (!modeAllowsSessions(getAuthMode())) {
+      res.status(404).json({ error: 'Not Found' });
+      return;
+    }
+
+    const payload = loginMfaSchema.parse(req.body);
+    const identifier = (payload.identifier ?? payload.username ?? payload.email) as string;
+
+    const outcome = loginWithMfa({
+      identifier,
+      password: payload.password,
+      code: payload.code,
+      ip: requestIp(req),
+      userAgent: req.get('user-agent') ?? null,
+      existingSessionId: readSessionCookie(req),
+    });
+
+    if (outcome.status === 'rate_limited') {
+      res.setHeader('Retry-After', String(Math.max(1, Math.ceil(outcome.retryAfterMs / 1000))));
+      res.status(429).json({ error: 'Too many attempts. Try again later.' });
+      return;
+    }
+
+    if (outcome.status === 'invalid') {
+      res.status(401).json({ error: 'Invalid username or password', code: 'invalid_credentials' });
+      return;
+    }
+
+    if (outcome.status === 'code_invalid') {
+      res.status(401).json({ error: MFA_CODE_INVALID_MESSAGE, code: 'mfa_code_invalid' });
+      return;
+    }
+
+    if (outcome.status === 'not_enabled') {
+      res.status(400).json({ error: MFA_NOT_ENABLED_MESSAGE, code: 'mfa_not_enabled' });
       return;
     }
 
@@ -661,6 +752,202 @@ authSessionRouter.delete('/sessions/:id', (req, res, next) => {
     });
 
     res.status(204).end();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// MFA (Phase D, D3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Enrolment and confirmation are interactive by nature — a human scans a QR
+ * code and types the result — so a bearer token is refused. Q17's freshness
+ * rule does *not* apply here: enrolling does not weaken anything, and demanding
+ * a five-minute-old session would break the normal flow of opening the account
+ * page, finding an authenticator app and confirming a code.
+ */
+function requireInteractiveAuth(
+  req: import('express').Request,
+  res: import('express').Response,
+  next: import('express').NextFunction
+): void {
+  if (req.authMethod === 'token') {
+    res.status(403).json({
+      error: 'This action requires interactive (browser) authentication',
+      code: 'interactive_authentication_required',
+    });
+    return;
+  }
+
+  next();
+}
+
+const mfaCodeSchema = z.object({ code: z.string().trim().min(1).max(64) });
+const mfaPasswordSchema = z.object({ password: z.string().min(1).max(PASSWORD_MAX_LENGTH) });
+
+/**
+ * POST /api/auth/mfa/enrol
+ *
+ * Issues a new secret and returns it (plus the `otpauth://` URI) exactly once.
+ * Nothing becomes active: `mfa_enabled` stays 0, so login is unchanged until a
+ * valid code is confirmed. An already-enrolled account is refused — silently
+ * replacing an active secret would break every working authenticator.
+ *
+ * `Cache-Control: no-store` is already set for this router; nothing about this
+ * response may be cached, and the server never logs it.
+ */
+authSessionRouter.post('/mfa/enrol', requireInteractiveAuth, (req, res, next) => {
+  try {
+    const outcome = startEnrolment({
+      userId: req.userId,
+      ip: requestIp(req),
+      userAgent: req.get('user-agent') ?? null,
+    });
+
+    switch (outcome.status) {
+      case 'not_found':
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      case 'already_enabled':
+        res
+          .status(409)
+          .json({ error: MFA_ALREADY_ENABLED_MESSAGE, code: 'mfa_already_enabled' });
+        return;
+      case 'ok':
+        res.json({
+          secret: outcome.secret,
+          otpauthUri: outcome.otpauthUri,
+          algorithm: 'SHA1',
+          digits: 6,
+          period: 30,
+        });
+        return;
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/auth/mfa/confirm
+ *
+ * The only path that can set `mfa_enabled = 1`, and it requires a code that
+ * verifies against the pending secret within the ±1-step window. On success the
+ * ten recovery codes are returned in plaintext **once**; only their hashes are
+ * stored.
+ */
+authSessionRouter.post('/mfa/confirm', requireInteractiveAuth, (req, res, next) => {
+  try {
+    const payload = mfaCodeSchema.parse(req.body);
+
+    const outcome = confirmEnrolment({
+      userId: req.userId,
+      code: payload.code,
+      ip: requestIp(req),
+      userAgent: req.get('user-agent') ?? null,
+    });
+
+    switch (outcome.status) {
+      case 'not_found':
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      case 'already_enabled':
+        res
+          .status(409)
+          .json({ error: MFA_ALREADY_ENABLED_MESSAGE, code: 'mfa_already_enabled' });
+        return;
+      case 'not_started':
+        res
+          .status(400)
+          .json({ error: MFA_NOT_STARTED_MESSAGE, code: 'mfa_enrolment_not_started' });
+        return;
+      case 'invalid':
+        res.status(400).json({ error: MFA_CODE_INVALID_MESSAGE, code: 'mfa_code_invalid' });
+        return;
+      case 'ok':
+        res.json({ recoveryCodes: outcome.recoveryCodes });
+        return;
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/auth/mfa/disable — Q17: password **and** a session fresher than
+ * five minutes. Clears the secret and every recovery code.
+ */
+authSessionRouter.post('/mfa/disable', requireFreshSession, (req, res, next) => {
+  try {
+    const payload = mfaPasswordSchema.parse(req.body);
+
+    const outcome = disableMfa({
+      userId: req.userId,
+      password: payload.password,
+      ip: requestIp(req),
+      userAgent: req.get('user-agent') ?? null,
+    });
+
+    switch (outcome.status) {
+      case 'not_found':
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      case 'not_enabled':
+        res.status(400).json({ error: MFA_NOT_ENABLED_MESSAGE, code: 'mfa_not_enabled' });
+        return;
+      case 'no_password':
+        res.status(400).json({ error: NO_PASSWORD_MESSAGE, code: 'password_not_set' });
+        return;
+      case 'incorrect':
+        res
+          .status(400)
+          .json({ error: PASSWORD_INCORRECT_MESSAGE, code: 'password_incorrect' });
+        return;
+      case 'ok':
+        res.status(204).end();
+        return;
+    }
+  } catch (error) {
+    next(error);
+  }
+});
+
+/**
+ * POST /api/auth/mfa/recovery-codes/regenerate — password-gated, and the old
+ * set dies in the same transaction that stores the new one.
+ */
+authSessionRouter.post('/mfa/recovery-codes/regenerate', requireFreshSession, (req, res, next) => {
+  try {
+    const payload = mfaPasswordSchema.parse(req.body);
+
+    const outcome = regenerateRecoveryCodes({
+      userId: req.userId,
+      password: payload.password,
+      ip: requestIp(req),
+      userAgent: req.get('user-agent') ?? null,
+    });
+
+    switch (outcome.status) {
+      case 'not_found':
+        res.status(401).json({ error: 'Unauthorized' });
+        return;
+      case 'not_enabled':
+        res.status(400).json({ error: MFA_NOT_ENABLED_MESSAGE, code: 'mfa_not_enabled' });
+        return;
+      case 'no_password':
+        res.status(400).json({ error: NO_PASSWORD_MESSAGE, code: 'password_not_set' });
+        return;
+      case 'incorrect':
+        res
+          .status(400)
+          .json({ error: PASSWORD_INCORRECT_MESSAGE, code: 'password_incorrect' });
+        return;
+      case 'ok':
+        res.json({ recoveryCodes: outcome.recoveryCodes });
+        return;
+    }
   } catch (error) {
     next(error);
   }

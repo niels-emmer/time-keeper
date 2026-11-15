@@ -29,7 +29,10 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `packages/backend/src/db/schema.ts` | All data types flow from here (`categories` now carries target cadence/minutes/start fields; `time_entries`, `user_settings`, and legacy `monthly_project_goals`) |
 | `packages/shared/src/utils/rounding.ts` | Core business logic — the rounding algorithm |
 | `packages/backend/src/middleware/auth.ts` | Auth boundary — Bearer tokens, server-side session cookies (`local`/`hybrid`), and `X-authentik-email` only with a trusted peer + matching `X-Internal-Token` in production; also gates token management |
-| `packages/backend/src/routes/auth.ts` | Auth surface — Phase B: `POST /login`, `GET /status` (public), `POST /logout`, `POST /logout-all`, `GET /me` (session-scoped); Phase C: `POST /accept-invite` (public), `PATCH /me`, `POST /password`, `DELETE /me`, `GET /sessions`, `DELETE /sessions/:id`, `DELETE /sessions/others` |
+| `packages/backend/src/routes/auth.ts` | Auth surface — Phase B: `POST /login`, `GET /status` (public), `POST /logout`, `POST /logout-all`, `GET /me` (session-scoped); Phase C: `POST /accept-invite` (public), `PATCH /me`, `POST /password`, `DELETE /me`, `GET /sessions`, `DELETE /sessions/:id`, `DELETE /sessions/others`; Phase D: `POST /login/mfa` (public), `POST /mfa/enrol`, `POST /mfa/confirm`, `POST /mfa/disable`, `POST /mfa/recovery-codes/regenerate` |
+| `packages/backend/src/lib/totp.ts` | RFC 6238 / RFC 4226 TOTP on Node stdlib (`crypto` HMAC-SHA1, 30 s step, 6 digits, ±1 step window); `totp.test.ts` reproduces the RFC 6238 Appendix B vectors |
+| `packages/backend/src/services/mfaService.ts` | MFA lifecycle — pending (encrypted) secret, confirm-before-activate, replay protection via `users.mfa_last_step`, hashed single-use recovery codes, disable/regenerate behind a password |
+| `packages/backend/src/lib/mfaCrypto.ts` | AES-256-GCM for `users.mfa_secret_enc` with a unique IV per record and a verified auth tag; `MFA_ENCRYPTION_KEY` from env |
 | `packages/backend/src/routes/admin.ts` | Admin surface — Phase C carries only `POST /api/admin/invites`; `requireAdmin` answers 404 for non-admins |
 | `packages/backend/src/services/inviteService.ts` | Single-use 72h invite tokens — hashed at rest, atomic claim, one generic failure for unknown/used/expired |
 | `packages/backend/src/services/accountService.ts` | Self-service lifecycle — profile update (username immutable), password change (revokes other sessions, rotates current), hard self-delete cascade with last-admin guard |
@@ -123,7 +126,12 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | Route | Auth | Notes |
 |-------|------|-------|
 | `GET /api/health` | No | Docker healthcheck; also used by macOS app to verify connectivity |
-| `POST /api/auth/login` | No | Username **or** email + password; session + CSRF cookies on success; `mfa_required` is a typed Phase D hole; 429 on lockout |
+| `POST /api/auth/login` | No | Username **or** email + password; session + CSRF cookies on success; `mfa_required` (no cookie) for an enrolled account; 429 on lockout |
+| `POST /api/auth/login/mfa` | No | Completes the challenge with a TOTP code (replay-protected, ±1 step) or a single-use recovery code; wrong codes use a separate, gentler counter so they cannot lock the password path |
+| `POST /api/auth/mfa/enrol` | Session | Issues a **pending** secret + `otpauth://` URI; nothing is active until confirmation; 409 if already enrolled |
+| `POST /api/auth/mfa/confirm` | Session | Verifies a code against the pending secret, then flips `mfa_enabled` and returns ten recovery codes once |
+| `POST /api/auth/mfa/disable` | Fresh session | Password required; clears the secret and deletes every recovery code |
+| `POST /api/auth/mfa/recovery-codes/regenerate` | Fresh session | Password required; replaces the whole set in one transaction |
 | `GET /api/auth/status` | No | Public session probe — `{ authenticated, mode, user? }`; used by the frontend AuthGate |
 | `POST /api/auth/logout` | Session | Revokes the presented session and clears both cookies (CSRF required) |
 | `POST /api/auth/logout-all` | Session | Revokes every session for the account (CSRF required) |
@@ -135,7 +143,7 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `DELETE /api/auth/sessions/others` | Session | Sign out every other device for this account |
 | `DELETE /api/auth/sessions/:id` | Session | Revoke one own session by its stored hash; another account's id is 404 |
 | `POST /api/auth/accept-invite` | No | Invite-only registration; single generic failure for unknown/used/expired tokens; sets session + CSRF cookies |
-| `POST /api/admin/invites` | Admin | Mint a single-use 72h invite; raw token returned once; 404 for non-admins |
+| `POST /api/admin/invites` | Admin | Mint a single-use 72h invite; raw token returned once; 404 for non-admins, 403 `mfa_enrolment_required` for a session-authenticated admin without MFA (Q8) |
 | `GET /api/info` | Yes | Version, repo URL, current user — drives Settings → About |
 | `GET /api/settings` | Yes | Returns `{ weeklyGoalHours, roundingIncrementMinutes }` |
 | `PUT /api/settings` | Yes | Update `{ weeklyGoalHours, roundingIncrementMinutes }` (increment: 30 or 60) |

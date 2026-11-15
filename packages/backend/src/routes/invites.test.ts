@@ -5,7 +5,9 @@ import type { Express } from 'express';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { AppDatabase } from '../db/client.js';
 import { authEvents, invites, users } from '../db/schema.js';
+import { encryptSecret } from '../lib/mfaCrypto.js';
 import { hashPassword } from '../lib/password.js';
+import { base32Decode, generateTotpSecret, hotp, totpStepAt } from '../lib/totp.js';
 import { createTestApp } from '../test/harness.js';
 
 /**
@@ -27,6 +29,13 @@ const INVITE_PASSWORD = 'a much longer passphrase';
 let app: Express;
 let db: AppDatabase;
 let adminId: string;
+/** The administrator's TOTP secret: Q8 requires MFA before any admin route. */
+let adminTotpSecret: string;
+/**
+ * One admin session per test. A TOTP code is single-use, so signing in twice in
+ * the same 30-second step would (correctly) be rejected as a replay.
+ */
+let adminSession: { cookie: string; csrf: string; sessionId: string } | null = null;
 
 function setCookies(response: request.Response): string[] {
   const header = response.headers['set-cookie'];
@@ -51,6 +60,8 @@ function seedAccount(options: {
   username: string;
   password: string;
   role?: 'user' | 'admin';
+  /** Q8: an administrator must have MFA enrolled to reach admin routes. */
+  mfaSecret?: string;
 }): string {
   const id = randomUUID();
   db.insert(users)
@@ -61,20 +72,40 @@ function seedAccount(options: {
       passwordHash: hashPassword(options.password),
       role: options.role ?? 'user',
       mustSetPassword: false,
+      mfaEnabled: Boolean(options.mfaSecret),
+      mfaSecretEnc: options.mfaSecret ? encryptSecret(options.mfaSecret) : null,
+      mfaLastStep: options.mfaSecret ? 0 : null,
     })
     .run();
   return id;
 }
 
+/** The code an authenticator would show right now. */
+function currentCode(secret: string): string {
+  return hotp(base32Decode(secret), totpStepAt(Date.now()));
+}
+
+/**
+ * Sign in, completing the TOTP step when the account has MFA (the administrator
+ * does — Q8). A non-admin account signs in with the password alone.
+ */
 async function signIn(
   username: string,
   password: string
 ): Promise<{ cookie: string; csrf: string; sessionId: string }> {
-  const response = await request(app)
+  let response = await request(app)
     .post('/api/auth/login')
     .send({ username, password });
 
   expect(response.status).toBe(200);
+
+  if (response.body.status === 'mfa_required') {
+    response = await request(app)
+      .post('/api/auth/login/mfa')
+      .send({ username, password, code: currentCode(adminTotpSecret) });
+    expect(response.status).toBe(200);
+  }
+
   const cookies = setCookies(response);
   const sessionId = cookieValue(cookies, 'tk_session') as string;
   const csrf = cookieValue(cookies, 'tk_csrf') as string;
@@ -86,7 +117,7 @@ async function issueInvite(
   body: Record<string, unknown> = {},
   auth: { cookie: string; csrf: string } | null = null
 ): Promise<request.Response> {
-  const session = auth ?? (await signIn(ADMIN_USERNAME, ADMIN_PASSWORD));
+  const session = auth ?? (adminSession ??= await signIn(ADMIN_USERNAME, ADMIN_PASSWORD));
   return request(app)
     .post('/api/admin/invites')
     .set('Cookie', session.cookie)
@@ -110,11 +141,14 @@ beforeEach(async () => {
   delete process.env.TRUSTED_PROXY_CIDRS;
 
   ({ app, db } = await createTestApp());
+  adminSession = null;
+  adminTotpSecret = generateTotpSecret();
   adminId = seedAccount({
     email: ADMIN_EMAIL,
     username: ADMIN_USERNAME,
     password: ADMIN_PASSWORD,
     role: 'admin',
+    mfaSecret: adminTotpSecret,
   });
 });
 

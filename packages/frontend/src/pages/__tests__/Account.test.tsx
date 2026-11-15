@@ -18,6 +18,10 @@ const { userState, apiMock } = vi.hoisted(() => ({
     sessions: vi.fn(),
     revokeSession: vi.fn(),
     revokeOtherSessions: vi.fn(),
+    enrolMfa: vi.fn(),
+    confirmMfa: vi.fn(),
+    disableMfa: vi.fn(),
+    regenerateRecoveryCodes: vi.fn(),
   },
 }));
 
@@ -151,6 +155,79 @@ describe('Account', () => {
     fireEvent.click(screen.getByRole('button', { name: /change password/i }));
 
     expect(await screen.findByText(/needs a fresh sign-in/i)).toBeTruthy();
+  });
+
+  it('walks through enrolment: secret shown, then recovery codes once', async () => {
+    apiMock.enrolMfa.mockResolvedValue({
+      secret: 'GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+      otpauthUri: 'otpauth://totp/Time%20Keeper:alice?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ',
+      algorithm: 'SHA1',
+      digits: 6,
+      period: 30,
+    });
+    apiMock.confirmMfa.mockResolvedValue({
+      recoveryCodes: [
+        'ABCDE-FGHJK',
+        '23456-789AB',
+        'CDEFG-HJKLM',
+        'NPQRS-TUVWX',
+        'YZ234-56789',
+        'ABCDE-23456',
+        'CDEFG-789AB',
+        'NPQRS-HJKLM',
+        'TUVWX-YZ234',
+        '56789-ABCDE',
+      ],
+    });
+
+    renderAccount();
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: /set up two-factor authentication/i })
+    );
+
+    // The secret is available for manual entry, grouped for reading.
+    expect(await screen.findByText(/GEZD GNBV GY3T QOJQ/i)).toBeTruthy();
+    expect(screen.getByText(/Nothing is active until this code is confirmed/i)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText(/Enter the 6-digit code/i), {
+      target: { value: '123456' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /confirm and turn on/i }));
+
+    await waitFor(() => expect(apiMock.confirmMfa).toHaveBeenCalledWith('123456'));
+
+    // Codes are shown once, with the warning that makes them worth saving.
+    expect(await screen.findByText('ABCDE-FGHJK')).toBeTruthy();
+    expect(screen.getByText(/Save these recovery codes now/i)).toBeTruthy();
+    expect(userState.refresh).toHaveBeenCalled();
+  });
+
+  it('prompts an administrator who has not enrolled to set up MFA (Q8)', () => {
+    userState.user = { ...USER, role: 'admin' };
+
+    renderAccount();
+
+    expect(
+      screen.getByText(/Administrator accounts must enable two-factor authentication/i)
+    ).toBeTruthy();
+  });
+
+  it('requires the password before turning MFA off', async () => {
+    userState.user = { ...USER, mfaEnabled: true };
+
+    renderAccount();
+
+    fireEvent.click(screen.getByRole('button', { name: /^turn off$/i }));
+    // The delete section also has a "Password" field; the MFA card comes first.
+    fireEvent.change(screen.getAllByLabelText('Password')[0], {
+      target: { value: 'alice password is long' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /turn off two-factor/i }));
+
+    await waitFor(() =>
+      expect(apiMock.disableMfa).toHaveBeenCalledWith('alice password is long')
+    );
   });
 
   it('requires the typed username and the password before deletion can be submitted', async () => {

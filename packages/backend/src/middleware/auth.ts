@@ -27,6 +27,8 @@ declare global {
       authMethod: 'header' | 'token' | 'session';
       /** Present only when `authMethod === 'session'`. */
       authSession?: SessionRow;
+      /** The resolved account row, so guards need not look it up again. */
+      authUser: UserRow;
     }
   }
 }
@@ -80,6 +82,7 @@ function attachUser(req: Request, context: AuthContext): void {
   req.userRole = context.userRole;
   req.authMethod = context.authMethod;
   req.authSession = context.session;
+  req.authUser = context.user;
 }
 
 /**
@@ -235,6 +238,20 @@ export const authMiddleware = requireAuth;
  * Non-admins get **404**, not 403 (plan §5): a 403 confirms that an admin
  * surface exists at that path, which is exactly the discovery signal a
  * non-admin should not get.
+ *
+ * Administrators must have MFA enrolled (Q8). The check fails **closed** and
+ * with its own machine-readable code rather than a 404, because the person is a
+ * legitimate administrator and the correct answer is "go and enrol", not "this
+ * page does not exist". The 404 above still hides the surface from everyone
+ * else.
+ *
+ * Scope of the gate: requests authenticated by a **session**, i.e. the local
+ * login path where MFA is part of authentication. `header` requests are
+ * authenticated by Authentik on every hop — in `proxy`/`hybrid` mode that
+ * identity provider owns MFA, and demanding a second factor that login never
+ * asks for would lock the deployed proxy administrator out of their own admin
+ * API. `token` requests are machine credentials and never reach this guard with
+ * an admin role they should act on.
  */
 export function requireAdmin(req: Request, res: Response, next: NextFunction): void {
   if (req.userRole !== 'admin') {
@@ -242,7 +259,40 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction): v
     return;
   }
 
+  if (requestRequiresAdminMfa(req)) {
+    res.status(403).json({
+      error: 'Two-factor authentication must be enabled before using administrator features.',
+      code: ADMIN_MFA_ENROLMENT_REQUIRED,
+    });
+    return;
+  }
+
   next();
+}
+
+/** The machine-readable answer the frontend routes to the enrolment screen. */
+export const ADMIN_MFA_ENROLMENT_REQUIRED = 'mfa_enrolment_required';
+
+/**
+ * True when an administrator is authenticated locally but has not enrolled MFA.
+ *
+ * Exported so the rule lives in one place: the admin guard, the token guard and
+ * the tests all ask the same question.
+ */
+export function adminMfaEnrolmentRequired(input: {
+  role: 'user' | 'admin' | undefined;
+  mfaEnabled: boolean;
+  authMethod: 'header' | 'token' | 'session' | undefined;
+}): boolean {
+  return input.role === 'admin' && input.authMethod === 'session' && !input.mfaEnabled;
+}
+
+function requestRequiresAdminMfa(req: Request): boolean {
+  return adminMfaEnrolmentRequired({
+    role: req.userRole,
+    mfaEnabled: Boolean(req.authUser?.mfaEnabled),
+    authMethod: req.authMethod,
+  });
 }
 
 /**
@@ -267,6 +317,17 @@ export function requireTokenManagementAuth(
 ): void {
   if (req.authMethod === 'token') {
     res.status(403).json({ error: 'Token management requires interactive (browser) authentication' });
+    return;
+  }
+
+  // Q8: an administrator without MFA may not mint credentials (or manage them).
+  // Checked before the freshness question so the frontend gets the actionable
+  // code even for a stale session.
+  if (requestRequiresAdminMfa(req)) {
+    res.status(403).json({
+      error: 'Two-factor authentication must be enabled before using administrator features.',
+      code: ADMIN_MFA_ENROLMENT_REQUIRED,
+    });
     return;
   }
 

@@ -127,6 +127,67 @@ export type LoginOutcome =
   | { status: 'invalid' }
   | { status: 'rate_limited'; retryAfterMs: number };
 
+export interface CompleteLoginInput {
+  /** The already-authenticated account (password verified, MFA satisfied). */
+  user: UserRow;
+  ip: string;
+  userAgent?: string | null;
+  /** A session cookie presented with the request; killed on success (fixation). */
+  existingSessionId?: string;
+  now?: Date;
+  database?: AppDatabase;
+}
+
+export interface CompletedLogin {
+  user: UserRow;
+  session: CreatedSession;
+  csrfToken: string;
+}
+
+/**
+ * Issue the session for an account that has proved who it is.
+ *
+ * Shared by the password path and the MFA completion path (Phase D) so the two
+ * cannot drift on the parts that matter: a brand-new session id every time (the
+ * presented cookie is revoked first — session fixation), `last_login_at`, and a
+ * `login_success` audit row.
+ */
+export function completeLogin(input: CompleteLoginInput): CompletedLogin {
+  const database = input.database ?? defaultDb;
+  const now = input.now ?? new Date();
+
+  if (input.existingSessionId) {
+    revokeSession(input.existingSessionId, database);
+  }
+
+  const session = createSession(
+    {
+      userId: input.user.id,
+      ip: input.ip,
+      userAgent: input.userAgent ?? null,
+      now,
+    },
+    database
+  );
+
+  database
+    .update(users)
+    .set({ lastLoginAt: now.toISOString() })
+    .where(eq(users.id, input.user.id))
+    .run();
+
+  recordAuthEvent(
+    { userId: input.user.id, kind: 'login_success', ip: input.ip, userAgent: input.userAgent },
+    database
+  );
+
+  return {
+    user: { ...input.user, lastLoginAt: now.toISOString() },
+    session,
+    csrfToken: generateCsrfToken(),
+  };
+}
+
 export interface LoginInput {
   /** Username or email, already trim-normalised is not required. */
   identifier: string;
@@ -209,9 +270,10 @@ export function loginWithPassword(input: LoginInput): LoginOutcome {
       .run();
   }
 
-  // Phase D: MFA completion is not implemented in this phase. The correct
-  // password is acknowledged with a typed `mfa_required` state and **no
-  // session cookie**, so there is no partial authentication to exploit.
+  // Phase D: a correct password for an MFA-enabled account is acknowledged with
+  // a typed `mfa_required` state and **no** session cookie. The challenge is
+  // completed by `POST /api/auth/login/mfa`, so there is no partial
+  // authentication to exploit.
   if (user.mfaEnabled) {
     recordAuthEvent(
       { userId: user.id, kind: 'login_mfa_challenge', ip: input.ip, userAgent: input.userAgent },
@@ -220,33 +282,15 @@ export function loginWithPassword(input: LoginInput): LoginOutcome {
     return { status: 'mfa_required' };
   }
 
-  // Session fixation: whatever the client presented is dead before the new id
-  // exists. The raw id is never reused.
-  if (input.existingSessionId) {
-    revokeSession(input.existingSessionId, database);
-  }
-
-  const session = createSession(
-    {
-      userId: user.id,
-      ip: input.ip,
-      userAgent: input.userAgent ?? null,
-      now,
-    },
-    database
-  );
-
-  database.update(users).set({ lastLoginAt: now.toISOString() }).where(eq(users.id, user.id)).run();
-
-  recordAuthEvent(
-    { userId: user.id, kind: 'login_success', ip: input.ip, userAgent: input.userAgent },
-    database
-  );
-
   return {
     status: 'ok',
-    user: { ...user, lastLoginAt: now.toISOString() },
-    session,
-    csrfToken: generateCsrfToken(),
+    ...completeLogin({
+      user,
+      ip: input.ip,
+      userAgent: input.userAgent,
+      existingSessionId: input.existingSessionId,
+      now,
+      database,
+    }),
   };
 }
