@@ -44,6 +44,12 @@ This is a single-user (or small-team) personal productivity tool, not a public-f
 
 Historical record of security-relevant API, schema and persistence changes. Kept for traceability; the sections above are the current state.
 
+### express-rate-limit 7 → 8 (2026-11-15)
+
+- The general `/api` limiter moved to `express-rate-limit` 8. No configuration change was required: `trust proxy` stays at exactly 2 hops, which is the setting v8 accepts (it rejects `true`, not a hop count).
+- **IPv6 keying changed.** v7 keyed the raw `req.ip`, so every IPv6 address had its own counter and a caller with a /64 or a residential /56 could rotate the interface ID to get a fresh bucket per request. v8 keys by subnet, default 56 bits, which is now stated explicitly in `app.ts`. Consequence: two addresses in one /56 share a bucket (the limit becomes real on IPv6), while distinct clients under one /56 also share it — acceptable at this app's traffic. IPv4 is still keyed per address. `app.test.ts` pins the grouping.
+- v8 validates its configuration and logs any finding (`ERR_ERL_*`) through its logger; no validation fires for this setup. Verified in a production-mode container: clean boot, 130 requests → 120×200 + 10×429, and the `/api/auth` per-IP, per-account and login-spray buckets still answer 429.
+
 ### Local authentication cutover (2026-11-15)
 
 - `AUTH_MODE` now defaults to `local`; the app owns accounts, sessions and MFA. `proxy` (Authentik header) and `hybrid` remain supported and are covered by the same test suite in CI.
@@ -244,7 +250,7 @@ Runtime dependencies and their risk profiles:
 | `better-sqlite3` | `^13` | Widely used SQLite binding with a native C++ addon. 13.x ships prebuilt binaries for every supported platform inside the package (`prebuilds/`: darwin, linux, linuxmusl, win32), and the root `package.json` sets `dependenciesMeta.better-sqlite3.built: false`, so no build script runs and nothing is compiled at install time. The trade-off is that you trust a binary shipped by the registry rather than one built from source on your machine |
 | `drizzle-orm` | `^0.45` | Newer library (2022–); less battle-tested than Prisma but growing adoption. Upgraded from 0.38 to fix CVE-2026-39356 (SQL injection via identifier escaping). |
 | `zod` | `^4` | Pure TypeScript; used for all input validation on the backend |
-| `express-rate-limit` | `^7` | Simple, auditable rate-limiting middleware |
+| `express-rate-limit` | `^8` | Simple, auditable rate-limiting middleware. 8.x validates its configuration and keys IPv6 by /56 subnet; both are covered by `app.test.ts` |
 | `react` | current | Mainstream, heavily used UI framework |
 | `@tanstack/react-query` | current | Mainstream, well-maintained |
 | `recharts` | current | Mainstream charting library used for the Monthly overview visualisations |

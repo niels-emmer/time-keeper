@@ -45,9 +45,20 @@ export function createApp() {
   // it must not be a free amplifier. The Docker healthcheck runs once every
   // 30 s (2 req/min) — two orders of magnitude below the 120/min budget — so
   // putting it under the limiter does not break the container healthcheck.
+  //
+  // express-rate-limit 8 (was 7): the options below use the v8 names —
+  // `limit` (v7's `max` still works but is deprecated) and explicit
+  // `ipv6Subnet`. v8 also keys IPv6 clients by subnet rather than by full
+  // address: 56 is the library default and is stated here on purpose, because
+  // it is a security property, not a detail. Two addresses inside one /56 share
+  // a bucket, so an attacker holding a /56 cannot mint a fresh counter per
+  // address; the cost is that unrelated clients under the same /56 share the
+  // 120/min budget, which is irrelevant at this app's traffic. IPv4 is keyed
+  // per address. `app.test.ts` pins both behaviours.
   const limiter = rateLimit({
     windowMs: 60 * 1000, // 1 minute
-    max: 120,
+    limit: 120,
+    ipv6Subnet: 56,
     standardHeaders: true,
     legacyHeaders: false,
   });
