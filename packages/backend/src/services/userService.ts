@@ -1,8 +1,10 @@
 import { randomBytes, randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { db as defaultDb, type AppDatabase } from '../db/client.js';
-import { users, type UserRow } from '../db/schema.js';
+import { passwordResetCodes, users, type UserRow } from '../db/schema.js';
 import { createUnusablePasswordHash, hashPassword } from '../lib/password.js';
+import { RESET_CODE_TTL_MS, generateResetCode, hashResetCode } from '../lib/resetCode.js';
+import { recordAuthEvent } from './authService.js';
 
 /**
  * User lookup, proxy provisioning and bootstrap (A1, A4, A6, Q2, Q3, Q18, Q21).
@@ -145,15 +147,93 @@ export function promoteToAdmin(userId: string, database: AppDatabase = defaultDb
 export interface AdminBootstrapResult {
   user: UserRow;
   promoted: boolean;
+  /**
+   * Present only when `ensureAdminFromEmail` created the first administrator on
+   * an otherwise empty database. The caller (boot) prints it exactly once; it is
+   * a single-use, 60-minute reset code, never a password.
+   */
+  bootstrapResetCode?: { code: string; expiresAt: string };
+}
+
+/**
+ * Create the first administrator on a brand-new database (Phase F).
+ *
+ * A fresh local deployment has no accounts for `ADMIN_EMAIL` to match, so
+ * refusing to boot would make a new install impossible. The account is created
+ * with an unusable password and `must_set_password`, and gets a single-use
+ * 60-minute reset code that boot prints once. The operator redeems it at
+ * `/reset` and chooses the password — the server never generates or logs one.
+ */
+function createFirstAdmin(
+  adminEmail: string,
+  database: AppDatabase
+): AdminBootstrapResult {
+  const email = normalizeEmail(adminEmail);
+  const username = generateUniqueUsername(email, database);
+  const now = new Date();
+  const code = generateResetCode();
+  const expiresAt = new Date(now.getTime() + RESET_CODE_TTL_MS).toISOString();
+  const resetCodeId = randomUUID();
+
+  const created = database.transaction((tx) => {
+    const user = tx
+      .insert(users)
+      .values({
+        id: randomUUID(),
+        email,
+        username,
+        passwordHash: createUnusablePasswordHash(),
+        role: 'admin',
+        mustSetPassword: true,
+      })
+      .returning()
+      .get();
+
+    tx.insert(passwordResetCodes)
+      .values({
+        id: resetCodeId,
+        userId: user.id,
+        codeHash: hashResetCode(code),
+        createdBy: null,
+        expiresAt,
+        usedAt: null,
+      })
+      .run();
+
+    recordAuthEvent(
+      {
+        userId: user.id,
+        kind: 'admin_bootstrap_reset_issued',
+        meta: { resetCodeId, expiresAt, email },
+      },
+      tx
+    );
+
+    return user;
+  });
+
+  return {
+    user: created,
+    promoted: true,
+    bootstrapResetCode: { code, expiresAt },
+  };
 }
 
 /**
  * Promote the account named by `ADMIN_EMAIL` (Q2).
  *
- * Q18: in production a missing `ADMIN_EMAIL` — or one that matches no migrated
- * user — is fatal. A running instance with no administrator cannot be
- * administered, and discovering that later means the operator has to find the
- * database. Outside production it warns and continues with no admin.
+ * Q18: in production a missing `ADMIN_EMAIL` — or one that matches no account
+ * on a database that already has accounts — is fatal. A running instance with
+ * no administrator cannot be administered, and discovering that later means the
+ * operator has to find the database. Outside production it warns and continues
+ * with no admin.
+ *
+ * Phase F refinement (fresh installs): an **empty** database cannot contain the
+ * account `ADMIN_EMAIL` names, and refusing to boot there would make a local
+ * deployment impossible to start. In that one case the first administrator is
+ * created and a single-use reset code is returned for boot to print once.
+ * A populated database keeps the fail-fast behaviour, where a non-matching
+ * `ADMIN_EMAIL` really is an operator mistake.
  */
 export function ensureAdminFromEmail(
   adminEmail: string | undefined,
@@ -174,11 +254,23 @@ export function ensureAdminFromEmail(
 
   const user = findUserByEmail(adminEmail, database);
   if (!user) {
-    const message = `ADMIN_EMAIL (${normalizeEmail(adminEmail)}) matches no user — no administrator exists. It must match an existing account (for a migrated database, one of the pre-existing emails).`;
     if (options.isProduction) {
-      throw new Error(message);
+      // Empty database = fresh install. Create the first administrator rather
+      // than refusing to boot; this is the only way a new local deployment can
+      // come up. Anything else is the operator error Q18 is meant to catch.
+      const anyUser = database.select({ id: users.id }).from(users).limit(1).get();
+      if (!anyUser) {
+        return createFirstAdmin(adminEmail, database);
+      }
+
+      throw new Error(
+        `ADMIN_EMAIL (${normalizeEmail(adminEmail)}) matches no user — no administrator exists. It must match an existing account (for a migrated database, one of the pre-existing emails).`
+      );
     }
-    warn(`[auth] ${message}`);
+
+    warn(
+      `[auth] ADMIN_EMAIL (${normalizeEmail(adminEmail)}) matches no user — no administrator will be promoted.`
+    );
     return null;
   }
 

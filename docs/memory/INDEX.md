@@ -11,7 +11,7 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 - Per-category targets — optional monthly targets, weekly targets converted to a month total, or one-time budgets that do not renew
 - Billable categories — flag categories for billable vs non-billable reporting
 - End-of-day rounding: minutes → nearest 30 or 60 min interval (configurable, default 60; capped at user's weekly goal)
-- Auth: Authentik embedded outpost via NPM forward auth (no auth code in the app)
+- Auth: the app owns local accounts (password + optional TOTP, server-side sessions); Authentik forward auth is an optional `AUTH_MODE=proxy` mode
 
 ## Critical files
 
@@ -29,11 +29,13 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `packages/backend/src/db/schema.ts` | All data types flow from here (`categories` now carries target cadence/minutes/start fields; `time_entries`, `user_settings`, and legacy `monthly_project_goals`) |
 | `packages/shared/src/utils/rounding.ts` | Core business logic — the rounding algorithm |
 | `packages/backend/src/middleware/auth.ts` | Auth boundary — Bearer tokens, server-side session cookies (`local`/`hybrid`), and `X-authentik-email` only with a trusted peer + matching `X-Internal-Token` in production; also gates token management |
-| `packages/backend/src/routes/auth.ts` | Auth surface — Phase B: `POST /login`, `GET /status` (public), `POST /logout`, `POST /logout-all`, `GET /me` (session-scoped); Phase C: `POST /accept-invite` (public), `PATCH /me`, `POST /password`, `DELETE /me`, `GET /sessions`, `DELETE /sessions/:id`, `DELETE /sessions/others`; Phase D: `POST /login/mfa` (public), `POST /mfa/enrol`, `POST /mfa/confirm`, `POST /mfa/disable`, `POST /mfa/recovery-codes/regenerate` |
+| `packages/backend/src/routes/auth.ts` | Auth surface — public: `POST /login`, `POST /login/mfa`, `GET /status`, `POST /accept-invite`, `POST /reset`; session-scoped: `POST /logout`, `POST /logout-all`, `GET/PATCH/DELETE /me`, `POST /password`, `GET /sessions`, `DELETE /sessions/:id`, `DELETE /sessions/others`, `POST /mfa/enrol|confirm|disable`, `POST /mfa/recovery-codes/regenerate` |
+| `packages/backend/src/lib/config.ts` | `AUTH_MODE` parsing (default `local`), production fail-loud validation for `SESSION_SECRET`/`MFA_ENCRYPTION_KEY`/`ADMIN_EMAIL`, ephemeral dev secrets |
+| `packages/backend/src/services/userService.ts` | Identity resolution — `ensureProxyUser`, `ensureAdminFromEmail` (including the fresh-install first-admin bootstrap and one-time reset code), `seedDevAdmin` |
 | `packages/backend/src/lib/totp.ts` | RFC 6238 / RFC 4226 TOTP on Node stdlib (`crypto` HMAC-SHA1, 30 s step, 6 digits, ±1 step window); `totp.test.ts` reproduces the RFC 6238 Appendix B vectors |
 | `packages/backend/src/services/mfaService.ts` | MFA lifecycle — pending (encrypted) secret, confirm-before-activate, replay protection via `users.mfa_last_step`, hashed single-use recovery codes, disable/regenerate behind a password |
 | `packages/backend/src/lib/mfaCrypto.ts` | AES-256-GCM for `users.mfa_secret_enc` with a unique IV per record and a verified auth tag; `MFA_ENCRYPTION_KEY` from env |
-| `packages/backend/src/routes/admin.ts` | Admin surface — Phase C carries only `POST /api/admin/invites`; `requireAdmin` answers 404 for non-admins |
+| `packages/backend/src/routes/admin.ts` | Admin surface — users list/create/update/delete, reset codes, invites, audit viewer. `requireAdmin` answers 404 for non-admins and fails with `mfa_enrolment_required` for a session admin without TOTP |
 | `packages/backend/src/services/inviteService.ts` | Single-use 72h invite tokens — hashed at rest, atomic claim, one generic failure for unknown/used/expired |
 | `packages/backend/src/services/accountService.ts` | Self-service lifecycle — profile update (username immutable), password change (revokes other sessions, rotates current), hard self-delete cascade with last-admin guard |
 | `packages/backend/src/lib/passwordPolicy.ts` | Q22 password policy — 12 chars minimum, no username/email substrings, local denylist, no outbound calls |
@@ -66,6 +68,7 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `packages/frontend/src/components/AuthGate.tsx` | Session gate around the routes; renders the app, the local `Login` page, or the proxy reload overlay |
 | `packages/frontend/src/pages/Login.tsx` | Local sign-in — username **or** email + password in one step, generic error copy, explicit MFA-required notice |
 | `packages/frontend/src/pages/Register.tsx` | Invite acceptance (outside `AuthGate`) — token from the URL, inline password policy, single generic failure copy |
+| `packages/frontend/src/pages/Reset.tsx` | Password reset / first password (outside `AuthGate`) — `?code=` or typed code, inline policy, success → sign-in. This is also the `must_set_password` path for new, migrated and bootstrap accounts |
 | `packages/frontend/src/pages/Account.tsx` | Self-service account — profile with a read-only username, password change, signed-in devices, typed-confirmation delete |
 | `packages/frontend/src/components/AccountSetting.tsx` | Settings → Account card that links to `/account`, keeping Settings' existing sections unchanged |
 | `packages/frontend/src/lib/theme.ts` | Pure theme utilities — `getStoredTheme`, `setStoredTheme`, `applyTheme`, `resolveTheme` |
@@ -143,7 +146,14 @@ A personal work-timer PWA for tracking time in categories from macOS and Android
 | `DELETE /api/auth/sessions/others` | Session | Sign out every other device for this account |
 | `DELETE /api/auth/sessions/:id` | Session | Revoke one own session by its stored hash; another account's id is 404 |
 | `POST /api/auth/accept-invite` | No | Invite-only registration; single generic failure for unknown/used/expired tokens; sets session + CSRF cookies |
+| `POST /api/auth/reset` | No | Redeem a single-use 60-minute admin-issued reset code and set a new password; clears `must_set_password`, revokes every session; 204 on success; single generic failure |
+| `GET /api/admin/users` | Admin | User table with entry counts; never includes hashes/secrets; 404 for non-admins |
+| `POST /api/admin/users` | Admin + fresh | Create an account with an unusable password; returns a 60-minute reset code once |
+| `PATCH /api/admin/users/:id` | Admin + fresh | Change role and/or enable/disable; disabling revokes sessions; last-admin guard |
+| `DELETE /api/admin/users/:id` | Admin + fresh | Delete with `{ mode: 'cascade' \| 'reassign' }`; last-admin guard |
+| `POST /api/admin/users/:id/reset` | Admin + fresh | Issue a new 60-minute reset code; invalidates the previous one |
 | `POST /api/admin/invites` | Admin | Mint a single-use 72h invite; raw token returned once; 404 for non-admins, 403 `mfa_enrolment_required` for a session-authenticated admin without MFA (Q8) |
+| `GET /api/admin/auth-events` | Admin | Audit viewer, newest first, 90-day retention pruned on read |
 | `GET /api/info` | Yes | Version, repo URL, current user — drives Settings → About |
 | `GET /api/settings` | Yes | Returns `{ weeklyGoalHours, roundingIncrementMinutes }` |
 | `PUT /api/settings` | Yes | Update `{ weeklyGoalHours, roundingIncrementMinutes }` (increment: 30 or 60) |
@@ -178,11 +188,24 @@ docker compose up -d --build
 
 `docs/screenshots/` contains four PNG screenshots (`track.png`, `weekly.png`, `monthly.png`, `settings.png`) captured at 390×844px using Chrome DevTools device emulation with html2canvas. To regenerate:
 
-1. Start dev servers: `DEV_USER_ID=dev@example.com yarn workspace @time-keeper/backend dev` + `yarn workspace @time-keeper/frontend dev`
+1. Start dev servers: `DEV_ADMIN_PASSWORD='a long dev passphrase' yarn workspace @time-keeper/backend dev` + `yarn workspace @time-keeper/frontend dev`, then sign in at `/login` as `admin@localhost`
 2. Seed sample data via the API (categories + an active timer)
 3. Open Chrome, enable 390×844 device emulation, and undock DevTools to a separate window
 4. For each page (`/`, `/weekly`, `/monthly`, `/settings`): inject html2canvas from CDN, capture `document.body`, POST the base64 PNG to a temporary `/api/dev/screenshot` endpoint on the backend (with a CORS header for localhost:5173), and save it to `docs/screenshots/{name}.png`
 5. Update `README.md` if filenames change
+
+### Auth screens to capture (Phase F)
+
+The accounts work adds five screens. Capture them after the cutover PR; the implementation session
+does not generate them.
+
+| Screen | Route | Required state |
+|---|---|---|
+| Login | `/login` | Signed out, `AUTH_MODE=local`, empty credentials form |
+| MFA step | `/login` (step 2) | MFA-enrolled account after a correct password; code field and "Use a recovery code" link visible |
+| Account | `/account` | Signed in as a normal user; profile, password, signed-in devices, MFA section (enrolled), typed-confirmation delete |
+| Admin users | `/settings` → Administrators | Signed in as an admin **with MFA enrolled**; at least two accounts (one disabled), reset-code action visible |
+| Reset | `/reset?code=…` | Signed out; a valid unused code; empty password and confirmation fields |
 
 ## Read next
 

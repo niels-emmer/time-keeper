@@ -7,26 +7,32 @@ import { randomBytes } from 'crypto';
  *
  *   1. `AUTH_MODE` is a known value (`local` | `proxy` | `hybrid`).
  *   2. In production, the secrets the auth subsystem needs actually exist:
- *      `INTERNAL_PROXY_SECRET` (the existing proxy-header gate),
- *      `SESSION_SECRET` and `MFA_ENCRYPTION_KEY` (new in Phase A).
+ *      `SESSION_SECRET` and `MFA_ENCRYPTION_KEY` always, plus
+ *      `INTERNAL_PROXY_SECRET` when the proxy header path is reachable
+ *      (`proxy` | `hybrid`).
  *   3. Outside production, missing secrets are generated ephemerally and
  *      announced loudly, so a development run never silently depends on a
  *      placeholder that would be catastrophic in production.
  *
+ * `ADMIN_EMAIL` is validated separately by `ensureAdminFromEmail()` during the
+ * boot sequence, because on a fresh database it may create the first account.
+ *
  * The failure mode is deliberate: a production instance with a missing or
  * short secret refuses to boot rather than running with a weak or empty key.
  *
- * `AUTH_MODE` defaults to `proxy` for Phase A: local login does not exist yet,
- * so the only honest default is the mode the app actually runs today. Phase F
- * flips the default to `local` when the login path is live (plan §2b, D1).
+ * `AUTH_MODE` defaults to `local`: Phase F cut the deployment over to the
+ * app's own accounts, and local login is the path the product now ships. The
+ * Authentik header path is still fully supported behind `AUTH_MODE=proxy` (or
+ * `hybrid` during a staged migration) — it is an optional mode, not the
+ * default (plan §2b, D1; ADR D-023).
  */
 
 export type AuthMode = 'local' | 'proxy' | 'hybrid';
 
 const AUTH_MODES: readonly AuthMode[] = ['local', 'proxy', 'hybrid'];
 
-/** Phase A default. Phase F changes this to 'local'. */
-export const DEFAULT_AUTH_MODE: AuthMode = 'proxy';
+/** Phase F: the app owns auth by default. Proxy auth is opt-in. */
+export const DEFAULT_AUTH_MODE: AuthMode = 'local';
 
 export const MIN_SESSION_SECRET_LENGTH = 32;
 export const MFA_KEY_BYTES = 32;

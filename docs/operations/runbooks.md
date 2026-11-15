@@ -47,7 +47,12 @@ Then refresh the app.
 
 ---
 
-## RB-003: Authentik redirect loop after login
+## RB-003: Authentik redirect loop after login (proxy mode only)
+
+> This runbook applies only when `AUTH_MODE=proxy` or `hybrid`. In the default `local` mode there is
+> no Authentik redirect in the path; a browser that still goes to Authentik has a leftover NPM
+> forward-auth config on the host.
+
 
 **Symptom:** Browser keeps cycling through the Authentik login page without reaching the app.
 

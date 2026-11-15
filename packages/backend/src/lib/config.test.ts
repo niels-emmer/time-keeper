@@ -21,9 +21,9 @@ const VALID_MFA_KEY = Buffer.alloc(32, 7).toString('base64');
 const SESSION_SECRET = 'x'.repeat(MIN_SESSION_SECRET_LENGTH);
 
 describe('getAuthMode', () => {
-  it('defaults to proxy for Phase A', () => {
-    expect(getAuthMode(env({}))).toBe('proxy');
-    expect(DEFAULT_AUTH_MODE).toBe('proxy');
+  it('defaults to local for the Phase F cutover', () => {
+    expect(getAuthMode(env({}))).toBe('local');
+    expect(DEFAULT_AUTH_MODE).toBe('local');
   });
 
   it('accepts the three known modes, case-insensitively', () => {
@@ -45,10 +45,10 @@ describe('validateStartupConfig — production', () => {
     MFA_ENCRYPTION_KEY: VALID_MFA_KEY,
   };
 
-  it('accepts a complete configuration', () => {
+  it('accepts a complete configuration with the default local mode', () => {
     const result = validateStartupConfig(env(base));
 
-    expect(result.authMode).toBe('proxy');
+    expect(result.authMode).toBe('local');
     expect(result.sessionSecret).toBe(SESSION_SECRET);
     expect(result.mfaEncryptionKey).toHaveLength(32);
   });
@@ -85,7 +85,9 @@ describe('validateStartupConfig — production', () => {
 
   it('requires INTERNAL_PROXY_SECRET only when the proxy path is reachable', () => {
     expect(() =>
-      validateStartupConfig(env({ ...base, INTERNAL_PROXY_SECRET: undefined }))
+      validateStartupConfig(
+        env({ ...base, AUTH_MODE: 'proxy', INTERNAL_PROXY_SECRET: undefined })
+      )
     ).toThrow(/INTERNAL_PROXY_SECRET/);
 
     // A local-only deployment has no proxy in front of it.
@@ -95,9 +97,18 @@ describe('validateStartupConfig — production', () => {
     expect(local.authMode).toBe('local');
   });
 
-  it('reports every problem at once', () => {
+  it('reports every problem at once for a proxy deployment', () => {
+    expect(() =>
+      validateStartupConfig(env({ NODE_ENV: 'production', AUTH_MODE: 'proxy' }))
+    ).toThrow(/INTERNAL_PROXY_SECRET[\s\S]*SESSION_SECRET[\s\S]*MFA_ENCRYPTION_KEY/);
+  });
+
+  it('does not demand an internal proxy secret for the default local mode', () => {
     expect(() => validateStartupConfig(env({ NODE_ENV: 'production' }))).toThrow(
-      /INTERNAL_PROXY_SECRET[\s\S]*SESSION_SECRET[\s\S]*MFA_ENCRYPTION_KEY/
+      /SESSION_SECRET[\s\S]*MFA_ENCRYPTION_KEY/
+    );
+    expect(() => validateStartupConfig(env({ NODE_ENV: 'production' }))).not.toThrow(
+      /INTERNAL_PROXY_SECRET/
     );
   });
 });

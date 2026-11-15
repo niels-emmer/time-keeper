@@ -5,7 +5,10 @@
 #   yarn workspace @time-keeper/frontend dev
 
 services:
-  # Auth is skipped in dev — backend reads DEV_USER_ID env var instead of X-authentik-email
+  # Local login is the development path (Q21). The backend seeds a dev admin
+  # (admin@localhost / devadmin) with DEV_ADMIN_PASSWORD, so the real login,
+  # session and MFA code is what gets exercised. DEV_USER_ID is a proxy-mode
+  # shortcut only and is not set here.
   frontend:
     build: null
     image: node:22-alpine
@@ -38,7 +41,10 @@ services:
       NODE_ENV: development
       PORT: "3001"
       DATABASE_PATH: "/data/time-keeper.db"
-      DEV_USER_ID: "dev@localhost"
+      AUTH_MODE: "local"
+      # Dev-only convenience so the seeded admin is predictable. Change or
+      # unset it to have a random password printed once at first boot.
+      DEV_ADMIN_PASSWORD: "${DEV_ADMIN_PASSWORD:-dev-admin-password}"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
       interval: 10s

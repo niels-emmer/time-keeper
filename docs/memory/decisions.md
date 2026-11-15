@@ -377,7 +377,7 @@ Tests pin the interesting cases: 00:30 and 23:30 local, a spring-forward and a f
 ## D-022: The app owns identity — real accounts, `users` table with UUID keys
 
 **Date:** 2026-11-14
-**Status:** Accepted (implementation in progress) — supersedes the "no users table" invariant (I-008) and D-004
+**Status:** Implemented (2026-11-15) — supersedes the "no users table" invariant (I-008) and D-004
 
 Identity moves into the application. A `users` table with a UUID primary key becomes the owner of every record: every data table (`categories`, `time_entries`, `user_settings`, `api_tokens`, …) gets a foreign key to `users.id` instead of the denormalised `user_id TEXT` email column.
 
@@ -391,7 +391,7 @@ This supersedes I-008 in `docs/memory/invariants.md`; the invariant must be rewr
 ## D-023: Authentik coexistence via `AUTH_MODE=local|proxy|hybrid`
 
 **Date:** 2026-11-14
-**Status:** Accepted (implementation in progress)
+**Status:** Implemented (2026-11-15)
 
 `AUTH_MODE` selects how requests are authenticated:
 - `local` — the app's own sessions (D-024). Becomes the **default at cutover**.
@@ -403,7 +403,7 @@ Proxy header auth is retained as a supported mode rather than deleted, so rollin
 ## D-024: Session authentication with server-side sessions
 
 **Date:** 2026-11-14
-**Status:** Accepted (implementation in progress)
+**Status:** Implemented (2026-11-15)
 
 Local auth uses **server-side sessions**: an opaque session identifier is held in an `httpOnly`, `Secure`, `SameSite=Lax` cookie, with the session record in SQLite (consistent with I-005 — no new stateful store).
 
@@ -414,7 +414,7 @@ Cross-site request forgery is handled with a **CSRF double-submit token**: a per
 ## D-025: Password storage — Node `crypto.scrypt`, versioned hash prefix
 
 **Date:** 2026-11-14
-**Status:** Accepted (implementation in progress)
+**Status:** Implemented (2026-11-15)
 
 Passwords are hashed with `crypto.scrypt` from Node's built-in `crypto` module. **No new dependency** is added — no bcrypt, no argon2 native addon, consistent with the project's preference for the standard library and its aversion to extra native code.
 
@@ -423,7 +423,7 @@ Stored hashes carry a **versioned prefix** so parameters can change without inva
 ## D-026: MFA — TOTP plus recovery codes, mandatory for admins
 
 **Date:** 2026-11-14
-**Status:** Accepted (implementation in progress)
+**Status:** Implemented (2026-11-15)
 
 Second factor is **TOTP** (RFC 6238) with a set of **single-use recovery codes** for device loss.
 
@@ -433,16 +433,104 @@ Second factor is **TOTP** (RFC 6238) with a set of **single-use recovery codes**
 ## D-027: Registration is invite-only
 
 **Date:** 2026-11-14
-**Status:** Accepted (implementation in progress)
+**Status:** Implemented (2026-11-15)
 
 There is **no public registration endpoint**, and none will be built. Accounts are created by an admin-issued invite. This keeps the instance closed by default and avoids the account-enumeration and abuse surface that a public signup form brings to a self-hosted tool.
 
 ## D-028: Destructive account actions
 
 **Date:** 2026-11-14
-**Status:** Accepted (implementation in progress)
+**Status:** Implemented (2026-11-15)
 
 - **Self-delete cascades.** A user deleting their own account removes their data via the foreign keys from D-022; no orphaned rows are left behind.
 - **Admin-delete chooses the disposition.** An admin deleting another account picks either **cascade** (delete the data) or **reassign** (move it to another user). Data is never silently destroyed or silently orphaned.
 - **Last-admin guards.** The final admin account cannot be deleted or demoted, so the instance cannot be locked out of administration.
 - **5-minute re-auth freshness** for sensitive actions (password change, MFA changes, account deletion). A sensitive action requires a credential check within the last five minutes, so a stolen session cannot be escalated into a permanent takeover.
+
+## D-029: Session lifetime and freshness policy
+
+**Date:** 2026-11-15
+**Status:** Implemented — realises D-024 and Q7/Q17
+
+Every local login creates a row in `sessions`. The browser holds an opaque 32-byte id in the `tk_session` cookie; the database stores only its SHA-256, so a database copy does not hand over live sessions.
+
+- **Idle timeout 14 days.** `last_seen_at` slides `expires_at` forward on use.
+- **Absolute cap 90 days.** `absolute_expires_at` is set at creation and never moves, so a continuously used session still ends.
+- **Rotation.** The session id is replaced on login, on MFA completion, and on password change. This defeats fixation: an id planted before authentication is never the id that authenticates.
+- **Revocation is immediate.** "Sign out", "sign out other devices", an admin disabling an account, and a password reset all delete rows; the next request with that cookie is 401.
+- **Five-minute freshness.** Password change, token minting, role change, account deletion and MFA disable require a session established (or re-authenticated) within five minutes. A stale session gets 403 `reauthentication_required`; the UI asks for a fresh sign-in. Proxy-header identities are exempt because Authentik re-authenticates every hop; Bearer tokens are refused outright.
+
+**Why these numbers:** 14/90 keeps a personal device signed in for weeks without making a stolen cookie permanent. The freshness window is short enough that an unattended laptop cannot be used to change a password, and long enough that the normal "open Account, change password" flow does not re-prompt.
+
+**Consequences:** sessions are part of the database backup (I-005), so restoring a backup restores the sessions that were live at snapshot time. That is acceptable for a single-file self-hosted app; revoking all sessions is one admin action if needed.
+
+## D-030: MFA enforcement and the TOTP-vs-password lockout separation
+
+**Date:** 2026-11-15
+**Status:** Implemented — realises D-026 and Q8
+
+Second factor is TOTP (RFC 6238) with ten single-use recovery codes.
+
+- **Admins must enrol.** A session-authenticated administrator without MFA gets 403 `mfa_enrolment_required` on every admin route, not a 404 — the person is legitimate and the correct answer is "go and enrol". Proxy-header administrators are exempt because Authentik owns MFA on that path; demanding a second factor its login never asked for would lock the deployed proxy admin out.
+- **Verification window is ±1 step (30 s).** `users.mfa_last_step` stores the last accepted step, so a replayed code is rejected. The accepted step is bumped in the same transaction that issues the session.
+- **Recovery codes are single-use and hashed.** Ten are shown once at confirmation; only hashes are stored; each is deleted on use. Regeneration replaces the whole set behind a password check.
+- **Wrong codes have their own counter.** A wrong TOTP or recovery code increments an MFA-specific failure counter; it does **not** increment the password lockout counter and cannot lock the password path. Conversely, a wrong password uses the password counter. This separation is the point: otherwise anyone who knows a username could deny service by sending bad codes, and a user fumbling an authenticator would be locked out of the thing that could recover them.
+- **Enrolment is confirm-before-activate.** A pending secret is stored encrypted but does not set `mfa_enabled`; only a valid code against it does. Disabling requires the password and a fresh session.
+
+**Why TOTP rather than WebAuthn:** every phone supports it and there is no browser ceremony. It is phishable, which is recorded as an accepted residual in `SECURITY.md`; WebAuthn is Phase G.
+
+**Consequences:** `MFA_ENCRYPTION_KEY` becomes a durable secret. Changing it makes every enrolled secret unreadable (a deliberate property); affected users must re-enrol.
+
+## D-031: Invite-only registration and the invite-token lifecycle
+
+**Date:** 2026-11-15
+**Status:** Implemented — realises D-027 and Q2
+
+There is **no public registration endpoint**. An administrator mints an invite; the invitee redeems it at `/register?token=…`.
+
+- Token is 32 random bytes, stored only as SHA-256. Raw value returned once.
+- Single use: the claim is atomic, and a second redemption is indistinguishable from an unknown token.
+- 72-hour expiry.
+- The role (`user` | `admin`) comes from the invite row, never from the request body.
+- An email-bound invite rejects a different email, but the rejection happens only for the link holder and the message is deliberately not an enumeration oracle.
+- Unknown, used and expired tokens share one generic message and one generic status.
+
+**Why:** an open signup form on a self-hosted personal instance is a spam and resource-exhaustion surface, and account enumeration is a gift to credential stuffing. Invite-only keeps onboarding deliberate while still satisfying "allow a user to register".
+
+**Consequences:** adding a person is an admin action. There is no `ALLOW_OPEN_REGISTRATION` flag to turn on accidentally; adding one later would be a new decision.
+
+## D-032: Password reset without SMTP
+
+**Date:** 2026-11-15
+**Status:** Implemented — realises D-005 and Q3
+
+There is no mail stack and no self-service "forgot password" email. An administrator issues a reset code from Settings → Users and hands it over out of band.
+
+- Code is 32 random bytes, stored only as SHA-256, valid for **60 minutes**, usable **once**.
+- Issuing a new code deletes the account's previous one, so a code already handed over stops working when a replacement exists.
+- Redemption writes the password, clears `must_set_password`, revokes **every** session for the account, and deletes any sibling code — all in one transaction with the single-use claim.
+- Unknown, expired and used codes share one generic failure.
+- The public `/reset` page accepts `?code=…` or a typed code and is also the `must_set_password` path for newly created and migrated accounts.
+
+**Why:** SMTP means credentials, deliverability, a new outbound dependency and a new phishing surface. For 2–10 users, an admin-mediated code is simpler and keeps the failure mode human.
+
+**Consequences:** a non-admin who forgets their password waits for an admin. If email is wanted later, it is a separate decision with its own threat model.
+
+## D-033: Fresh-install first-administrator bootstrap
+
+**Date:** 2026-11-15
+**Status:** Implemented — refines Q18
+
+Q18 says production must fail to boot when `ADMIN_EMAIL` is missing or matches no user. That is right for a **migrated** database, where a non-match is an operator typo. It cannot hold literally for a **brand-new** database: there is no account for any email to match, so a fresh local deployment would be unbootable.
+
+The rule is therefore:
+
+- `ADMIN_EMAIL` missing → still fatal in production.
+- Populated database, no match → still fatal (Q18's intent).
+- **Empty `users` table** → create the first administrator with an unusable password and `must_set_password`, issue a single-use 60-minute reset code, and print it **once** at boot. The operator sets the password at `/reset`.
+
+No password is generated or logged. The reset code is a credential with a one-use, 60-minute life, and it is the only way in, so it is printed loudly and once.
+
+**Why not a CLI seed script:** a boot-time bootstrap is one code path, one place to document, and works for the exact `docker compose up` flow in the deployment guide. A CLI adds a second entry point that can drift.
+
+**Consequences:** a fresh install's container logs contain one credential until it is used or expires. `SECURITY.md` records that residual and recommends setting the password promptly. A populated database keeps the fail-fast behaviour, so a typo cannot silently create a second administrator.

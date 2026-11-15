@@ -16,14 +16,21 @@ This is a single-user (or small-team) personal productivity tool, not a public-f
 
 | Threat | Likelihood | Mitigation |
 |--------|-----------|------------|
-| Unauthorised access to your time data via browser | Low | Authentik auth blocks the app entirely before any request reaches it. Nothing is published to the host; production header auth is only trusted when the TCP peer is loopback/private (or in `TRUSTED_PROXY_CIDRS`) **and** the request carries a matching `X-Internal-Token` derived from `INTERNAL_PROXY_SECRET` |
-| Cross-site request forgery against browser-authenticated write endpoints | Low | Header-authenticated non-GET requests must now present a same-origin `Origin` or `Referer`; cross-site browser requests are rejected with 403 |
+| Unauthorised access to your time data via browser | Low | `AUTH_MODE=local` (default): password + optional TOTP, server-side sessions, per-IP and per-account lockout. `AUTH_MODE=proxy` remains available and keeps the Authentik trust rules below. Nothing is published to the host in either mode |
+| Credential stuffing / password guessing | Medium | `crypto.scrypt` at N=2^15 with constant-time comparison; 12-character minimum plus a local common-password denylist; no outbound breach-list calls; `/api/auth/*` has a stricter per-IP bucket (10/min) plus per-account exponential backoff (5 failures → 1 min, doubling to a 15 min cap), cleared on success. Counters are persisted, so a restart does not reset them |
+| Session theft / session fixation | Low | `tk_session` is `HttpOnly`, `Secure` in production and `SameSite=Lax`; the database stores only the SHA-256 of the id; the id rotates on login, MFA completion and password change; 14-day idle / 90-day absolute expiry; every device can be signed out individually or all at once; a five-minute freshness gate covers sensitive actions |
+| **Cross-site request forgery (new surface)** | Medium | Cookie-authenticated requests carry ambient credentials, which the old header-only design did not. Central double-submit protection requires a `tk_csrf` cookie **and** a matching `X-CSRF-Token` header, compared in constant time, on every non-GET `/api` route; the existing same-origin `Origin`/`Referer` check stays as a second layer; the public `/api/auth/*` paths are exempt only because no cookie can exist before login. Mounted centrally, not per route, so a new mutating endpoint cannot forget it |
+| TOTP replay | Low | Each accepted code's step is stored in `users.mfa_last_step`; a reused or older step is rejected. The verification window is ±1 step (30 s) |
+| TOTP phishing / real-time code relay | Medium | TOTP is phishable by design: a relayed code works inside its window. Mitigations are the short window, a single-use step, login rate limits and lockout, and generic error copy. WebAuthn/passkeys are out of scope for v1 and would be the real fix |
+| Privilege escalation via the admin API | Low | Every `/api/admin/*` route sits behind `requireAdmin`, which returns **404** for non-admins so the surface is not discoverable; a local administrator must have MFA enrolled (`mfa_enrolment_required` otherwise); mutations require a session fresher than five minutes; the last administrator cannot be demoted, disabled or deleted; every action is written to `auth_events` |
+| Invite-token abuse | Low | 32-byte single-use token, stored only as SHA-256, 72-hour expiry; the role comes from the invite row, never the request; unknown/used/expired tokens share one generic failure; an admin-only endpoint mints them |
+| Reset-code abuse | Low | 32-byte single-use code, stored only as SHA-256, 60-minute expiry; issuing a new code deletes the previous one; unknown/used/expired codes share one generic failure; redemption revokes every session and clears `must_set_password` in the same transaction; only an admin (or the first-admin bootstrap) can issue one |
 | Unauthorised access via API token | Low | 256-bit tokens; HTTPS enforced on api.* subdomain; rate-limited; token never stored in plain text; tokens expire after one year |
 | API token brute-forced | Negligible | 2^256 keyspace; a 120 req/min limiter constrains attempts (see the rate-limit caveat in "What has not been done") |
 | Bearer token stolen from device | Low | Stored in macOS Keychain (not plaintext); revoke immediately from web app Settings; expiry limits long-term exposure; the macOS app refuses non-HTTPS base URLs |
-| Token used to create more tokens | None | Token management endpoints require Authentik header auth — Bearer tokens receive 403 |
+| Token used to create more tokens | None | Token management endpoints require interactive auth (a fresh session, or the proxy header) — Bearer tokens receive 403 |
 | Unauthorised modification of another user's time entries via adjust-cell | None | `PATCH /api/summary/adjust-cell` validates category ownership before any write; all DB operations are scoped to `req.userId` |
-| Unauthorised creation or reassignment of manual entries | None | `POST /api/entries` requires Authentik auth, validates the target category belongs to `req.userId`, and only creates completed entries (`endTime` is required); `PATCH /api/entries/:id` validates category ownership before reassignment, rejects invalid time ranges, and rejects `endTime: null` — so it cannot be used to forge a second running timer. A partial unique index on `time_entries (user_id) WHERE end_time IS NULL` enforces the same rule in the database |
+| Unauthorised creation or reassignment of manual entries | None | `POST /api/entries` requires auth, validates the target category belongs to `req.userId`, and only creates completed entries (`endTime` is required); `PATCH /api/entries/:id` validates category ownership before reassignment, rejects invalid time ranges, and rejects `endTime: null` — so it cannot be used to forge a second running timer. A partial unique index on `time_entries (user_id) WHERE end_time IS NULL` enforces the same rule in the database |
 | Unauthorised timer start against another user's category | None | `startTimer()` asserts category ownership before inserting, so a cross-user `categoryId` is rejected rather than silently creating a row |
 | SQL injection | Low | All queries use Drizzle ORM with parameterised statements; no raw SQL with user input |
 | XSS | Low | React escapes output by default; no `dangerouslySetInnerHTML` is used. The production CSP is `script-src 'self'` with no `'unsafe-inline'`, and the theme bootstrap is a same-origin file rather than an inline script |
@@ -36,6 +43,16 @@ This is a single-user (or small-team) personal productivity tool, not a public-f
 ## Change log
 
 Historical record of security-relevant API, schema and persistence changes. Kept for traceability; the sections above are the current state.
+
+### Local authentication cutover (2026-11-15)
+
+- `AUTH_MODE` now defaults to `local`; the app owns accounts, sessions and MFA. `proxy` (Authentik header) and `hybrid` remain supported and are covered by the same test suite in CI.
+- New tables: `users`, `sessions`, `recovery_codes`, `invites`, `password_reset_codes`, `auth_events`. `categories`, `time_entries`, `user_settings` and `api_tokens` now carry `user_id` as a foreign key to `users.id`; the Phase A migration backfilled one account per distinct legacy email.
+- New public surface: `POST /api/auth/login`, `/login/mfa`, `/accept-invite`, `/reset`, `GET /api/auth/status`.
+- New session surface: `/api/auth/logout`, `/logout-all`, `/me` (GET/PATCH/DELETE), `/password`, `/sessions`, `/mfa/*`.
+- New admin surface: `/api/admin/users`, `/api/admin/users/:id`, `/users/:id/reset`, `/invites`, `/auth-events`. Every route 404s for non-admins.
+- Cookie-authenticated sessions introduce a **CSRF surface**; a central double-submit check plus the existing same-origin check cover every non-GET route.
+- No new npm dependency: scrypt, TOTP, AES-256-GCM and token hashing use Node's `crypto`.
 
 ### Data schema changes (2026-05-13)
 
@@ -68,49 +85,86 @@ Historical record of security-relevant API, schema and persistence changes. Kept
 
 ## Authentication
 
-The application supports two auth paths.
+The app owns its accounts. `AUTH_MODE` selects which browser credential path is authoritative; `local` is the default, and the Authentik proxy path is an optional mode rather than the owner of identity.
 
-### Trust model (C-1)
+| `AUTH_MODE` | Browser path | Requires Authentik/NPM forward auth |
+|---|---|---|
+| `local` (default) | App login (`/api/auth/login`) + server-side session cookie | No |
+| `proxy` | Trusted `X-authentik-email` header from the forward-auth proxy | Yes |
+| `hybrid` | Both, during a staged migration | Only for the header path |
 
-Nothing in this stack is published to the host. Both containers attach only to the external `proxy-net` Docker network; Nginx Proxy Manager (also attached to that network) reaches `frontend:80` and `backend:3001` by Docker service name. There is no host-port binding and no LAN exposure.
+The macOS app's Bearer-token path is available in every mode.
+
+### Local accounts (default)
+
+- **Passwords** are hashed with Node's built-in `crypto.scrypt` (N=2^15, r=8, p=1, 16-byte salt, 64-byte output) and stored with a versioned prefix (`scrypt$v1$…`). No password hashing dependency is added. Comparison is constant-time. Migrated or admin-created accounts that have never set a password carry an `unusable$…` sentinel that no input verifies against.
+- **Password policy:** at least 12 characters, rejected when it contains the username or email, and checked against a small local common-password denylist. There are no composition rules and no outbound breach-list calls.
+- **Login enumeration:** unknown user and wrong password produce the same 401 body and the same work (the unknown-user path verifies against a dummy hash).
+- **Lockout:** `/api/auth/*` is rate-limited per IP (10 attempts/min) and per account with persisted exponential backoff (5 failures → 1 min, doubling to a 15 min cap), cleared on success. Counters survive restarts.
+- **Sessions:** server-side rows; the cookie carries an opaque 32-byte id and the database stores only its SHA-256. Flags are `HttpOnly`, `Secure` (production), `SameSite=Lax`, `Path=/`. 14-day idle / 90-day absolute; the id rotates on login, MFA completion and password change; revocation is immediate.
+- **CSRF:** a non-`httpOnly` `tk_csrf` cookie plus an `X-CSRF-Token` header, compared in constant time and required on every non-GET `/api` route. This is a real new surface created by using cookies; it is mitigated centrally, not per route.
+- **MFA:** TOTP (RFC 6238) ±1 step with replay protection, plus 10 single-use hashed recovery codes. Required for administrators, optional-but-prompted for users. Secrets are AES-256-GCM ciphertext under `MFA_ENCRYPTION_KEY`.
+- **Reset codes:** no SMTP. An administrator issues a single-use 60-minute code; the holder redeems it at `/reset` (or `/reset?code=…`) and chooses the password. Issuing a new code replaces the old one; redemption revokes every session and clears `must_set_password`.
+- **Invites:** registration is invite-only. An administrator mints a single-use 72-hour token (stored as SHA-256) and hands over the link; unknown/used/expired tokens share one generic failure.
+- **Admin surface:** every `/api/admin/*` route returns 404 for non-admins, requires MFA for session-authenticated admins, and requires a session fresher than five minutes for mutations. The audit viewer reads `auth_events` (90-day retention).
+- **First administrator:** on a migrated database, `ADMIN_EMAIL` must match an existing account or boot fails. On a brand-new empty database, boot creates that account with an unusable password and prints a **single-use 60-minute reset code once**; the operator sets the password at `/reset`. No password is generated or logged.
+
+### Proxy-mode trust model (optional, C-1)
+
+This applies only when `AUTH_MODE` is `proxy` or `hybrid`. Nothing in this stack is published to the host. Both containers attach only to the external `proxy-net` Docker network; Nginx Proxy Manager (also attached to that network) reaches `frontend:80` and `backend:3001` by Docker service name. There is no host-port binding and no LAN exposure.
 
 The `X-authentik-email` header is trusted only when all of the following hold:
 
 1. **Trusted peer.** The TCP peer address (`req.socket.remoteAddress`, never the client-controlled `X-Forwarded-For`) is loopback, a private range (RFC 1918, IPv6 ULA/link-local), or inside the optional `TRUSTED_PROXY_CIDRS` allowlist. A public peer presenting the header is rejected with 401.
 2. **Internal token.** In production the request also carries `X-Internal-Token` equal to `INTERNAL_PROXY_SECRET`. nginx injects it server-side and overwrites any client-supplied value, so an outside caller cannot supply their own.
-3. **Same origin** for non-GET header-authenticated requests (see the CSRF row below).
+3. **Same origin** for non-GET header-authenticated requests (see the CSRF row above).
 
 **Nginx must never be the only hop.** It forwards whatever `X-authentik-email` arrives and stamps the token on top, so publishing `frontend:80` would let anyone who can reach it authenticate as any email they choose. The peer allowlist is defence in depth; it is not permission to publish the port.
 
-### Path 1 — Browser / PWA (Authentik forward auth)
-
-```
-Internet → NPM (TLS + Authentik forward auth; proxy-net) → frontend nginx:80 → backend:3001
-```
-
-The backend reads the `X-authentik-email` header set by the Authentik outpost. Under the trust model above, a header from a non-private peer is ignored (401), and in production the request must also carry a matching `X-Internal-Token` derived from `INTERNAL_PROXY_SECRET`; if the secret is missing or mismatched the backend returns 401. Header-authenticated non-GET requests are also checked for a same-origin `Origin` or `Referer` before they reach mutating routes.
+In proxy mode the header email is resolved to `users.id`; an email the app has never seen is provisioned on first sight with an unusable password and `must_set_password`, exactly as accounts appeared before Phase A.
 
 See [docs/integration/auth.md](docs/integration/auth.md).
 
-### Path 2 — Native app (Bearer token via api.* subdomain)
+### Path 1 — Native app (Bearer token via api.* subdomain)
 
 ```
 Internet → NPM (TLS only, no forward auth; proxy-net) → backend:3001 → Bearer token check
 ```
 
-Added to support the macOS status bar app. The `api.*` subdomain bypasses Authentik but the backend validates the `Authorization: Bearer <token>` header itself:
+Added to support the macOS status bar app. The `api.*` subdomain has no forward-auth in front of it; the backend validates the `Authorization: Bearer <token>` header itself:
 
 - Tokens are 32 random bytes encoded as base64url (256-bit entropy)
 - Only the SHA-256 hash is stored in the database — a DB breach does not expose usable tokens
 - Tokens are shown once on creation and cannot be retrieved again
 - Tokens are revocable from the web app (Settings → Personal Access Tokens)
 - Tokens expire one year after creation; expired tokens are rejected server-side
-- Token management endpoints require Authentik-header auth — a Bearer token cannot create or list tokens
+- Token management endpoints require interactive auth (a session fresher than five minutes, or the proxy header in proxy mode) — a Bearer token cannot create or list tokens
 - The backend publishes no host port; NPM reaches `backend:3001` over `proxy-net`
 - The Bearer path is unaffected by the peer allowlist — a valid token is accepted from any peer
 - HTTPS is enforced by NPM on the api.* subdomain
 
 See [docs/integration/api-subdomain.md](docs/integration/api-subdomain.md).
+
+### Startup configuration and secrets
+
+Production validates configuration before binding a port and **refuses to boot** when something required is missing or malformed, naming the variable in the error:
+
+- `AUTH_MODE` must be one of `local`, `proxy`, `hybrid` (default `local`).
+- `SESSION_SECRET` is required and must be at least 32 characters. Rotating it signs everyone out.
+- `MFA_ENCRYPTION_KEY` is required and must decode to exactly 32 bytes (base64 or hex).
+  **Changing it makes every enrolled TOTP secret unreadable**; affected users must re-enrol.
+- `INTERNAL_PROXY_SECRET` is required only when `AUTH_MODE` is `proxy` or `hybrid`.
+- `ADMIN_EMAIL` is required; it must match an existing account on a migrated database. On a brand-new empty database the first administrator is created and its one-time reset code is printed once.
+
+Outside production the backend generates ephemeral secrets with a loud warning. They change on every restart, so sessions and encrypted MFA secrets do not survive one.
+
+### Rollback to Authentik
+
+The proxy path is still supported, so rollback is configuration, not a code revert:
+
+1. Set `AUTH_MODE=proxy` (keep `INTERNAL_PROXY_SECRET` and the NPM forward-auth host config).
+2. `docker compose up -d`.
+3. Optionally keep local accounts in the database; switching back to `local` later re-enables them. A password set locally still works, and the proxy path resolves the same `users` row by email.
 
 ---
 
@@ -118,6 +172,8 @@ See [docs/integration/api-subdomain.md](docs/integration/api-subdomain.md).
 
 - All data lives in a **single SQLite file** on the host (`/data/time-keeper.db` inside the backend container, mounted as a Docker volume).
 - There is no external database, no cloud sync, no analytics, no telemetry.
+- The same file now holds the auth subsystem: `users`, `sessions`, `recovery_codes`, `invites`, `password_reset_codes` and `auth_events`. A WAL-safe backup is therefore a complete backup of accounts, live sessions and MFA state; treat the file as credential material.
+- `users.password_hash` holds only scrypt hashes (or the `unusable$…` sentinel); `users.mfa_secret_enc` holds AES-256-GCM ciphertext under a key that is **not** in this file. A stolen database therefore does not immediately yield passwords or TOTP secrets.
 - The file is readable by anyone with shell access to the host. Protect it with standard filesystem permissions and volume encryption if required.
 - The backend container now drops to the non-root `node` user at runtime; SQLite still remains host-readable to anyone with host access.
 - WAL mode is enabled, so recent commits live in `time-keeper.db-wal` until checkpointed. **Backup must take a consistent snapshot** (online `better-sqlite3` backup, or stop the backend first) — copying only `time-keeper.db` while the backend runs can silently lose the newest entries (finding M-5). Procedure and restore drill: [docs/operations/runbooks.md](docs/operations/runbooks.md#rb-006-wal-safe-backup).
@@ -147,7 +203,9 @@ Neither image is pinned by digest — both track the upstream `node:22-alpine` a
 
 ## Dependency audit
 
-Audited with `yarn npm audit --all --recursive --severity high` on **2026-11-14**, last re-run as the final step of the remediation pass. The result is **clean** — `No audit suggestions`, exit code 0, across every workspace:
+Audited with `yarn npm audit --all --recursive --severity high` on **2026-11-15**, re-run as the final step of the Phase F cutover. The result is **clean** — `No audit suggestions`, exit code 0, across every workspace:
+
+The accounts/auth work across Phases A–F added **no new runtime dependency**: password hashing (`crypto.scrypt`), TOTP (HMAC-SHA1), AES-256-GCM, random token generation and SHA-256 hashing all use Node's built-in `crypto` module. The dependency table below is therefore unchanged by this work; the audit date is the only change.
 
 ```bash
 $ yarn npm audit --all --recursive --severity high
@@ -206,16 +264,20 @@ yarn npm audit
 
 To be explicit about what a proper security review would include and this project has not had:
 
-- No penetration test, and no independent third-party audit — the 2026-11-14 audit was internal, AI-assisted, and read-only
+- No penetration test, and no independent third-party audit — the 2026-11-14 audit was internal, AI-assisted, and read-only. The local-auth subsystem (Phases A–F) was reviewed by AI tooling directed by the author; it has not had an independent security review
 - No static analysis (SAST) beyond TypeScript's type checker
 - No dependency licence audit
 - No end-to-end review of the *deployed* nginx / NPM configuration; only the checked-in templates and compose wiring are reviewed. Findings C-1 and M-10 both landed here — a config that looks safe in the repo can still be published by an uncommitted override or a firewall nobody wrote down
-- No assessment of the Authentik configuration for misconfigurations
+- No assessment of the Authentik configuration for misconfigurations when `AUTH_MODE=proxy` is used
 - No fuzzing of API inputs beyond Zod schema validation
 - No formal review of the CSP against every browser-extension or self-hosted-customisation scenario; the inline-script conflict (M-1) is fixed, but the policy is only validated against the checked-in bundle
-- No automated *runtime* coverage of the identity-header path beyond unit tests of `isTrustedProxyPeer()` / `isTrustedProxyRequest()`; whether the deployment actually blocks a non-proxy peer depends on the network, and Gate 1 of the remediation plan still needs an operator `curl` from off-host to confirm it
-- **Rate limiting is only per-IP on the browser path.** `app.set('trust proxy', 2)` is correct for the two-hop browser path (NPM → nginx → backend), but the `api.*` Bearer path reaches the backend through NPM alone. With only one hop present, a caller-supplied leading `X-Forwarded-For` entry becomes `req.ip`, so a Bearer-token holder can choose their own rate-limit bucket. The token is still required, so this is limiter evasion, not an auth bypass. Verified against `proxy-addr`'s algorithm; keying the limiter on `req.userId` once authenticated would close it
-- **`X-authentik-email` is used verbatim.** It is trusted only under the peer + token conditions above, but the value is not trimmed, lowercased, length-capped, or checked for duplicate headers — Node joins repeated headers into one string, so a malformed or duplicated header produces a malformed `user_id` rather than a 401
+- No automated *runtime* coverage of the identity-header path beyond unit tests of `isTrustedProxyPeer()` / `isTrustedProxyRequest()`; whether the deployment actually blocks a non-proxy peer depends on the network, and Gate 1 of the remediation plan still needs an operator `curl` from off-host to confirm it. This is a **proxy-mode** residual only
+- **Rate limiting is only per-IP on the general API surface.** `app.set('trust proxy', 2)` is correct for the two-hop browser path (NPM → nginx → backend), but the `api.*` Bearer path reaches the backend through NPM alone. With only one hop present, a caller-supplied leading `X-Forwarded-For` entry becomes `req.ip`, so a Bearer-token holder can choose their own rate-limit bucket. The token is still required, so this is limiter evasion, not an auth bypass. Verified against `proxy-addr`'s algorithm; keying the limiter on `req.userId` once authenticated would close it. `/api/auth/*` additionally has a persisted per-account backoff, which does not depend on the IP bucket
+- **`X-authentik-email` is used verbatim in proxy mode.** It is trusted only under the peer + token conditions above, but the value is not trimmed, lowercased, length-capped, or checked for duplicate headers — Node joins repeated headers into one string, so a malformed or duplicated header produces a malformed identity rather than a 401. Local-mode emails are normalised (trim + lowercase) before lookup and storage
+- **TOTP is phishable.** A real-time relay of a code works inside its 30-second window. Replay of an already-used step is rejected, and login is rate-limited, but WebAuthn/passkeys are not implemented and would be the structural fix (Phase G)
+- **No SMTP means no self-service "forgot password".** A non-admin who forgets their password needs an administrator to issue a 60-minute reset code out of band. That is a deliberate scope decision (D-029), not an oversight
+- **The first-admin bootstrap reset code is printed to the container log once.** It is single-use and expires in 60 minutes, and no password is ever generated or logged, but a log aggregator that retains output would retain that first code until it is used or expires. Retrieve it and set the password promptly on a fresh install
+- **No WebAuthn/passkeys, no SSO/SAML/OIDC into the app, and no per-user session administration** beyond "sign out other devices"
 - **Container images are not pinned by digest**; they track the `node:22-alpine` and `nginx:alpine` tags, so a rebuild can pick up a different base image. The Trivy job catches fixed advisories on each PR, but an unreviewed upstream change is possible
 - The legacy `monthly_project_goals` table is retained for migration/backward-compatibility, but no automated cleanup/removal migration has been added yet
 - No triage has been recorded for Dependabot's 7 open medium/low advisories (four `qs`, plus `minimatch`, `glob`, `deepmerge`); see "Dependency audit" above. `yarn npm audit` is clean at high severity, and CI enforces that

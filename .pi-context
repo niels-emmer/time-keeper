@@ -7,7 +7,7 @@ Time Keeper is a self-hosted personal work-timer PWA for tracking time by catego
 - Frontend: React + Vite + Tailwind + shadcn/ui
 - Backend: Node.js + Express + Drizzle ORM
 - Database: SQLite
-- Auth: Authentik embedded outpost via NPM forward auth
+- Auth: app-owned local accounts (password + TOTP, server-side sessions); optional Authentik proxy mode (`AUTH_MODE=proxy`)
 - Package manager: Yarn 4 workspaces
 
 ## Primary source of truth

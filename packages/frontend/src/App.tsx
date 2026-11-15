@@ -9,6 +9,7 @@ const Monthly = lazy(() => import('@/pages/Monthly').then((module) => ({ default
 const Settings = lazy(() => import('@/pages/Settings').then((module) => ({ default: module.Settings })));
 const Account = lazy(() => import('@/pages/Account').then((module) => ({ default: module.Account })));
 const Register = lazy(() => import('@/pages/Register').then((module) => ({ default: module.Register })));
+const Reset = lazy(() => import('@/pages/Reset').then((module) => ({ default: module.Reset })));
 
 function RouteFallback() {
   return <div className="py-12 text-center text-muted-foreground">Loading…</div>;
@@ -32,6 +33,21 @@ export default function App() {
           element={
             <LazyRoute>
               <Register />
+            </LazyRoute>
+          }
+        />
+
+        {/*
+          Password reset / first-password redemption sits outside `AuthGate` for
+          the same reason as `Register`: the holder of a reset code has no
+          session yet. This is also the page a newly created or migrated account
+          uses to clear `must_set_password`.
+        */}
+        <Route
+          path="reset"
+          element={
+            <LazyRoute>
+              <Reset />
             </LazyRoute>
           }
         />

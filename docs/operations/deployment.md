@@ -3,9 +3,12 @@
 ## Prerequisites
 
 - VPS with Docker Engine 24+ and Docker Compose v2
-- [Authentik](https://goauthentik.io) instance (can be on the same VPS)
-- [Nginx Proxy Manager](https://nginxproxymanager.com) as the SSL reverse proxy
+- [Nginx Proxy Manager](https://nginxproxymanager.com) (or another TLS reverse proxy)
 - A domain name pointing to your VPS
+- **Optional:** an [Authentik](https://goauthentik.io) instance, only if you deploy with
+  `AUTH_MODE=proxy` (or `hybrid` for a staged migration)
+
+The app owns authentication by default. No identity provider is required to deploy.
 
 ## Step 1: Clone the repository
 
@@ -20,14 +23,30 @@ cd /opt/time-keeper
 cp .env.example .env
 ```
 
-Generate the internal proxy secret and paste it in:
+Fill in the four auth values. `AUTH_MODE` defaults to `local`.
 
 ```bash
-openssl rand -hex 32
-# → paste the output as INTERNAL_PROXY_SECRET in .env
+# Session secret, at least 32 characters (rotating it signs everyone out)
+openssl rand -base64 48        # → SESSION_SECRET
+
+# 32-byte key that encrypts TOTP secrets at rest
+openssl rand -base64 32        # → MFA_ENCRYPTION_KEY  (or: openssl rand -hex 32)
+
+# The account promoted to role=admin at boot
+#   migrated database: must be one of the pre-existing emails
+#   brand-new database: created at boot, with a one-time reset code printed to the logs
+ADMIN_EMAIL=you@example.com
 ```
 
-This secret prevents header injection attacks on the `api.*` subdomain (see [docs/integration/api-subdomain.md](../integration/api-subdomain.md)). In production the backend now fails closed without it and will refuse to trust browser-auth headers if it is missing or mismatched.
+**Warning — `MFA_ENCRYPTION_KEY` is durable.** Changing it makes every enrolled TOTP secret
+unreadable. Affected users must re-enrol MFA. Keep it stable and back it up separately from the
+database (a database backup alone cannot decrypt the secrets without this key).
+
+`INTERNAL_PROXY_SECRET` is required **only** when `AUTH_MODE` is `proxy` or `hybrid`:
+
+```bash
+openssl rand -hex 32           # → INTERNAL_PROXY_SECRET (proxy mode only)
+```
 
 ## Step 3: Start the containers
 
@@ -43,29 +62,84 @@ Verify they're running:
 
 ```bash
 docker compose ps
-docker compose logs backend   # should show "Database migrations applied" and "running on port 3001"
+docker compose logs backend   # "Database migrations applied", then "running on port 3001"
 ```
 
-## Step 4: Configure Authentik
+### First administrator
 
-See [docs/integration/auth.md](../integration/auth.md) for the full walkthrough. Summary:
+- **Fresh database:** boot creates the account named by `ADMIN_EMAIL` and prints a one-time,
+  60-minute reset code:
 
-1. Create a **Proxy Provider** (mode: Forward auth, external host: `https://timekeeper.yourdomain.com`)
-2. Create an **Application** linked to that provider
-3. Add the application to your existing **proxy outpost**
+  ```text
+  FIRST ADMINISTRATOR CREATED
+    email:      you@example.com
+    reset code: <single-use code>
+  ```
 
-## Step 5: Configure Nginx Proxy Manager
+  Open `https://timekeeper.yourdomain.com/reset?code=<code>` (or `/reset` and paste it), choose a
+  password of at least 12 characters, then sign in at `/login`. The code works once. No password is
+  generated or logged.
+
+- **Migrated database:** `ADMIN_EMAIL` must match an existing account, and boot fails loudly if it
+  does not. Follow the cutover procedure below before switching `AUTH_MODE` to `local`.
+
+## Step 4: Configure Nginx Proxy Manager
 
 Add a proxy host:
-- **Forward to:** `frontend:80` — the Docker service name on the external `proxy-net` network. Attach NPM to the same `proxy-net` network; do **not** publish the frontend port to the host (see [docs/integration/docker.md](../integration/docker.md#network-layout)).
-- **SSL:** enabled, force HTTPS
-- **Advanced tab:** paste the standard Authentik NPM forward auth template (same block you use for other protected apps)
+- **Forward to:** `frontend:80` — the Docker service name on the external `proxy-net` network.
+  Attach NPM to the same `proxy-net` network; do **not** publish the frontend port to the host (see
+  [docs/integration/docker.md](../integration/docker.md#network-layout)).
+- **SSL:** enabled, force HTTPS.
 
-See [docs/integration/auth.md](../integration/auth.md) for the exact NPM config.
+For the default local mode, that is the whole NPM configuration: a TLS reverse proxy. **Do not**
+attach Authentik forward auth unless you are running `AUTH_MODE=proxy`.
 
-## Step 6: Verify
+### Optional: Authentik forward auth (`AUTH_MODE=proxy`)
 
-Open `https://timekeeper.yourdomain.com` in a browser. You should be redirected to Authentik's login page. After logging in you land on the Time Keeper home screen.
+1. Create a **Proxy Provider** (mode: Forward auth, external host:
+   `https://timekeeper.yourdomain.com`).
+2. Create an **Application** linked to that provider.
+3. Add the application to your existing **proxy outpost**.
+4. Paste the standard Authentik NPM forward-auth template into the host's Advanced tab.
+
+Full walkthrough: [docs/integration/auth.md](../integration/auth.md#proxy-mode-optional).
+
+## Step 5: Verify
+
+Open `https://timekeeper.yourdomain.com`.
+
+- `AUTH_MODE=local` (default): you land on the app's own sign-in page. Sign in with the admin
+  account, enrol TOTP at `/account`, and create the first normal user from **Settings → Users**
+  (invite or direct create + reset code).
+- `AUTH_MODE=proxy`: you are redirected to Authentik's login page; after logging in you land on
+  the Time Keeper home screen.
+
+## Cutover from Authentik to local auth
+
+Use this for an existing deployment with real data. It is also the only way a **migrated**
+account (which has no password) can be given one, because the proxy path is available during the
+window.
+
+1. **Back up** with the WAL-safe snapshot ([runbooks](runbooks.md#rb-006-wal-safe-backup)) and
+   rehearse the Phase A migration on a copy ([migration-phase-a.md](migration-phase-a.md)).
+2. Set `AUTH_MODE=hybrid`, keep `INTERNAL_PROXY_SECRET` and the NPM forward-auth config, and
+   restart.
+3. Sign in through Authentik as the `ADMIN_EMAIL` account.
+4. In **Settings → Users**, issue a reset code for every account (including your own).
+5. Each person opens `/reset?code=…` and sets a password. This clears `must_set_password`.
+6. As the admin, open `/account` and enrol TOTP (required for admin features once you are on a
+   local session).
+7. Set `AUTH_MODE=local`, remove the Authentik Advanced config from the NPM host (leave it as a
+   plain TLS proxy to `frontend:80`), and run `docker compose up -d`.
+8. Sign in at `/login`.
+
+### Rollback to Authentik
+
+1. Set `AUTH_MODE=proxy` (keep `INTERNAL_PROXY_SECRET`).
+2. Restore the NPM forward-auth Advanced config for the host.
+3. `docker compose up -d`.
+
+Local passwords and accounts stay in the database, so you can switch back to `local` later.
 
 ## Updating
 
@@ -74,12 +148,25 @@ cd /opt/time-keeper
 ./refresh-vps.sh
 ```
 
-The root helper script runs `git pull --ff-only --tags`, exports `APP_VERSION` from the latest git tag, and rebuilds the `frontend` and `backend` services with Docker Compose. The `APP_VERSION` variable bakes the latest git tag into the backend image so the Settings → About section shows the correct version. Docker rebuilds only changed layers. The SQLite database is preserved in the `db-data` volume.
-If `APP_VERSION` is omitted, the image now falls back to the latest git tag available in the clone, then to the version in `packages/backend/package.json`.
+The root helper script runs `git pull --ff-only --tags`, exports `APP_VERSION` from the latest git
+tag, and rebuilds the `frontend` and `backend` services with Docker Compose. The `APP_VERSION`
+variable bakes the latest git tag into the backend image so the Settings → About section shows the
+correct version. Docker rebuilds only changed layers. The SQLite database is preserved in the
+`db-data` volume.
+
+If `APP_VERSION` is omitted, the image falls back to the latest git tag available in the clone, then
+to the version in `packages/backend/package.json`.
 
 ## Backup
 
-The entire application state is a single SQLite file, but WAL mode means the file alone is not a consistent snapshot while the backend is running (finding M-5). Use the online `better-sqlite3` backup, or stop the backend first. Full detail, cron, and verification: [runbooks.md#rb-006-wal-safe-backup](runbooks.md#rb-006-wal-safe-backup).
+The entire application state is a single SQLite file, but WAL mode means the file alone is not a
+consistent snapshot while the backend is running (finding M-5). Use the online `better-sqlite3`
+backup, or stop the backend first. Full detail, cron, and verification:
+[runbooks.md#rb-006-wal-safe-backup](runbooks.md#rb-006-wal-safe-backup).
+
+The file now also contains accounts, live sessions and encrypted MFA secrets. Back it up together
+with `MFA_ENCRYPTION_KEY`: without the key, the TOTP secrets in a restored database cannot be
+decrypted.
 
 ```bash
 mkdir -p /opt/time-keeper/backups
@@ -111,3 +198,6 @@ docker compose start backend
 ```
 
 Verify with the restore drill in [runbooks.md#rb-007-restore-drill](runbooks.md#rb-007-restore-drill).
+
+Restoring a snapshot also restores the sessions that were live at that moment. To force everyone
+to sign in again, sign out other devices from `/account` after the restore.

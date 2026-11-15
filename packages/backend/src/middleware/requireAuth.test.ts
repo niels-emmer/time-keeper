@@ -43,7 +43,13 @@ async function createSessionFor(email: string): Promise<string> {
   return createSession({ userId }).id;
 }
 
-describe('proxy mode (default)', () => {
+describe('proxy mode', () => {
+  beforeEach(() => {
+    // Phase F: local is now the default, so the proxy path must be requested
+    // explicitly here rather than relying on an unset AUTH_MODE.
+    process.env.AUTH_MODE = 'proxy';
+  });
+
   it('authenticates the Authentik header as before', async () => {
     const res = await request(app).get('/api/info').set(HEADERS);
 
@@ -175,6 +181,10 @@ describe('hybrid mode', () => {
 });
 
 describe('token path', () => {
+  beforeEach(() => {
+    process.env.AUTH_MODE = 'proxy';
+  });
+
   it('keeps authMethod=token, so token management stays interactive-only', async () => {
     await request(app).get('/api/info').set(HEADERS).expect(200);
 

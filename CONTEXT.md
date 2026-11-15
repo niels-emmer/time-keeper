@@ -1,6 +1,6 @@
 # Time Keeper Context
 
-Time Keeper is a self-hosted personal work-timer PWA aimed at a single person's real workflow, while still supporting multiple isolated users through Authentik-provided identity headers.
+Time Keeper is a self-hosted personal work-timer PWA aimed at a single person's real workflow, while supporting multiple isolated users through the app's own accounts. The app owns authentication (password + TOTP, server-side sessions); Authentik proxy auth remains available as an optional mode.
 
 ## Domain model
 - A user tracks time in categories.
