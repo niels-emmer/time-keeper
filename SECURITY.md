@@ -44,6 +44,12 @@ This is a single-user (or small-team) personal productivity tool, not a public-f
 
 Historical record of security-relevant API, schema and persistence changes. Kept for traceability; the sections above are the current state.
 
+### Four `qs` advisories cleared (2026-11-15)
+
+- `express` 4.22.1 → 4.22.3, a patch bump inside the existing `^4.21.0` range. Express's own `qs` requirement moves from `~6.14.0` to `~6.16.0`, so the runtime tree no longer contains the 6.14.2 build that four medium advisories cover (`GHSA-q8mj-m7cp-5q26`, `GHSA-x5fp-wj9c-mxmx`, `GHSA-4mjr-xmp4-gh2g`, `GHSA-6pq8-jhm2-2vcw`).
+- No `resolutions` override was added and no Express major was taken. The same bump also carries `body-parser` 1.20.9 and `path-to-regexp` 0.1.13.
+- The remaining three Dependabot advisories are build/test-only and accepted; see "Dependency audit".
+
 ### express-rate-limit 7 → 8 (2026-11-15)
 
 - The general `/api` limiter moved to `express-rate-limit` 8. No configuration change was required: `trust proxy` stays at exactly 2 hops, which is the setting v8 accepts (it rejects `true`, not a hop count).
@@ -225,16 +231,20 @@ Two independent scans now run on every pull request and fail the build rather th
 - the `audit` job in `.github/workflows/security.yml` runs the command above;
 - the `trivy` job scans the filesystem and both container images for HIGH/CRITICAL advisories, including fixed base-image findings (see "Base images and pinned build tooling" above).
 
-**Scope of "clean".** That verdict is scoped to what `yarn npm audit` reports at high severity. GitHub's Dependabot reports **7 open advisories** on the default branch below that line, which this command does not surface because the two use different advisory sources and severity floors:
+**Scope of "clean".** That verdict is scoped to what `yarn npm audit` reports at high severity. GitHub's Dependabot reports advisory classes below that line, which this command does not surface because the two use different advisory sources and severity floors. Seven such advisories were open on 2026-11-15 and are now triaged:
 
-| Package | Severity | Path |
-|---|---|---|
-| `qs` (×4) | medium | runtime — Express 4 parses query strings with it (`express@4.22.1` resolves a nested `qs@6.14.2`) |
-| `minimatch` | medium | build/test tooling |
-| `glob` | medium | build/test tooling |
-| `deepmerge` | low | build/test tooling |
+**The four `qs` advisories are fixed, not accepted.** `express` moved from 4.22.1 to 4.22.3 *within* its existing `^4.21.0` range; that patch release raises Express's own requirement from `qs@~6.14.0` to `qs@~6.16.0`. Every `qs` in the tree is now at or above the 6.16.1 floor the four advisories jointly demand (`GHSA-q8mj-m7cp-5q26` → 6.15.2, `GHSA-x5fp-wj9c-mxmx` → 6.16.0, `GHSA-4mjr-xmp4-gh2g` → 6.16.0, `GHSA-6pq8-jhm2-2vcw` → 6.16.1): 6.16.2 under Express and body-parser, 6.17.1 under supertest's superagent. No `resolutions` override and no Express major was needed — which is why this was the one group worth fixing rather than deferring.
 
-None of these are triaged yet. They are deliberately **not** fixed in this document's remediation pass, which was scoped to the audit's own findings; deciding whether each is reachable, and then fixing or dismissing it, is a separate change. The `qs` group is the one worth doing first — it is the only runtime-reachable path in the set.
+| Package | Severity | Advisory | Fixed in | Tree | Path | Decision |
+|---|---|---|---|---|---|---|
+| `qs` (×4) | medium | GHSA-q8mj-m7cp-5q26, GHSA-x5fp-wj9c-mxmx, GHSA-4mjr-xmp4-gh2g, GHSA-6pq8-jhm2-2vcw | 6.16.1 | 6.16.2 / 6.17.1 | runtime — Express query parsing | **fixed** (express 4.22.3) |
+| `minimatch` | medium | GHSA-g3hv-75wg-m249 | 11.0.1 | 10.2.5 | build/test — under `glob` | accepted |
+| `glob` | medium | GHSA-3g3m-2fjr-6pw4 | 14.0.2 | 11.1.0, 13.0.5 | build/test — under `cacache`, `workbox-build` | accepted |
+| `deepmerge` | low | GHSA-gcqx-w48m-w2h4 | none published | 4.3.1 | build/test — under `@rollup/plugin-node-resolve` | accepted |
+
+**Acceptance rationale for the three accepted advisories.** All three live in the build/test graph (`cacache`, `vite-plugin-pwa` → `workbox-build`, `@rollup/plugin-node-resolve`), which the runtime image never contains: `packages/backend/Dockerfile` installs with `yarn workspaces focus @time-keeper/backend --production`, and Trivy scans both images separately on every PR. Each advisory needs attacker-controlled input in the vulnerable API: `minimatch`'s ReDoS needs a hostile glob *pattern* (ours come from build config, never from a request), `glob`'s needs a caller-controlled pattern plus `AbortSignal` cancellation, and `deepmerge`'s needs untrusted objects passed to a plugin's option merge. No request data reaches any of them. Clearing them costs a major in build tooling — `glob@11` and `cacache` pin `minimatch@^10`, and `workbox-build` pins `glob@11`/`13` — so a `resolutions` override would break the declared ranges of the toolchain for zero runtime benefit.
+
+**Revisit each of those when:** (a) upstream moves `workbox-build` / `cacache` / `glob` onto `minimatch@11` and `glob@14` — then the pins can be dropped with no override; (b) any of the three enters the runtime image (check the Dockerfile's production install, not just `package.json`); (c) any of them starts receiving request-derived data; (d) `deepmerge` publishes a fixed release — the advisory currently has **no** patched version, so 4.3.1 being latest is a fact to re-check, not a settled one.
 
 The dependency graph was refreshed during the remediation pass: app/runtime deps resolve to `@tanstack/react-query` 5.100.x and `react-router-dom` 7.18.x; the frontend build/test toolchain to `vite` 6.4.x, `vite-plugin-pwa` 1.3.0 and `vitest` 4.1.x; backend tooling to `drizzle-kit` 0.31.10. The root `resolutions` block pins transitive versions for packages such as `@babel/plugin-transform-modules-systemjs`, `esbuild`, `fast-uri`, `ip-address`, `path-to-regexp`, `postcss`, `rollup`, `serialize-javascript`, `tar` and `ws`; those pins exist because the transitive dependency was flagged, so re-check them rather than dropping them on an unrelated upgrade.
 
@@ -246,7 +256,7 @@ Runtime dependencies and their risk profiles:
 
 | Package | Version pinned to | Notes |
 |---------|------------------|-------|
-| `express` | `^4` | 15+ years old, very widely used, actively maintained |
+| `express` | `^4` | 15+ years old, very widely used, actively maintained. Held at 4.22.3 deliberately: that patch release is what raises its `qs` floor above the four `qs` advisories, so do not downgrade it without re-checking the audit |
 | `better-sqlite3` | `^13` | Widely used SQLite binding with a native C++ addon. 13.x ships prebuilt binaries for every supported platform inside the package (`prebuilds/`: darwin, linux, linuxmusl, win32), and the root `package.json` sets `dependenciesMeta.better-sqlite3.built: false`, so no build script runs and nothing is compiled at install time. The trade-off is that you trust a binary shipped by the registry rather than one built from source on your machine |
 | `drizzle-orm` | `^0.45` | Newer library (2022–); less battle-tested than Prisma but growing adoption. Upgraded from 0.38 to fix CVE-2026-39356 (SQL injection via identifier escaping). |
 | `zod` | `^4` | Pure TypeScript; used for all input validation on the backend |
@@ -287,7 +297,7 @@ To be explicit about what a proper security review would include and this projec
 - **No WebAuthn/passkeys, no SSO/SAML/OIDC into the app, and no per-user session administration** beyond "sign out other devices"
 - **Container images are not pinned by digest**; they track the `node:22-alpine` and `nginx:alpine` tags, so a rebuild can pick up a different base image. The Trivy job catches fixed advisories on each PR, but an unreviewed upstream change is possible
 - The legacy `monthly_project_goals` table is retained for migration/backward-compatibility, but no automated cleanup/removal migration has been added yet
-- No triage has been recorded for Dependabot's 7 open medium/low advisories (four `qs`, plus `minimatch`, `glob`, `deepmerge`); see "Dependency audit" above. `yarn npm audit` is clean at high severity, and CI enforces that
+- The three remaining Dependabot advisories (`minimatch`, `glob`, `deepmerge`) are accepted rather than fixed, with the rationale and the revisit conditions recorded under "Dependency audit". There is no scheduled re-check: the re-check happens when someone reads that section. `yarn npm audit` is clean at high severity and CI enforces that floor on every PR
 
 ---
 
